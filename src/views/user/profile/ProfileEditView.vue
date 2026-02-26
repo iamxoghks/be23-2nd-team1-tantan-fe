@@ -173,16 +173,33 @@
                 <div class="v-profile-edit-avatar-frame">
                   <img :src="form.profileImage" alt="프로필" class="v-cover-image" />
                 </div>
-                <button class="v-profile-edit-avatar-btn" type="button">
+                <button class="v-profile-edit-avatar-btn" type="button" @click="openProfileImagePicker">
                   <Camera class="v-icon-18-md20" />
                   사진 변경
                 </button>
+                <input
+                  ref="profileImageInputRef"
+                  type="file"
+                  accept="image/*"
+                  class="u-hidden"
+                  @change="onProfileImageChange"
+                />
               </div>
 
               <div class="v-profile-edit-form">
                 <label class="v-form-label">
+                  이름
+                  <input v-model="form.userName" type="text" class="v-history-search-input v-profile-edit-input v-profile-edit-input-left" placeholder="이름을 입력하세요" />
+                </label>
+
+                <label class="v-form-label">
                   닉네임
-                  <input v-model="form.userName" type="text" class="v-history-search-input v-profile-edit-input" placeholder="닉네임을 입력하세요" />
+                  <input v-model="form.nickName" type="text" class="v-history-search-input v-profile-edit-input v-profile-edit-input-left" placeholder="닉네임을 입력하세요" />
+                </label>
+
+                <label class="v-form-label">
+                  이메일
+                  <input v-model="form.email" type="email" class="v-history-search-input v-profile-edit-input v-profile-edit-input-left" placeholder="이메일을 입력하세요" />
                 </label>
 
                 <label class="v-form-label">
@@ -226,16 +243,6 @@
                   </div>
                 </label>
 
-                <div class="v-profile-edit-grid">
-                  <label class="v-form-label">
-                    홈 헬스장
-                    <input v-model="form.mainGym" type="text" class="v-history-search-input v-profile-edit-input" placeholder="주로 운동하는 헬스장" />
-                  </label>
-                  <label class="v-form-label">
-                    운동 목표
-                    <input v-model="form.goal" type="text" class="v-history-search-input v-profile-edit-input" placeholder="예: 체지방 감량, 근비대" />
-                  </label>
-                </div>
               </div>
             </div>
 
@@ -305,13 +312,16 @@ const profileLink = computed(() => (
 
 const form = ref({
   userName: '',
+  nickName: '',
+  email: '',
   bio: '',
-  mainGym: '',
-  goal: '',
   profileImage: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?q=80&w=200&h=200&auto=format&fit=crop',
   isPublic: true,
   showStats: true,
 });
+const profileImageInputRef = ref(null);
+const profileImageFile = ref(null);
+const profileImagePreviewUrl = ref(null);
 
 const bioEditorRef = ref(null);
 const isBioComposing = ref(false);
@@ -603,10 +613,10 @@ const loadProfile = async () => {
   try {
     const response = await userApi.myInfo();
     const data = extractPayload(response);
-    form.value.userName = data.displayName || data.nickName || data.nickname || data.userName || data.name || '';
+    form.value.userName = data.userName || data.name || data.displayName || '';
+    form.value.nickName = data.nickName || data.nickname || '';
+    form.value.email = data.email || '';
     form.value.bio = String(data.bio ?? '');
-    form.value.mainGym = data.mainGym || '';
-    form.value.goal = data.goal || '';
     form.value.profileImage = data.profileImageUrl || data.profileImage || form.value.profileImage;
     form.value.isPublic = typeof data.isPublic === 'boolean' ? data.isPublic : true;
     form.value.showStats = typeof data.showStats === 'boolean' ? data.showStats : true;
@@ -617,6 +627,25 @@ const loadProfile = async () => {
   renderBioEditor();
 };
 
+const openProfileImagePicker = () => {
+  if (profileImageInputRef.value) {
+    profileImageInputRef.value.value = '';
+  }
+  profileImageInputRef.value?.click();
+};
+
+const onProfileImageChange = (event) => {
+  const file = event?.target?.files?.[0];
+  if (!file) return;
+  if (profileImagePreviewUrl.value) {
+    URL.revokeObjectURL(profileImagePreviewUrl.value);
+  }
+  const previewUrl = URL.createObjectURL(file);
+  profileImagePreviewUrl.value = previewUrl;
+  profileImageFile.value = file;
+  form.value.profileImage = previewUrl;
+};
+
 const saveProfile = async () => {
   syncBioFromEditor({ preserveSelection: false });
   if (isBioOverLimit.value) return;
@@ -624,11 +653,12 @@ const saveProfile = async () => {
   try {
     await userApi.update({
       userName: form.value.userName,
+      nickName: form.value.nickName,
+      email: form.value.email,
       bio: String(form.value.bio || ''),
-      mainGym: form.value.mainGym,
-      goal: form.value.goal,
       isPublic: form.value.isPublic,
       showStats: form.value.showStats,
+      profileImage: profileImageFile.value || undefined,
     });
     router.push(profileLink.value);
   } catch (error) {
@@ -845,6 +875,15 @@ onMounted(async () => {
 </script>
 
 <style scoped>
+.u-hidden {
+  display: none;
+}
+
+.v-profile-edit-input-left {
+  text-align: left;
+  padding-left: 14px;
+}
+
 .owner-edit-page {
   display: grid;
   gap: 14px;

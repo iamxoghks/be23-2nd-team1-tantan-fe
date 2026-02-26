@@ -100,13 +100,6 @@
               <div class="v-card-pad">
                 <div class="sx-views-community-communityview-008">
                   <div class="v-user-row"><img :src="post.authorImage" alt="" class="v-user-avatar" /><div><div class="v-text-user">{{ post.author }}</div><div class="v-text-subtle">{{ post.time }}{{ post.location ? ` · ${post.location}` : '' }}</div></div></div>
-                  <button
-                    class="v-community-report-btn"
-                    :disabled="isReportingPostId === post.id"
-                    @click.stop="reportPost(post)"
-                  >
-                    <Flag :size="14" />
-                  </button>
                 </div>
 
                 <div v-if="post.type === 'workout' || post.hasWorkout">
@@ -132,8 +125,17 @@
 
                 <div class="v-community-reaction-row">
                   <div class="sx-views-community-communityview-016">
-                    <button class="v-community-reaction-btn ux-views-community-communityview-018">
-                      <Heart :size="18" class="ux-views-community-communityview-019" /> {{ post.likes }}
+                    <button
+                      class="v-community-reaction-btn ux-views-community-communityview-018"
+                      :class="post.liked ? 'v-community-like-active' : 'v-community-like-inactive'"
+                      @click.stop="toggleLike(post.id)"
+                    >
+                      <Heart
+                        :size="18"
+                        :fill="post.liked ? 'currentColor' : 'none'"
+                        :class="post.liked ? 'v-community-like-active' : 'ux-views-community-communityview-019'"
+                      />
+                      {{ post.likes }}
                     </button>
                     <button class="v-community-reaction-btn ux-views-community-communityview-020">
                       <MessageCircle :size="18" class="ux-views-community-communityview-021" /> {{ post.comments }}
@@ -142,8 +144,12 @@
                       <Eye :size="18" class="ux-views-community-communityview-021" /> {{ post.views }}
                     </button>
                   </div>
-                  <button class="v-community-cheer-btn ux-views-community-communityview-022" @click.stop="toggleLike(post.id)">
-                    <Zap :size="14" />응원해요!
+                  <button
+                    class="v-community-report-btn ux-views-community-communityview-022"
+                    :disabled="isReportingPostId === post.id"
+                    @click.stop="reportPost(post)"
+                  >
+                    <Flag :size="14" />
                   </button>
                 </div>
               </div>
@@ -275,6 +281,7 @@ const mergePostFromDetail = (basePost, detailSource) => {
     images: Array.isArray(basePost.images) && basePost.images.length > 0
       ? basePost.images
       : (normalizedDetail.images || []),
+    liked: Boolean(normalizedDetail.liked ?? basePost.liked),
   };
 };
 
