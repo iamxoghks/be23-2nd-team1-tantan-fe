@@ -76,6 +76,10 @@
                   좋아요
                 </button>
                 <span class="ux-views-community-communityview-035">총 {{ post.likes || 0 }}개</span>
+                <span class="ux-views-community-communityview-035" style="display: inline-flex; align-items: center; gap: 4px;">
+                  <Eye :size="15" />
+                  {{ post.views || 0 }}
+                </span>
               </div>
 
               <div class="sx-views-community-communityview-033">
@@ -83,12 +87,7 @@
                   <h4 class="ux-views-community-communityview-036">댓글 {{ totalCommentCount }}</h4>
                   <button class="ux-views-community-communityview-037">최신순</button>
                 </div>
-
-                <div v-if="comments.length === 0" class="v-community-comment-empty">
-                  첫 댓글을 작성해보세요.
-                </div>
-
-                <div v-else class="v-community-ig-list">
+                <div class="v-community-ig-list">
                   <article v-for="comment in comments" :key="comment.id" class="v-community-thread">
                     <div class="v-community-ig-item">
                       <img :src="comment.authorImage" :alt="comment.author" class="v-community-ig-avatar" />
@@ -129,7 +128,7 @@
                             >
                               @{{ reply.replyToNickName }}
                             </span>
-                            <span>{{ reply.content }}</span>
+                            <span>{{ getReplyDisplayContent(reply) }}</span>
                           </p>
                           <div class="v-community-ig-meta">
                             <span class="v-community-ig-time">{{ reply.timeAgo }}</span>
@@ -181,8 +180,6 @@
                   </div>
                   <button class="v-community-ig-submit-btn" @click="submitComment">게시</button>
                 </div>
-
-                <p class="v-community-comment-note">댓글과 반응은 백엔드 연동 후 활성화됩니다.</p>
               </div>
             </div>
           </div>
@@ -196,14 +193,16 @@
 import { computed, nextTick, onMounted, ref } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import NavigationRail from '@/components/sections/NavigationRail.vue';
-import { Heart, MapPin, Clock, Zap, Flag } from 'lucide-vue-next';
+import { Heart, MapPin, Clock, Zap, Flag, Eye } from 'lucide-vue-next';
 import { communityCommentApi, communityLikeApi, communityPostApi, reportApi, workoutApi } from '@/services/apis';
+import { useSession } from '@/composables/useSession';
 import { normalizeCommunityPost } from '@/utils/postNormalizer';
 import { extractList } from '@/utils/api';
 import { formatTimeAgo } from '@/utils/time';
 
 const route = useRoute();
 const router = useRouter();
+const { sessionProfile } = useSession();
 const postId = computed(() => String(route.params.postId || '').trim());
 const listQuery = computed(() => {
   const query = {};
@@ -225,7 +224,11 @@ const replyLoadingMap = ref({});
 const isLoading = ref(false);
 const errorMessage = ref('');
 const isLiked = ref(false);
-const myProfileImage = computed(() => post.value?.authorImage || fallbackAvatar('me'));
+const myProfileImage = computed(() => (
+  sessionProfile.value?.raw?.profileImageUrl
+  || sessionProfile.value?.raw?.profileImage
+  || fallbackAvatar(sessionProfile.value?.displayName || sessionProfile.value?.userName || 'me')
+));
 const showWorkoutPanel = computed(() => Boolean(post.value?.type === 'workout' || post.value?.hasWorkout));
 const totalCommentCount = computed(() => {
   const serverCount = Number(post.value?.comments ?? post.value?.commentCount);
@@ -240,6 +243,8 @@ const toNumber = (value, fallback = 0) => {
   return Number.isFinite(parsed) ? parsed : fallback;
 };
 
+const escapeRegExp = (value) => String(value || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
 const getCommentTimestamp = (comment) => {
   const raw = comment?.createdTime || comment?.createdAt || '';
   const parsed = new Date(raw).getTime();
@@ -247,6 +252,15 @@ const getCommentTimestamp = (comment) => {
 };
 
 const sortCommentsByCreatedAsc = (a, b) => getCommentTimestamp(a) - getCommentTimestamp(b);
+
+const getReplyDisplayContent = (reply = {}) => {
+  const content = String(reply?.content || '').trimStart();
+  const nickName = String(reply?.replyToNickName || '').trim();
+  if (!content || !nickName) return content;
+
+  const mentionPrefixPattern = new RegExp(`^@${escapeRegExp(nickName)}(?:\\s+|$)`);
+  return content.replace(mentionPrefixPattern, '').trimStart();
+};
 
 const normalizeCommentItem = (item = {}, index = 0, parentCommentId = null) => {
   const author = String(
@@ -601,10 +615,13 @@ const submitComment = async () => {
   const contentDraft = commentInput.value.trim();
   if (!contentDraft || !post.value?.id) return;
 
-  const mentionPrefix = replyTarget.value?.nickName
-    ? `@${String(replyTarget.value.nickName).trim()} `
-    : '';
-  const content = `${mentionPrefix}${contentDraft}`.trim();
+  let content = contentDraft;
+  const targetNickName = String(replyTarget.value?.nickName || '').trim();
+  if (targetNickName) {
+    const mentionPrefixPattern = new RegExp(`^@${escapeRegExp(targetNickName)}\\s+`);
+    content = content.replace(mentionPrefixPattern, '').trim();
+  }
+  if (!content) return;
 
   try {
     await communityCommentApi.create({
@@ -685,6 +702,7 @@ onMounted(loadDetail);
   margin: 0;
   padding-left: 24px;
   padding-right: 24px;
+  padding-bottom: 112px;
 }
 
 .v-community-detail-body .sx-views-community-communityview-021 > div:first-child {
@@ -745,6 +763,15 @@ onMounted(loadDetail);
   gap: 6px;
 }
 
+.v-community-ig-list {
+  min-height: 280px;
+}
+
+.v-community-ig-list-empty {
+  display: flex;
+  align-items: center;
+}
+
 .v-community-reply-list {
   display: grid;
   gap: 2px;
@@ -788,12 +815,22 @@ onMounted(loadDetail);
 }
 
 .v-community-detail-body .v-community-ig-input-wrap {
+  position: fixed;
+  left: 64px;
+  right: 0;
+  bottom: 0;
+  z-index: 1200;
   display: grid;
   grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: center;
   column-gap: 6px;
-  width: 100%;
+  width: auto;
   min-width: 0;
+  margin-top: 8px;
+  padding: 10px 24px;
+  border-top: 1px solid #e5e7eb;
+  background: #ffffff;
+  box-shadow: 0 -4px 18px rgba(15, 23, 42, 0.06);
 }
 
 .v-community-detail-body .v-community-ig-input-box {
@@ -820,18 +857,12 @@ onMounted(loadDetail);
   flex: 1;
 }
 
-.v-community-comment-note {
-  margin-top: 8px;
-  font-size: 12px;
-  color: #94a3b8;
-}
-
 @media (max-width: 767px) {
   .v-community-detail-main .v-content-wrap {
     margin: 0;
     padding-left: 8px;
     padding-right: 8px;
-    padding-bottom: calc(56px + env(safe-area-inset-bottom, 0px) + 20px);
+    padding-bottom: calc(56px + env(safe-area-inset-bottom, 0px) + 88px);
   }
 
   .v-community-detail-body .sx-views-community-communityview-020 {
@@ -854,14 +885,10 @@ onMounted(loadDetail);
   }
 
   .v-community-detail-body .v-community-ig-input-wrap {
-    position: sticky;
-    bottom: 0;
-    z-index: 12;
-    margin-top: 8px;
-    padding-top: 8px;
-    padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 10px);
-    border-top: 1px solid #e5e7eb;
-    background: #ffffff;
+    left: 0;
+    right: 0;
+    bottom: calc(56px + env(safe-area-inset-bottom, 0px));
+    padding: 8px 12px;
   }
 }
 </style>

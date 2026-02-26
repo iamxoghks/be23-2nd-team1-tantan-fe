@@ -223,6 +223,10 @@
               </div>
 
               <div class="u-col-gap-4">
+                <p v-if="logs.length === 0" class="v-profile-log-empty">
+                  운동 기록이 없습니다.<br />
+                  기록을 등록하고 다른 사용자들과 운동 루틴을 공유해보세요.
+                </p>
                 <div v-for="log in logs" :key="log.id" class="sx-views-user-profile-profileview-018 v-profile-log-item v-profile-log-item-group">
                   <div class="sx-views-user-profile-profileview-019">
                     <div :class="['v-profile-log-icon', log.color]">
@@ -1138,6 +1142,18 @@ onMounted(() => {
 .v-owner-wrap {
   display: grid;
   gap: 16px;
+}
+
+.v-profile-log-empty {
+  margin: 0;
+  padding: 18px 16px;
+  border: 1px dashed #cbd5e1;
+  border-radius: 12px;
+  background: #f8fafc;
+  color: #64748b;
+  font-size: 14px;
+  line-height: 1.6;
+  text-align: left;
 }
 
 .v-owner-hero-card {

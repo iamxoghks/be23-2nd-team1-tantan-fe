@@ -26,6 +26,17 @@ const toNumber = (value, fallback = 0) => {
   return Number.isFinite(parsed) ? parsed : fallback;
 };
 
+const toBoolean = (value, fallback = false) => {
+  if (typeof value === 'boolean') return value;
+  if (typeof value === 'number') return value === 1;
+  if (typeof value === 'string') {
+    const normalized = value.trim().toLowerCase();
+    if (['y', 'yes', 'true', '1'].includes(normalized)) return true;
+    if (['n', 'no', 'false', '0'].includes(normalized)) return false;
+  }
+  return fallback;
+};
+
 const isObject = (value) => Boolean(value) && typeof value === 'object' && !Array.isArray(value);
 
 const fallbackAvatar = (seed) => `https://api.dicebear.com/9.x/initials/svg?seed=${encodeURIComponent(seed || 'user')}&backgroundType=gradientLinear`;
@@ -333,7 +344,7 @@ export const normalizeCommunityPost = (item = {}, index = 0) => {
     duration: workout.duration || '-',
     streak: workout.streak,
     exercises: workout.exercises,
-    liked: Boolean(post.liked ?? post.isLiked ?? post.likeYn),
+    liked: toBoolean(post.liked ?? post.isLiked ?? post.likeYn, false),
     location: firstNonEmptyString(post.location, post.address, post.region),
   };
 };

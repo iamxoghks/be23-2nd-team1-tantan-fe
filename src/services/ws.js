@@ -17,11 +17,17 @@ function toWsUrl(httpOrWsUrl) {
   return httpOrWsUrl.replace('http://', 'ws://');
 }
 
+function normalizeWsBaseUrl(rawUrl) {
+  const wsUrl = toWsUrl(String(rawUrl || ''));
+  // Allow env values like ".../ws" while connectEndpoint is also "/ws".
+  return wsUrl.replace(/\/ws\/?$/, '');
+}
+
 export const wsConfig = {
   connectEndpoint: '/ws',
   sendDestination: '/app/send',
   roomTopic(roomId) {
     return `/user/queue/chat/rooms/${roomId}`;
   },
-  wsBaseUrl: toWsUrl(WS_BASE_URL),
+  wsBaseUrl: normalizeWsBaseUrl(WS_BASE_URL),
 };
