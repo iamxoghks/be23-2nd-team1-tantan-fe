@@ -21,7 +21,7 @@ export const wsConfig = {
   connectEndpoint: '/ws',
   sendDestination: '/app/send',
   roomTopic(roomId) {
-    return `/topic/chat/rooms/${roomId}`;
+    return `/user/queue/chat/rooms/${roomId}`;
   },
   wsBaseUrl: toWsUrl(WS_BASE_URL),
 };

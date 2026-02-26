@@ -399,11 +399,7 @@ const subscribeRoom = (roomId) => {
 
   clearRoomSubscriptions();
   const roomKey = String(selectedRoom.value?.roomKey || roomId);
-  const topicCandidates = [
-    wsConfig.roomTopic(roomKey),
-    `/topic/chat/room/${roomKey}`,
-    `/topic/rooms/${roomKey}`,
-  ];
+  const topicCandidates = [wsConfig.roomTopic(roomKey)];
 
   const subscriptions = topicCandidates.map((destination) => (
     stompClient.value.subscribe(destination, (frame) => {

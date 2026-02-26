@@ -132,7 +132,7 @@
                   </p>
                 </div>
 
-                <div class="v-profile-stat-row">
+                <div v-if="!shouldMaskPrivateProfile" class="v-profile-stat-row">
                   <div class="v-profile-stat-item"><span class="v-profile-stat-value">1.2천</span><span class="u-text-muted-sm">팔로워</span></div>
                   <div class="v-profile-stat-item"><span class="v-profile-stat-value">482</span><span class="u-text-muted-sm">팔로잉</span></div>
                   <div class="v-profile-stat-item"><span class="v-profile-trophy">🏆</span><span class="v-profile-stat-value">8</span><span class="u-text-muted-sm">업적</span></div>
@@ -140,7 +140,7 @@
               </div>
             </div>
 
-            <div class="sx-views-user-profile-profileview-005">
+            <div v-if="!shouldMaskPrivateProfile" class="sx-views-user-profile-profileview-005">
               <template v-if="isOwnProfile">
                 <RouterLink to="/profile/edit" class="v-profile-action-secondary v-profile-action-btn v-profile-edit-link-btn">
                   프로필 수정
@@ -162,9 +162,10 @@
                 {{ isFollowBusy ? '처리 중...' : (isFollowing ? '팔로우 취소' : '팔로우') }}
               </button>
             </div>
+            <p v-else class="v-owner-read-text">비공개 프로필입니다.</p>
           </div>
 
-          <div class="sx-views-user-profile-profileview-006">
+          <div v-if="!shouldMaskPrivateProfile" class="sx-views-user-profile-profileview-006">
             <div class="sx-views-user-profile-profileview-007">
               <h3 class="v-profile-section-title">운동 활동</h3>
               <div class="sx-views-user-profile-profileview-008">
@@ -210,7 +211,7 @@
           </div>
         </div>
 
-        <div v-if="!isGymOwner" class="sx-views-user-profile-profileview-015">
+        <div v-if="!isGymOwner && !shouldMaskPrivateProfile" class="sx-views-user-profile-profileview-015">
           <div class="v-profile-log-column">
             <div class="view-card">
               <div class="sx-views-user-profile-profileview-016">
@@ -446,7 +447,10 @@ const isOwnProfile = computed(() => {
   if (!viewedUserId.value || !currentUserId.value) return true;
   return Number(viewedUserId.value) === Number(currentUserId.value);
 });
+const isPrivateProfile = computed(() => Boolean(profile.value?.privateProfile));
+const shouldMaskPrivateProfile = computed(() => !isOwnProfile.value && isPrivateProfile.value);
 const canStartChat = computed(() => {
+  if (shouldMaskPrivateProfile.value) return false;
   if (isOwnProfile.value) return false;
   if (typeof profile.value?.canChat === 'boolean') return profile.value.canChat;
   return true;
@@ -859,24 +863,26 @@ const loadProfileData = async () => {
       // preview mode can continue with local state
     }
 
-    const [userResponse, workoutResponse] = await Promise.allSettled([
-      userApi.myInfo(routeTargetUserId.value ? { userId: routeTargetUserId.value } : undefined),
-      isGymOwner.value ? Promise.resolve({ data: [] }) : workoutApi.list({ page: 0, size: 5, sort: 'workoutDate,desc' }),
-    ]);
+    const userResponse = await userApi.myInfo(routeTargetUserId.value ? { userId: routeTargetUserId.value } : undefined);
+    profile.value = userResponse?.data?.data || userResponse?.data?.result || userResponse?.data || {};
 
-    if (userResponse.status === 'fulfilled') {
-      profile.value = userResponse.value.data?.data || userResponse.value.data?.result || userResponse.value.data || {};
-    }
-    if (workoutResponse.status === 'fulfilled') {
-      const payload = workoutResponse.value.data?.data || workoutResponse.value.data?.result || workoutResponse.value.data;
-      const list = Array.isArray(payload)
-        ? payload
-        : Array.isArray(payload?.content)
-          ? payload.content
-          : Array.isArray(payload?.list)
-            ? payload.list
-            : [];
-      logs.value = list.map(normalizeWorkout);
+    if (!isGymOwner.value && !shouldMaskPrivateProfile.value) {
+      try {
+        const workoutResponse = await workoutApi.list({ page: 0, size: 5, sort: 'workoutDate,desc' });
+        const payload = workoutResponse?.data?.data || workoutResponse?.data?.result || workoutResponse?.data;
+        const list = Array.isArray(payload)
+          ? payload
+          : Array.isArray(payload?.content)
+            ? payload.content
+            : Array.isArray(payload?.list)
+              ? payload.list
+              : [];
+        logs.value = list.map(normalizeWorkout);
+      } catch (error) {
+        logs.value = [];
+      }
+    } else {
+      logs.value = [];
     }
     let gymPayload = null;
     if (isGymOwner.value) {
@@ -899,7 +905,7 @@ const loadProfileData = async () => {
       }
     }
 
-    isFollowing.value = Boolean(profile.value?.isFollowing);
+    isFollowing.value = shouldMaskPrivateProfile.value ? false : Boolean(profile.value?.isFollowing);
     if (!isOwnProfile.value && isGymOwner.value && viewedGymId.value) {
       try {
         const checkResponse = await gymFavoriteApi.check(viewedGymId.value);
@@ -912,7 +918,13 @@ const loadProfileData = async () => {
       isFavoriteGym.value = false;
     }
 
-    await loadHeatmapData();
+    if (shouldMaskPrivateProfile.value) {
+      const today = new Date();
+      months.value = [`${today.getMonth() + 1}월`];
+      applyHeatmap(createEmptyMonthlyHeatmap(today));
+    } else {
+      await loadHeatmapData();
+    }
   } catch (error) {
     console.error('Failed to load profile data:', error);
   }
