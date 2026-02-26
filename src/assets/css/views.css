@@ -1,0 +1,2 @@
+/* Compatibility entry point. Styles are now split by view in ./views/*.css */
+@import './views/index.css';
