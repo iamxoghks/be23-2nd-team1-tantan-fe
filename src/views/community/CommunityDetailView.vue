@@ -30,9 +30,23 @@
 
             <div class="sx-views-community-communityview-022">
               <div class="u-row-gap-3">
-                <img :src="post.authorImage" alt="" class="sx-views-community-communityview-023" />
+                <button
+                  type="button"
+                  class="v-user-profile-trigger"
+                  :disabled="!canOpenAuthorProfile"
+                  @click="openAuthorProfile"
+                >
+                  <img :src="post.authorImage" alt="" class="sx-views-community-communityview-023" />
+                </button>
                 <div>
-                  <p class="ux-views-community-communityview-030">{{ post.author }}</p>
+                  <button
+                    type="button"
+                    class="v-user-profile-trigger v-user-profile-trigger-text"
+                    :disabled="!canOpenAuthorProfile"
+                    @click="openAuthorProfile"
+                  >
+                    <span class="ux-views-community-communityview-030">{{ post.author }}</span>
+                  </button>
                   <p class="sx-views-community-communityview-024">{{ post.time }}</p>
                 </div>
               </div>
@@ -229,6 +243,11 @@ const myProfileImage = computed(() => (
   || sessionProfile.value?.raw?.profileImage
   || fallbackAvatar(sessionProfile.value?.displayName || sessionProfile.value?.userName || 'me')
 ));
+const authorUserId = computed(() => {
+  const parsed = Number(post.value?.userId ?? post.value?.authorId ?? post.value?.writerId ?? 0);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
+});
+const canOpenAuthorProfile = computed(() => Boolean(authorUserId.value));
 const showWorkoutPanel = computed(() => Boolean(post.value?.type === 'workout' || post.value?.hasWorkout));
 const totalCommentCount = computed(() => {
   const serverCount = Number(post.value?.comments ?? post.value?.commentCount);
@@ -498,6 +517,11 @@ const goBackToList = async () => {
   router.push({ path: '/community', query: listQuery.value });
 };
 
+const openAuthorProfile = () => {
+  if (!authorUserId.value) return;
+  router.push({ path: '/profile', query: { userId: String(authorUserId.value) } });
+};
+
 const toggleLike = async () => {
   if (!post.value?.id) return;
   try {
@@ -739,6 +763,34 @@ onMounted(loadDetail);
 
 .v-community-detail-image-wrap {
   max-width: 100%;
+}
+
+.v-user-profile-trigger {
+  border: 0;
+  padding: 0;
+  margin: 0;
+  background: transparent;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.v-user-profile-trigger:disabled {
+  cursor: default;
+}
+
+.v-user-profile-trigger:not(:disabled) {
+  cursor: pointer;
+}
+
+.v-user-profile-trigger-text {
+  font: inherit;
+  color: inherit;
+}
+
+.v-user-profile-trigger-text:not(:disabled):hover .ux-views-community-communityview-030 {
+  color: #2563eb;
+  text-decoration: underline;
 }
 
 .v-community-detail-image {

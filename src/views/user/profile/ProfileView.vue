@@ -276,12 +276,21 @@
             </div>
           </div>
         </div>
+
         <footer class="v-page-footer">
           <div class="sx-views-user-profile-profileview-027">
             <span>© 2026 탄탄 짐 탐색</span>
             <RouterLink to="/settings" class="v-footer-link">설정</RouterLink>
             <RouterLink to="/legal/terms" class="v-footer-link">이용약관</RouterLink>
             <RouterLink to="/legal/privacy" class="v-footer-link">개인정보처리방침</RouterLink>
+            <button
+              v-if="isOwnProfile && !isGymOwner"
+              type="button"
+              class="v-footer-link v-footer-link-button"
+              @click="openGymOwnerApplyModal"
+            >
+              관리자 신청
+            </button>
           </div>
           <div class="v-profile-footer-status"><div class="v-status-dot" /><span>시스템 정상</span></div>
         </footer>
@@ -361,6 +370,63 @@
         </div>
       </div>
     </div>
+
+    <div
+      v-if="isGymOwnerApplyModalOpen && isOwnProfile && !isGymOwner"
+      class="v-owner-apply-modal-backdrop"
+      @click.self="closeGymOwnerApplyModal"
+    >
+      <div class="v-owner-apply-modal">
+        <div class="v-owner-apply-modal-head">
+          <h2 class="v-modal-title">헬스장 관리자 신청</h2>
+          <button
+            type="button"
+            class="sx-views-user-profile-profileview-031"
+            :disabled="isApplyingGymOwner"
+            @click="closeGymOwnerApplyModal"
+          >
+            <X :size="24" />
+          </button>
+        </div>
+
+        <div class="v-owner-apply-modal-body">
+          <p class="v-owner-apply-modal-desc">
+            사업자 등록번호를 입력하면 사장님 권한 신청을 진행합니다.
+          </p>
+          <input
+            v-model="gymOwnerRegistryNum"
+            type="text"
+            placeholder="사업자 등록번호 입력 (예: 123-45-67890)"
+            class="v-history-search-input v-owner-apply-modal-input"
+          />
+          <p v-if="gymOwnerApplyMessage" class="v-profile-owner-apply-msg v-profile-owner-apply-msg-success">
+            {{ gymOwnerApplyMessage }}
+          </p>
+          <p v-else-if="gymOwnerApplyError" class="v-profile-owner-apply-msg v-profile-owner-apply-msg-error">
+            {{ gymOwnerApplyError }}
+          </p>
+        </div>
+
+        <div class="v-owner-apply-modal-actions">
+          <button
+            type="button"
+            class="v-modal-cancel-btn"
+            :disabled="isApplyingGymOwner"
+            @click="closeGymOwnerApplyModal"
+          >
+            취소
+          </button>
+          <button
+            type="button"
+            class="v-modal-save-btn"
+            :disabled="isApplyingGymOwner"
+            @click="applyForGymOwner"
+          >
+            {{ isApplyingGymOwner ? '신청 중...' : '신청하기' }}
+          </button>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -395,6 +461,11 @@ const isFollowBusy = ref(false);
 const isFavoriteBusy = ref(false);
 const isFollowing = ref(false);
 const isFavoriteGym = ref(false);
+const gymOwnerRegistryNum = ref('');
+const isApplyingGymOwner = ref(false);
+const gymOwnerApplyMessage = ref('');
+const gymOwnerApplyError = ref('');
+const isGymOwnerApplyModalOpen = ref(false);
 const previewRole = computed(() => normalizeRole(route.query.previewRole));
 const routeTargetUserId = computed(() => {
   const raw = String(route.query.userId || '').trim();
@@ -986,6 +1057,50 @@ const toggleGymFavorite = async () => {
   }
 };
 
+const openGymOwnerApplyModal = () => {
+  gymOwnerApplyMessage.value = '';
+  gymOwnerApplyError.value = '';
+  isGymOwnerApplyModalOpen.value = true;
+};
+
+const closeGymOwnerApplyModal = () => {
+  if (isApplyingGymOwner.value) return;
+  isGymOwnerApplyModalOpen.value = false;
+  gymOwnerApplyError.value = '';
+  gymOwnerApplyMessage.value = '';
+};
+
+const applyForGymOwner = async () => {
+  const registryNum = String(gymOwnerRegistryNum.value || '').trim();
+  if (!registryNum) {
+    gymOwnerApplyError.value = '사업자 등록번호를 입력해주세요.';
+    gymOwnerApplyMessage.value = '';
+    return;
+  }
+
+  isApplyingGymOwner.value = true;
+  gymOwnerApplyError.value = '';
+  gymOwnerApplyMessage.value = '';
+  try {
+    await gymApi.apply(registryNum);
+    gymOwnerApplyMessage.value = '헬스장 관리자 신청이 완료되었습니다.';
+    gymOwnerRegistryNum.value = '';
+    isGymOwnerApplyModalOpen.value = false;
+    await syncSessionFromServer({ force: true });
+    await loadProfileData();
+  } catch (error) {
+    const message = String(
+      error?.response?.data?.message
+      || error?.response?.data?.error
+      || error?.response?.data?.result
+      || '',
+    ).trim();
+    gymOwnerApplyError.value = message || '헬스장 관리자 신청에 실패했습니다.';
+  } finally {
+    isApplyingGymOwner.value = false;
+  }
+};
+
 const toDateParam = (date) => {
   const year = date.getFullYear();
   const month = String(date.getMonth() + 1).padStart(2, '0');
@@ -1199,6 +1314,86 @@ onMounted(() => {
   font-size: 24px;
   font-weight: 800;
   color: #0f172a;
+}
+
+.v-profile-owner-apply-msg {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.v-profile-owner-apply-msg-success {
+  color: #16a34a;
+}
+
+.v-profile-owner-apply-msg-error {
+  color: #dc2626;
+}
+
+.v-footer-link-button {
+  border: 0;
+  background: transparent;
+  padding: 0;
+  font: inherit;
+  cursor: pointer;
+}
+
+.v-footer-link-button:hover {
+  text-decoration: underline;
+}
+
+.v-owner-apply-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 2100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(15, 23, 42, 0.5);
+  padding: 20px;
+}
+
+.v-owner-apply-modal {
+  width: 100%;
+  max-width: 520px;
+  border-radius: 16px;
+  background: #ffffff;
+  box-shadow: 0 24px 40px rgba(15, 23, 42, 0.25);
+  overflow: hidden;
+}
+
+.v-owner-apply-modal-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 18px 20px;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.v-owner-apply-modal-body {
+  display: grid;
+  gap: 12px;
+  padding: 20px;
+}
+
+.v-owner-apply-modal-desc {
+  margin: 0;
+  font-size: 13px;
+  color: #64748b;
+}
+
+.v-owner-apply-modal-input {
+  min-height: 44px;
+  text-align: left;
+  padding-left: 14px;
+}
+
+.v-owner-apply-modal-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+  padding: 14px 20px 20px;
 }
 
 .v-owner-sub {

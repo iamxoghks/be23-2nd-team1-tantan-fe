@@ -27,7 +27,52 @@
         <form class="v-auth-form" @submit.prevent="handleSignUp">
           <input v-model="userName" type="text" placeholder="이름" class="v-auth-input" />
           <input v-model="nickName" type="text" placeholder="닉네임(선택)" class="v-auth-input" />
-          <input v-model="email" type="email" placeholder="이메일" class="v-auth-input" :readonly="isSocialVerified" />
+          <div class="v-signup-email-verify-wrap">
+            <label class="v-auth-form-label">
+              이메일
+              <div class="v-signup-email-row">
+                <input
+                  v-model="email"
+                  type="email"
+                  placeholder="이메일"
+                  class="v-auth-input"
+                  :readonly="isSocialVerified || isEmailVerified"
+                />
+                <button
+                  type="button"
+                  class="v-signup-email-btn"
+                  :disabled="isSendingCode || isEmailVerified"
+                  @click="sendVerificationCode"
+                >
+                  {{ isSendingCode ? '발송 중...' : (isCodeSent ? '재전송' : '인증') }}
+                </button>
+              </div>
+              <p v-if="emailVerificationMessage" class="v-signup-email-status v-signup-email-status-success">
+                {{ emailVerificationMessage }}
+              </p>
+              <p v-else-if="emailVerificationError" class="v-signup-email-status v-signup-email-status-error">
+                {{ emailVerificationError }}
+              </p>
+            </label>
+
+            <div v-if="isCodeSent || isEmailVerified" class="v-signup-code-row">
+              <input
+                v-model="verificationCode"
+                type="text"
+                placeholder="인증코드 입력"
+                class="v-auth-input"
+                :disabled="isEmailVerified"
+              />
+              <button
+                type="button"
+                class="v-signup-email-btn v-signup-email-btn-verify"
+                :disabled="!isCodeSent || isVerifyingCode || isEmailVerified"
+                @click="verifyEmailCode"
+              >
+                {{ isEmailVerified ? '인증 완료' : (isVerifyingCode ? '확인 중...' : '인증') }}
+              </button>
+            </div>
+          </div>
           <input v-model="password" type="password" placeholder="비밀번호" class="v-auth-input" />
           <input v-model="passwordConfirm" type="password" placeholder="비밀번호 확인" class="v-auth-input" />
           <div class="v-signup-consent-wrap">
@@ -95,6 +140,14 @@ const password = ref('');
 const passwordConfirm = ref('');
 const isSubmitting = ref(false);
 const errorMessage = ref('');
+const verificationCode = ref('');
+const isSendingCode = ref(false);
+const isCodeSent = ref(false);
+const isVerifyingCode = ref(false);
+const isEmailVerified = ref(false);
+const verifiedEmail = ref('');
+const emailVerificationMessage = ref('');
+const emailVerificationError = ref('');
 const agreeAll = ref(false);
 const agreeTerms = ref(false);
 const agreePrivacy = ref(false);
@@ -123,9 +176,96 @@ const createConsents = () => {
   };
 };
 
+const normalizeEmail = (value) => String(value || '').trim().toLowerCase();
+
+const resetEmailVerificationState = () => {
+  isCodeSent.value = false;
+  isEmailVerified.value = false;
+  verificationCode.value = '';
+  verifiedEmail.value = '';
+  emailVerificationMessage.value = '';
+  emailVerificationError.value = '';
+};
+
+const toFriendlyEmailVerifyError = (error, fallbackMessage) => {
+  const serverMessage = String(
+    error?.response?.data?.message
+      || error?.response?.data?.error
+      || error?.response?.data?.result
+      || '',
+  ).trim();
+  return serverMessage || fallbackMessage;
+};
+
+const sendVerificationCode = async () => {
+  const targetEmail = normalizeEmail(email.value);
+  if (!targetEmail) {
+    emailVerificationError.value = '이메일을 입력해주세요.';
+    emailVerificationMessage.value = '';
+    return;
+  }
+
+  isSendingCode.value = true;
+  emailVerificationError.value = '';
+  emailVerificationMessage.value = '';
+  isEmailVerified.value = false;
+  verifiedEmail.value = '';
+  try {
+    await userApi.sendEmailVerification({ email: targetEmail });
+    isCodeSent.value = true;
+    verificationCode.value = '';
+    emailVerificationMessage.value = '인증코드를 전송했습니다. 이메일을 확인해주세요.';
+  } catch (error) {
+    emailVerificationError.value = toFriendlyEmailVerifyError(error, '인증코드 전송에 실패했습니다.');
+  } finally {
+    isSendingCode.value = false;
+  }
+};
+
+const verifyEmailCode = async () => {
+  const targetEmail = normalizeEmail(email.value);
+  const code = String(verificationCode.value || '').trim();
+  if (!targetEmail) {
+    emailVerificationError.value = '이메일을 입력해주세요.';
+    emailVerificationMessage.value = '';
+    return;
+  }
+  if (!code) {
+    emailVerificationError.value = '인증코드를 입력해주세요.';
+    emailVerificationMessage.value = '';
+    return;
+  }
+
+  isVerifyingCode.value = true;
+  emailVerificationError.value = '';
+  emailVerificationMessage.value = '';
+  try {
+    await userApi.verifyEmailCode({ email: targetEmail, code });
+    isEmailVerified.value = true;
+    verifiedEmail.value = targetEmail;
+    emailVerificationMessage.value = '인증 완료되었습니다.';
+  } catch (error) {
+    emailVerificationError.value = toFriendlyEmailVerifyError(error, '이메일 인증에 실패했습니다.');
+  } finally {
+    isVerifyingCode.value = false;
+  }
+};
+
 watch([agreeTerms, agreePrivacy], () => {
   syncAgreeAll();
 });
+
+watch(
+  () => normalizeEmail(email.value),
+  (next, prev) => {
+    if (next === prev) return;
+    if (next !== verifiedEmail.value) {
+      resetEmailVerificationState();
+      return;
+    }
+    emailVerificationError.value = '';
+  },
+);
 
 const handleSignUp = async () => {
   if (!userName.value || !email.value || !password.value) {
@@ -135,6 +275,11 @@ const handleSignUp = async () => {
 
   if (password.value !== passwordConfirm.value) {
     errorMessage.value = '비밀번호 확인이 일치하지 않습니다.';
+    return;
+  }
+
+  if (!isEmailVerified.value || normalizeEmail(email.value) !== verifiedEmail.value) {
+    errorMessage.value = '이메일 인증을 완료해주세요.';
     return;
   }
 
@@ -169,6 +314,54 @@ const handleSignUp = async () => {
 </script>
 
 <style scoped>
+.v-signup-email-verify-wrap {
+  display: grid;
+  gap: 8px;
+}
+
+.v-signup-email-row,
+.v-signup-code-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 96px;
+  gap: 8px;
+}
+
+.v-signup-email-btn {
+  border: 1px solid #bfdbfe;
+  border-radius: 10px;
+  background: #eff6ff;
+  color: #1d4ed8;
+  font-size: 12px;
+  font-weight: 700;
+  min-height: 44px;
+  padding: 0 8px;
+}
+
+.v-signup-email-btn:disabled {
+  background: #f1f5f9;
+  color: #94a3b8;
+  border-color: #e2e8f0;
+}
+
+.v-signup-email-btn-verify {
+  border-color: #93c5fd;
+  background: #dbeafe;
+}
+
+.v-signup-email-status {
+  margin: 6px 0 0;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.v-signup-email-status-success {
+  color: #16a34a;
+}
+
+.v-signup-email-status-error {
+  color: #dc2626;
+}
+
 .v-signup-consent-wrap {
   margin-top: 8px;
   display: grid;

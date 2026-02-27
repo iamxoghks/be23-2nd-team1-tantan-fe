@@ -45,10 +45,6 @@
           이메일로 가입하기<ArrowRight class="u-icon-16" />
         </button>
 
-        <button type="button" class="v-auth-link-inline" @click="startGymOwnerSignUp">
-          헬스장 관리자이신가요? 여기서 가입해주세요.
-        </button>
-
         <p v-if="errorMessage" class="u-text-error-xs">{{ errorMessage }}</p>
         <button type="button" class="v-auth-outline-link v-auth-outline-link-green" @click="openAuthModal">로그인 하러가기</button>
       </section>
@@ -96,9 +92,5 @@ const startSocialSignUp = async (provider) => {
 
 const startEmailSignUp = () => {
   router.push('/signup/new');
-};
-
-const startGymOwnerSignUp = () => {
-  router.push('/signup/gym-owner');
 };
 </script>

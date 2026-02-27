@@ -13,11 +13,11 @@
         :class="`rail-item ${item.className || ''}`"
       >
         <button
-          v-if="item.id === 'login'"
+          v-if="item.id === 'auth'"
           type="button"
           :aria-label="item.label"
           :title="item.label"
-          :class="`rail-item-link ${route.path === item.to ? 'rail-item-link-active' : 'rail-item-link-inactive'}`"
+          :class="`rail-item-link rail-item-link-inactive`"
           @click="openAuthModal"
         >
           <div class="rail-item-icon-wrap">
@@ -25,12 +25,12 @@
               <component :is="item.icon" :size="22" :stroke-width="2.5" />
             </div>
             <span
-              v-if="item.hasDot && route.path !== item.to"
+              v-if="item.hasDot"
               class="rail-item-dot"
             />
           </div>
           <span
-            :class="`rail-item-label ${route.path === item.to ? 'rail-item-label-active' : 'rail-item-label-inactive'}`"
+            class="rail-item-label rail-item-label-inactive"
           >
             {{ item.label }}
           </span>
@@ -60,24 +60,6 @@
         </RouterLink>
       </li>
     </ul>
-
-    <div class="rail-auth-block">
-      <button
-        type="button"
-        class="rail-auth-btn rail-auth-btn-login"
-        @click="openAuthModal"
-      >
-        <LogIn :size="14" />
-        로그인
-      </button>
-      <RouterLink
-        to="/signup"
-        class="rail-auth-btn rail-auth-btn-signup"
-      >
-        <UserPlus :size="14" />
-        회원가입
-      </RouterLink>
-    </div>
   </nav>
 </template>
 
@@ -89,7 +71,7 @@ import {
   watch,
 } from 'vue';
 import { RouterLink, useRoute } from 'vue-router';
-import { Home, MessageCircle, Users, Bell, User, Dumbbell, LogIn, UserPlus, Shield } from 'lucide-vue-next';
+import { Home, MessageCircle, Users, Bell, User, Dumbbell, LogIn, Shield } from 'lucide-vue-next';
 import { useAuthModal } from '@/composables/useAuthModal';
 import { useSession } from '@/composables/useSession';
 import { useNotificationCenter } from '@/composables/useNotificationCenter';
@@ -119,7 +101,7 @@ const items = computed(() => {
     { id: 'notifications', icon: Bell, label: '알림', to: '/notifications', hasDot: hasUnread.value },
     isAuthenticated.value
       ? { id: 'profile', icon: User, label: '프로필', to: '/profile' }
-      : { id: 'login', icon: LogIn, label: '로그인', to: '/login', className: 'rail-mobile-only' },
+      : { id: 'auth', icon: LogIn, label: '로그인/가입', className: '' },
   ];
 
   if (sessionProfile.value?.role === 'ADMIN') {
