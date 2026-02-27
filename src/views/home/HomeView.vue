@@ -109,7 +109,7 @@ import MapCanvasContainer from '@/components/sections/MapCanvasContainer.vue';
 import MapControlsOverlay from '@/components/sections/MapControlsOverlay.vue';
 import CategoryPills from '@/components/sections/CategoryPills.vue';
 import { Search, X } from 'lucide-vue-next';
-import { gymApi, mapApi } from '@/services/apis';
+import { gymApi, gymFavoriteApi, mapApi } from '@/services/apis';
 import { getAccessToken } from '@/services/token';
 import { useAuthModal } from '@/composables/useAuthModal';
 
@@ -424,11 +424,29 @@ const setMobileSheetState = (nextState) => {
 
 const toggleFavoriteGym = (id) => {
   if (!id) return;
-  if (favoriteGymIds.value.includes(id)) {
-    favoriteGymIds.value = favoriteGymIds.value.filter((gymId) => gymId !== id);
-  } else {
-    favoriteGymIds.value = [...favoriteGymIds.value, id];
+  if (!getAccessToken()) {
+    openAuthModal();
+    return;
   }
+
+  const normalizedId = String(id);
+  const isFavorite = favoriteGymIds.value.includes(normalizedId);
+
+  const request = isFavorite
+    ? gymFavoriteApi.remove(normalizedId)
+    : gymFavoriteApi.add(normalizedId);
+
+  request
+    .then(() => {
+      if (isFavorite) {
+        favoriteGymIds.value = favoriteGymIds.value.filter((gymId) => gymId !== normalizedId);
+      } else {
+        favoriteGymIds.value = [...favoriteGymIds.value, normalizedId];
+      }
+    })
+    .catch((error) => {
+      console.error('Failed to toggle favorite gym:', error);
+    });
 };
 
 const toggleFavoritesOnlyOnMap = () => {
@@ -456,6 +474,19 @@ onMounted(async () => {
     }
   } catch (error) {
     console.error('Failed to load gyms:', error);
+  }
+
+  if (!getAccessToken()) return;
+
+  try {
+    const response = await gymFavoriteApi.list();
+    const payload = response.data?.data || response.data?.result || response.data;
+    const list = Array.isArray(payload) ? payload : [];
+    favoriteGymIds.value = list
+      .map((item) => String(item?.gymId ?? item?.id ?? item ?? '').trim())
+      .filter(Boolean);
+  } catch (error) {
+    console.error('Failed to load favorite gyms:', error);
   }
 });
 </script>
