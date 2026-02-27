@@ -134,6 +134,7 @@
   position: relative;
   flex: 1;
   height: 100%;
+  z-index: 1;
 }
 
 .home-map-route-summary {
@@ -312,7 +313,7 @@
   left: 0;
   right: 0;
   bottom: 0;
-  z-index: 1100;
+  z-index: 1190;
   width: 100%;
   height: calc(56px + env(safe-area-inset-bottom, 0px));
   padding-bottom: env(safe-area-inset-bottom, 0px);
@@ -322,6 +323,8 @@
   background: var(--color-surface-base);
   border-top: 1px solid var(--color-border-base);
   user-select: none;
+  pointer-events: auto;
+  isolation: isolate;
 }
 
 .rail-nav-logo {
@@ -399,6 +402,7 @@
   height: 100%;
   overflow: hidden;
   background: var(--color-surface-brand-muted);
+  z-index: 1;
 }
 
 .map-error-banner {
