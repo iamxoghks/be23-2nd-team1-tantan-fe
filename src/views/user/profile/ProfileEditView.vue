@@ -199,7 +199,56 @@
 
                 <label class="v-form-label">
                   이메일
-                  <input v-model="form.email" type="email" class="v-history-search-input v-profile-edit-input v-profile-edit-input-left" placeholder="이메일을 입력하세요" />
+                  <div class="v-profile-email-verify-wrap">
+                    <div class="v-profile-email-row">
+                      <input
+                        v-model="form.email"
+                        type="email"
+                        class="v-history-search-input v-profile-edit-input v-profile-edit-input-left"
+                        placeholder="이메일을 입력하세요"
+                        :readonly="isEmailVerifiedForCurrent"
+                      />
+                      <button
+                        type="button"
+                        class="v-profile-email-btn"
+                        :disabled="isSendingEmailCode || !isEmailChangeRequested || isEmailVerifiedForCurrent"
+                        @click="sendEmailVerificationCode"
+                      >
+                        {{ isSendingEmailCode ? '발송 중...' : (isEmailCodeSent ? '재전송' : '인증') }}
+                      </button>
+                    </div>
+
+                    <div v-if="isEmailCodeSent || isEmailVerifiedForCurrent" class="v-profile-email-row">
+                      <input
+                        v-model="emailVerificationCode"
+                        type="text"
+                        class="v-history-search-input v-profile-edit-input v-profile-edit-input-left"
+                        placeholder="인증코드 입력"
+                        :disabled="isEmailVerifiedForCurrent"
+                      />
+                      <button
+                        type="button"
+                        class="v-profile-email-btn v-profile-email-btn-verify"
+                        :disabled="!isEmailCodeSent || isVerifyingEmailCode || isEmailVerifiedForCurrent"
+                        @click="verifyEmailCode"
+                      >
+                        {{ isEmailVerifiedForCurrent ? '인증 완료' : (isVerifyingEmailCode ? '확인 중...' : '인증') }}
+                      </button>
+                    </div>
+
+                    <p
+                      v-if="emailVerifyMessage"
+                      class="v-profile-email-msg v-profile-email-msg-success"
+                    >
+                      {{ emailVerifyMessage }}
+                    </p>
+                    <p
+                      v-else-if="emailVerifyError"
+                      class="v-profile-email-msg v-profile-email-msg-error"
+                    >
+                      {{ emailVerifyError }}
+                    </p>
+                  </div>
                 </label>
 
                 <label class="v-form-label">
@@ -285,6 +334,7 @@ import {
   nextTick,
   onMounted,
   ref,
+  watch,
 } from 'vue';
 import { useRouter, RouterLink, useRoute } from 'vue-router';
 import NavigationRail from '@/components/sections/NavigationRail.vue';
@@ -319,6 +369,14 @@ const form = ref({
   isPublic: true,
   showStats: true,
 });
+const originalEmail = ref('');
+const verifiedEmail = ref('');
+const emailVerificationCode = ref('');
+const isSendingEmailCode = ref(false);
+const isEmailCodeSent = ref(false);
+const isVerifyingEmailCode = ref(false);
+const emailVerifyMessage = ref('');
+const emailVerifyError = ref('');
 const profileImageInputRef = ref(null);
 const profileImageFile = ref(null);
 const profileImagePreviewUrl = ref(null);
@@ -333,6 +391,16 @@ const bioSafeText = computed(() => bioChars.value.slice(0, PROFILE_BIO_MAX_LENGT
 const bioOverflowText = computed(() => bioChars.value.slice(PROFILE_BIO_MAX_LENGTH).join(''));
 const bioCircleRatio = computed(() => Math.min(bioLength.value / PROFILE_BIO_MAX_LENGTH, 1));
 const bioCircleDashOffset = computed(() => BIO_CIRCLE_CIRCUMFERENCE * (1 - bioCircleRatio.value));
+const normalizedCurrentEmail = computed(() => String(form.value.email || '').trim().toLowerCase());
+const normalizedOriginalEmail = computed(() => String(originalEmail.value || '').trim().toLowerCase());
+const isEmailChangeRequested = computed(() => (
+  Boolean(normalizedCurrentEmail.value)
+  && normalizedCurrentEmail.value !== normalizedOriginalEmail.value
+));
+const isEmailVerifiedForCurrent = computed(() => (
+  Boolean(normalizedCurrentEmail.value)
+  && normalizedCurrentEmail.value === verifiedEmail.value
+));
 
 const normalizeBioText = (value) => (
   String(value || '')
@@ -609,6 +677,81 @@ const applyGymData = (payload = {}) => {
     : [];
 };
 
+const toFriendlyEmailVerifyError = (error, fallbackMessage) => {
+  const serverMessage = String(
+    error?.response?.data?.message
+      || error?.response?.data?.error
+      || error?.response?.data?.result
+      || '',
+  ).trim();
+  return serverMessage || fallbackMessage;
+};
+
+const resetEmailVerificationState = () => {
+  verifiedEmail.value = '';
+  emailVerificationCode.value = '';
+  isEmailCodeSent.value = false;
+  emailVerifyMessage.value = '';
+  emailVerifyError.value = '';
+};
+
+const sendEmailVerificationCode = async () => {
+  const email = normalizedCurrentEmail.value;
+  if (!email) {
+    emailVerifyError.value = '이메일을 입력해주세요.';
+    emailVerifyMessage.value = '';
+    return;
+  }
+  if (!isEmailChangeRequested.value) {
+    emailVerifyError.value = '변경할 이메일을 입력해주세요.';
+    emailVerifyMessage.value = '';
+    return;
+  }
+
+  isSendingEmailCode.value = true;
+  emailVerifyError.value = '';
+  emailVerifyMessage.value = '';
+  verifiedEmail.value = '';
+  try {
+    await userApi.sendEmailVerification({ email });
+    isEmailCodeSent.value = true;
+    emailVerificationCode.value = '';
+    emailVerifyMessage.value = '인증코드를 전송했습니다. 이메일을 확인해주세요.';
+  } catch (error) {
+    emailVerifyError.value = toFriendlyEmailVerifyError(error, '인증코드 전송에 실패했습니다.');
+  } finally {
+    isSendingEmailCode.value = false;
+  }
+};
+
+const verifyEmailCode = async () => {
+  const email = normalizedCurrentEmail.value;
+  const code = String(emailVerificationCode.value || '').trim();
+  if (!email) {
+    emailVerifyError.value = '이메일을 입력해주세요.';
+    emailVerifyMessage.value = '';
+    return;
+  }
+  if (!code) {
+    emailVerifyError.value = '인증코드를 입력해주세요.';
+    emailVerifyMessage.value = '';
+    return;
+  }
+
+  isVerifyingEmailCode.value = true;
+  emailVerifyError.value = '';
+  emailVerifyMessage.value = '';
+  try {
+    await userApi.verifyEmailCode({ email, code });
+    verifiedEmail.value = email;
+    emailVerifyMessage.value = '인증 완료되었습니다.';
+  } catch (error) {
+    emailVerifyError.value = toFriendlyEmailVerifyError(error, '이메일 인증에 실패했습니다.');
+  } finally {
+    isVerifyingEmailCode.value = false;
+  }
+};
+
 const loadProfile = async () => {
   try {
     const response = await userApi.myInfo();
@@ -616,6 +759,8 @@ const loadProfile = async () => {
     form.value.userName = data.userName || data.name || data.displayName || '';
     form.value.nickName = data.nickName || data.nickname || '';
     form.value.email = data.email || '';
+    originalEmail.value = String(data.email || '').trim().toLowerCase();
+    verifiedEmail.value = originalEmail.value;
     form.value.bio = String(data.bio ?? '');
     form.value.profileImage = data.profileImageUrl || data.profileImage || form.value.profileImage;
     form.value.isPublic = typeof data.isPublic === 'boolean' ? data.isPublic : true;
@@ -646,9 +791,29 @@ const onProfileImageChange = (event) => {
   form.value.profileImage = previewUrl;
 };
 
+watch(
+  () => normalizedCurrentEmail.value,
+  (next, prev) => {
+    if (next === prev) return;
+    emailVerifyError.value = '';
+
+    if (next !== verifiedEmail.value) {
+      resetEmailVerificationState();
+      if (next && next === normalizedOriginalEmail.value) {
+        verifiedEmail.value = normalizedOriginalEmail.value;
+      }
+    }
+  },
+);
+
 const saveProfile = async () => {
   syncBioFromEditor({ preserveSelection: false });
   if (isBioOverLimit.value) return;
+  if (isEmailChangeRequested.value && !isEmailVerifiedForCurrent.value) {
+    emailVerifyError.value = '이메일 변경 시 인증을 완료해주세요.';
+    emailVerifyMessage.value = '';
+    return;
+  }
 
   try {
     await userApi.update({
@@ -877,6 +1042,53 @@ onMounted(async () => {
 <style scoped>
 .u-hidden {
   display: none;
+}
+
+.v-profile-email-verify-wrap {
+  display: grid;
+  gap: 8px;
+}
+
+.v-profile-email-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 96px;
+  gap: 8px;
+}
+
+.v-profile-email-btn {
+  border: 1px solid #bfdbfe;
+  border-radius: 10px;
+  background: #eff6ff;
+  color: #1d4ed8;
+  font-size: 12px;
+  font-weight: 700;
+  min-height: 44px;
+  padding: 0 8px;
+}
+
+.v-profile-email-btn:disabled {
+  background: #f1f5f9;
+  color: #94a3b8;
+  border-color: #e2e8f0;
+}
+
+.v-profile-email-btn-verify {
+  border-color: #93c5fd;
+  background: #dbeafe;
+}
+
+.v-profile-email-msg {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.v-profile-email-msg-success {
+  color: #16a34a;
+}
+
+.v-profile-email-msg-error {
+  color: #dc2626;
 }
 
 .v-profile-edit-input-left {

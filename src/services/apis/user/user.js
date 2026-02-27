@@ -25,6 +25,14 @@ export const userApi = {
     return apiClient.post('/user/signUp', payload);
   },
 
+  sendEmailVerification(payload) {
+    return apiClient.post('/auth/email/send', payload);
+  },
+
+  verifyEmailCode(payload) {
+    return apiClient.post('/auth/email/verify', payload);
+  },
+
   login(payload) {
     return apiClient.post('/user/login', payload);
   },

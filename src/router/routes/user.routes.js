@@ -1,7 +1,7 @@
 import LoginView from '@/views/user/LoginView.vue';
 import SignupView from '@/views/user/SignupView.vue';
 import SignupCreateView from '@/views/user/SignupCreateView.vue';
-import SignupGymOwnerView from '@/views/user/SignupGymOwnerView.vue';
+import PasswordResetView from '@/views/user/PasswordResetView.vue';
 import ProfileView from '@/views/user/profile/ProfileView.vue';
 import ProfileEditView from '@/views/user/profile/ProfileEditView.vue';
 import ProfileDayWorkoutsView from '@/views/user/profile/ProfileDayWorkoutsView.vue';
@@ -10,7 +10,7 @@ export const userRoutes = [
   { path: '/login', component: LoginView },
   { path: '/signup', component: SignupView },
   { path: '/signup/new', component: SignupCreateView },
-  { path: '/signup/gym-owner', component: SignupGymOwnerView },
+  { path: '/reset-password', component: PasswordResetView },
   { path: '/profile', component: ProfileView },
   { path: '/workoutHistory', component: ProfileDayWorkoutsView, meta: { requiresAuth: true } },
   { path: '/profile/history', redirect: { path: '/workoutHistory' } },

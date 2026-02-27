@@ -56,6 +56,9 @@
           <button :disabled="isSubmitting" type="submit" class="v-auth-submit v-auth-submit-green">
             {{ isSubmitting ? '로그인 중...' : '로그인' }}<ArrowRight class="u-icon-16" />
           </button>
+          <button type="button" class="v-login-forgot-btn" @click="goToPasswordReset">
+            비밀번호를 잊으셨나요?
+          </button>
           <button type="button" class="v-login-alt-method-btn" @click="backToEmailStep">다른 방법으로 로그인하기</button>
         </form>
       </template>
@@ -113,6 +116,15 @@ const backToEmailStep = () => {
   loginStep.value = 'email';
 };
 
+const goToPasswordReset = () => {
+  const query = {};
+  if (String(email.value || '').trim()) {
+    query.email = String(email.value || '').trim();
+  }
+  closeAuthModal();
+  router.push({ path: '/reset-password', query });
+};
+
 const handleLogin = async () => {
   if (!password.value) {
     errorMessage.value = '비밀번호를 입력해주세요.';
@@ -147,3 +159,14 @@ const handleLogin = async () => {
   }
 };
 </script>
+
+<style scoped>
+.v-login-forgot-btn {
+  margin-top: 8px;
+  width: 100%;
+  text-align: right;
+  font-size: 12px;
+  font-weight: 700;
+  color: #2563eb;
+}
+</style>

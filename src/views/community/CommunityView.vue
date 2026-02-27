@@ -99,7 +99,27 @@
             <div v-for="post in posts" :key="post.id" class="v-community-post-card" @click="openPost(post)">
               <div class="v-card-pad">
                 <div class="sx-views-community-communityview-008">
-                  <div class="v-user-row"><img :src="post.authorImage" alt="" class="v-user-avatar" /><div><div class="v-text-user">{{ post.author }}</div><div class="v-text-subtle">{{ post.time }}{{ post.location ? ` · ${post.location}` : '' }}</div></div></div>
+                  <div class="v-user-row">
+                    <button
+                      type="button"
+                      class="v-user-profile-trigger"
+                      :disabled="!canOpenAuthorProfile(post)"
+                      @click.stop="openAuthorProfile(post)"
+                    >
+                      <img :src="post.authorImage" alt="" class="v-user-avatar" />
+                    </button>
+                    <div>
+                      <button
+                        type="button"
+                        class="v-user-profile-trigger v-user-profile-trigger-text"
+                        :disabled="!canOpenAuthorProfile(post)"
+                        @click.stop="openAuthorProfile(post)"
+                      >
+                        <span class="v-text-user">{{ post.author }}</span>
+                      </button>
+                      <div class="v-text-subtle">{{ post.time }}{{ post.location ? ` · ${post.location}` : '' }}</div>
+                    </div>
+                  </div>
                 </div>
 
                 <div v-if="post.type === 'workout' || post.hasWorkout">
@@ -221,6 +241,11 @@ const getPostCreatedTime = (post) => {
 const getPostLikeCount = (post) => getNumber(post?.likeCount ?? post?.likes, 0);
 const getPostCommentCount = (post) => getNumber(post?.commentCount ?? post?.comments, 0);
 const getPostViewCount = (post) => getNumber(post?.viewCount ?? post?.views, 0);
+const resolveAuthorUserId = (post) => {
+  const parsed = Number(post?.userId ?? post?.authorId ?? post?.writerId ?? 0);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
+};
+const canOpenAuthorProfile = (post) => Boolean(resolveAuthorUserId(post));
 
 const compareByCreatedAndId = (a, b) => {
   const createdDiff = getPostCreatedTime(b) - getPostCreatedTime(a);
@@ -369,6 +394,12 @@ const loadPosts = async (
 const openPost = (post) => {
   if (!post?.id) return;
   router.push({ path: `/community/${post.id}`, query: buildListQuery() });
+};
+
+const openAuthorProfile = (post) => {
+  const userId = resolveAuthorUserId(post);
+  if (!userId) return;
+  router.push({ path: '/profile', query: { userId: String(userId) } });
 };
 
 const handleCategoryChange = (category) => {
@@ -606,3 +637,33 @@ onBeforeUnmount(() => {
   }
 });
 </script>
+
+<style scoped>
+.v-user-profile-trigger {
+  border: 0;
+  padding: 0;
+  margin: 0;
+  background: transparent;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.v-user-profile-trigger:disabled {
+  cursor: default;
+}
+
+.v-user-profile-trigger:not(:disabled) {
+  cursor: pointer;
+}
+
+.v-user-profile-trigger-text {
+  font: inherit;
+  color: inherit;
+}
+
+.v-user-profile-trigger-text:not(:disabled):hover .v-text-user {
+  color: #2563eb;
+  text-decoration: underline;
+}
+</style>
