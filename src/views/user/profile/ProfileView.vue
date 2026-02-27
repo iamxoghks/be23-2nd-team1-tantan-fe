@@ -133,8 +133,22 @@
                 </div>
 
                 <div v-if="!shouldMaskPrivateProfile" class="v-profile-stat-row">
-                  <div class="v-profile-stat-item"><span class="v-profile-stat-value">1.2천</span><span class="u-text-muted-sm">팔로워</span></div>
-                  <div class="v-profile-stat-item"><span class="v-profile-stat-value">482</span><span class="u-text-muted-sm">팔로잉</span></div>
+                  <button
+                    type="button"
+                    class="v-profile-stat-item v-profile-stat-button"
+                    @click="openFollowListModal('followers')"
+                  >
+                    <span class="v-profile-stat-value">{{ followerCountText }}</span>
+                    <span class="u-text-muted-sm">팔로워</span>
+                  </button>
+                  <button
+                    type="button"
+                    class="v-profile-stat-item v-profile-stat-button"
+                    @click="openFollowListModal('followings')"
+                  >
+                    <span class="v-profile-stat-value">{{ followingCountText }}</span>
+                    <span class="u-text-muted-sm">팔로잉</span>
+                  </button>
                   <div class="v-profile-stat-item"><span class="v-profile-trophy">🏆</span><span class="v-profile-stat-value">8</span><span class="u-text-muted-sm">업적</span></div>
                 </div>
               </div>
@@ -150,17 +164,22 @@
                   운동기록 올리기
                 </button>
               </template>
-              <button v-else-if="canStartChat" class="v-profile-action-primary v-profile-action-btn" :disabled="isCreatingChat" @click="startChatWithUser">
-                {{ isCreatingChat ? '연결 중...' : '채팅하기' }}
-              </button>
-              <button
-                v-if="!isOwnProfile"
-                class="v-profile-action-secondary v-profile-action-btn"
-                :disabled="isFollowBusy"
-                @click="toggleFollow"
-              >
-                {{ isFollowBusy ? '처리 중...' : (isFollowing ? '팔로우 취소' : '팔로우') }}
-              </button>
+              <template v-else>
+                <button
+                  class="v-profile-action-primary v-profile-action-btn"
+                  :disabled="isCreatingChat || !canStartChat"
+                  @click="startChatWithUser"
+                >
+                  {{ isCreatingChat ? '연결 중...' : (canStartChat ? '채팅하기' : '채팅 불가') }}
+                </button>
+                <button
+                  class="v-profile-action-secondary v-profile-action-btn"
+                  :disabled="isFollowBusy"
+                  @click="toggleFollow"
+                >
+                  {{ isFollowBusy ? '처리 중...' : (isFollowing ? '팔로우 취소' : '팔로우') }}
+                </button>
+              </template>
             </div>
             <p v-else class="v-owner-read-text">비공개 프로필입니다.</p>
           </div>
@@ -294,6 +313,60 @@
           </div>
           <div class="v-profile-footer-status"><div class="v-status-dot" /><span>시스템 정상</span></div>
         </footer>
+      </div>
+    </div>
+
+    <div
+      v-if="isFollowListModalOpen && !isGymOwner && !shouldMaskPrivateProfile"
+      class="v-follow-modal-backdrop"
+      @click.self="closeFollowListModal"
+    >
+      <div class="v-follow-modal">
+        <div class="v-follow-modal-head">
+          <div class="v-follow-modal-tabs">
+            <button
+              type="button"
+              class="v-follow-modal-tab"
+              :class="activeFollowListTab === 'followers' ? 'v-follow-modal-tab-active' : ''"
+              @click="changeFollowListTab('followers')"
+            >
+              팔로워 {{ followerCountText }}
+            </button>
+            <button
+              type="button"
+              class="v-follow-modal-tab"
+              :class="activeFollowListTab === 'followings' ? 'v-follow-modal-tab-active' : ''"
+              @click="changeFollowListTab('followings')"
+            >
+              팔로잉 {{ followingCountText }}
+            </button>
+          </div>
+          <button type="button" class="v-follow-modal-close" @click="closeFollowListModal">
+            <X :size="20" />
+          </button>
+        </div>
+
+        <div class="v-follow-modal-body">
+          <p v-if="isFollowListLoading" class="v-follow-modal-empty">목록을 불러오는 중입니다...</p>
+          <p v-else-if="followListError" class="v-follow-modal-empty v-follow-modal-error">{{ followListError }}</p>
+          <p v-else-if="activeFollowList.length === 0" class="v-follow-modal-empty">표시할 사용자가 없습니다.</p>
+          <div v-else class="v-follow-modal-list">
+            <button
+              v-for="item in activeFollowList"
+              :key="item.userId"
+              type="button"
+              class="v-follow-modal-item"
+              @click="moveToProfile(item.userId)"
+            >
+              <img :src="item.profileImageUrl" :alt="item.displayName" class="v-follow-modal-avatar" />
+              <div class="v-follow-modal-meta">
+                <strong>{{ item.displayName }}</strong>
+                <span>@{{ item.userName }}</span>
+              </div>
+              <span v-if="item.isFollowedByMe" class="v-follow-modal-chip">팔로잉</span>
+            </button>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -431,7 +504,7 @@
 </template>
 
 <script setup>
-import { computed, onMounted, ref } from 'vue';
+import { computed, onMounted, ref, watch } from 'vue';
 import { RouterLink, useRoute, useRouter } from 'vue-router';
 import NavigationRail from '@/components/sections/NavigationRail.vue';
 import { Plus, History, Zap, Trash2, X, CheckCircle2 } from 'lucide-vue-next';
@@ -466,6 +539,13 @@ const isApplyingGymOwner = ref(false);
 const gymOwnerApplyMessage = ref('');
 const gymOwnerApplyError = ref('');
 const isGymOwnerApplyModalOpen = ref(false);
+const followCounts = ref({ followerCount: 0, followingCount: 0 });
+const isFollowListModalOpen = ref(false);
+const activeFollowListTab = ref('followers');
+const isFollowListLoading = ref(false);
+const followListError = ref('');
+const followers = ref([]);
+const followings = ref([]);
 const previewRole = computed(() => normalizeRole(route.query.previewRole));
 const routeTargetUserId = computed(() => {
   const raw = String(route.query.userId || '').trim();
@@ -524,12 +604,18 @@ const isOwnProfile = computed(() => {
 });
 const isPrivateProfile = computed(() => Boolean(profile.value?.privateProfile));
 const shouldMaskPrivateProfile = computed(() => !isOwnProfile.value && isPrivateProfile.value);
+const normalizedProfileUserId = computed(() => Number(viewedUserId.value || currentUserId.value || 0));
 const canStartChat = computed(() => {
   if (shouldMaskPrivateProfile.value) return false;
   if (isOwnProfile.value) return false;
   if (typeof profile.value?.canChat === 'boolean') return profile.value.canChat;
   return true;
 });
+const activeFollowList = computed(() => (
+  activeFollowListTab.value === 'followers' ? followers.value : followings.value
+));
+const followerCountText = computed(() => formatFollowCount(followCounts.value.followerCount));
+const followingCountText = computed(() => formatFollowCount(followCounts.value.followingCount));
 const gymOwnerEditLink = computed(() => (
   previewRole.value
     ? { path: '/profile/edit', query: { previewRole: previewRole.value } }
@@ -625,6 +711,132 @@ const openWorkoutModal = () => {
 
 const closeWorkoutModal = () => {
   isModalOpen.value = false;
+};
+
+const formatFollowCount = (value) => {
+  const count = Number(value || 0);
+  if (!Number.isFinite(count) || count <= 0) return '0';
+  if (count >= 1000) {
+    const compact = (count / 1000).toFixed(count % 1000 === 0 ? 0 : 1);
+    return `${compact}천`;
+  }
+  return count.toLocaleString();
+};
+
+const toFollowUserList = (payload) => {
+  const rawList = Array.isArray(payload)
+    ? payload
+    : Array.isArray(payload?.content)
+      ? payload.content
+      : Array.isArray(payload?.list)
+        ? payload.list
+        : [];
+
+  return rawList
+    .map((item) => {
+      const userId = Number(item?.userId ?? item?.id ?? 0);
+      if (!Number.isFinite(userId) || userId <= 0) return null;
+      return {
+        userId,
+        userName: String(item?.userName || item?.nickname || '').trim() || `user${userId}`,
+        displayName: String(item?.displayName || item?.nickname || item?.userName || '').trim() || `사용자 ${userId}`,
+        profileImageUrl: item?.profileImageUrl
+          || item?.profileImage
+          || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?q=80&w=100&h=100&auto=format&fit=crop',
+        isFollowedByMe: Boolean(item?.isFollowedByMe),
+      };
+    })
+    .filter(Boolean);
+};
+
+const resetFollowModalState = () => {
+  isFollowListLoading.value = false;
+  followListError.value = '';
+  isFollowListModalOpen.value = false;
+};
+
+const loadFollowCounts = async () => {
+  const userId = Number(normalizedProfileUserId.value || 0);
+  if (!userId) {
+    followCounts.value = { followerCount: 0, followingCount: 0 };
+    return;
+  }
+
+  try {
+    const response = await followApi.count(userId);
+    const payload = response?.data?.data || response?.data?.result || response?.data || {};
+    followCounts.value = {
+      followerCount: Number(payload?.followerCount || 0),
+      followingCount: Number(payload?.followingCount || 0),
+    };
+  } catch (error) {
+    followCounts.value = { followerCount: 0, followingCount: 0 };
+  }
+};
+
+const loadFollowList = async (tab) => {
+  const userId = Number(normalizedProfileUserId.value || 0);
+  if (!userId) {
+    followListError.value = '사용자 정보를 확인할 수 없습니다.';
+    followers.value = [];
+    followings.value = [];
+    return;
+  }
+
+  isFollowListLoading.value = true;
+  followListError.value = '';
+  try {
+    const request = tab === 'followers'
+      ? followApi.followers(userId, { offset: 0, limit: 100 })
+      : followApi.followings(userId, { offset: 0, limit: 100 });
+    const response = await request;
+    const payload = response?.data?.data || response?.data?.result || response?.data || [];
+    const list = toFollowUserList(payload);
+
+    if (tab === 'followers') {
+      followers.value = list;
+    } else {
+      followings.value = list;
+    }
+  } catch (error) {
+    followListError.value = '팔로우 목록을 불러오지 못했습니다.';
+  } finally {
+    isFollowListLoading.value = false;
+  }
+};
+
+const openFollowListModal = async (tab) => {
+  if (isGymOwner.value || shouldMaskPrivateProfile.value) return;
+  activeFollowListTab.value = tab === 'followings' ? 'followings' : 'followers';
+  isFollowListModalOpen.value = true;
+  await loadFollowList(activeFollowListTab.value);
+};
+
+const changeFollowListTab = async (tab) => {
+  const normalizedTab = tab === 'followings' ? 'followings' : 'followers';
+  if (activeFollowListTab.value === normalizedTab) return;
+  activeFollowListTab.value = normalizedTab;
+  await loadFollowList(normalizedTab);
+};
+
+const closeFollowListModal = () => {
+  resetFollowModalState();
+};
+
+const moveToProfile = (userId) => {
+  const nextUserId = Number(userId || 0);
+  if (!nextUserId) return;
+  closeFollowListModal();
+
+  if (currentUserId.value && nextUserId === Number(currentUserId.value)) {
+    router.push({ path: '/profile' });
+    return;
+  }
+
+  router.push({
+    path: '/profile',
+    query: { userId: String(nextUserId) },
+  });
 };
 
 const normalizeWorkout = (item, index) => ({
@@ -940,6 +1152,15 @@ const loadProfileData = async () => {
 
     const userResponse = await userApi.myInfo(routeTargetUserId.value ? { userId: routeTargetUserId.value } : undefined);
     profile.value = userResponse?.data?.data || userResponse?.data?.result || userResponse?.data || {};
+    followers.value = [];
+    followings.value = [];
+    resetFollowModalState();
+
+    if (!isGymOwner.value && !shouldMaskPrivateProfile.value) {
+      await loadFollowCounts();
+    } else {
+      followCounts.value = { followerCount: 0, followingCount: 0 };
+    }
 
     if (!isGymOwner.value && !shouldMaskPrivateProfile.value) {
       try {
@@ -1007,7 +1228,7 @@ const loadProfileData = async () => {
 
 const startChatWithUser = async () => {
   const otherUserId = Number(viewedUserId.value || 0);
-  if (!otherUserId || isOwnProfile.value) return;
+  if (!otherUserId || isOwnProfile.value || !canStartChat.value) return;
   isCreatingChat.value = true;
   try {
     await chatApi.createRoom({ otherUserId });
@@ -1027,9 +1248,17 @@ const toggleFollow = async () => {
     if (isFollowing.value) {
       await followApi.unfollow(otherUserId);
       isFollowing.value = false;
+      followCounts.value = {
+        ...followCounts.value,
+        followerCount: Math.max(0, Number(followCounts.value.followerCount || 0) - 1),
+      };
     } else {
       await followApi.follow(otherUserId);
       isFollowing.value = true;
+      followCounts.value = {
+        ...followCounts.value,
+        followerCount: Number(followCounts.value.followerCount || 0) + 1,
+      };
     }
   } catch (error) {
     // no-op
@@ -1248,6 +1477,13 @@ const createWorkout = async () => {
   }
 };
 
+watch(
+  () => route.fullPath,
+  () => {
+    loadProfileData();
+  },
+);
+
 onMounted(() => {
   loadProfileData();
 });
@@ -1257,6 +1493,188 @@ onMounted(() => {
 .v-owner-wrap {
   display: grid;
   gap: 16px;
+}
+
+.v-profile-stat-button {
+  border: 0;
+  background: transparent;
+  padding: 0;
+  cursor: pointer;
+}
+
+.v-profile-stat-button:hover .v-profile-stat-value {
+  color: #2563eb;
+}
+
+.v-follow-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 2200;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  background: rgba(15, 23, 42, 0.45);
+}
+
+.v-follow-modal {
+  width: 100%;
+  max-width: 520px;
+  max-height: min(78vh, 720px);
+  background: #ffffff;
+  border-radius: 18px;
+  box-shadow: 0 24px 40px rgba(15, 23, 42, 0.28);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.v-follow-modal-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid #e2e8f0;
+  padding: 14px 16px;
+  gap: 8px;
+}
+
+.v-follow-modal-tabs {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.v-follow-modal-tab {
+  border: 0;
+  background: transparent;
+  border-radius: 9999px;
+  padding: 8px 12px;
+  font-size: 14px;
+  font-weight: 700;
+  color: #64748b;
+  cursor: pointer;
+}
+
+.v-follow-modal-tab-active {
+  background: #eff6ff;
+  color: #1d4ed8;
+}
+
+.v-follow-modal-close {
+  width: 32px;
+  height: 32px;
+  border: 0;
+  border-radius: 10px;
+  background: #f8fafc;
+  color: #475569;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.v-follow-modal-body {
+  flex: 1;
+  min-height: 240px;
+  overflow-y: auto;
+}
+
+.v-follow-modal-empty {
+  margin: 0;
+  padding: 36px 20px;
+  text-align: center;
+  font-size: 14px;
+  color: #64748b;
+}
+
+.v-follow-modal-error {
+  color: #dc2626;
+}
+
+.v-follow-modal-list {
+  display: grid;
+  gap: 2px;
+  padding: 8px;
+}
+
+.v-follow-modal-item {
+  width: 100%;
+  border: 0;
+  border-radius: 12px;
+  background: #ffffff;
+  padding: 10px 12px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+}
+
+.v-follow-modal-item:hover {
+  background: #f8fafc;
+}
+
+.v-follow-modal-avatar {
+  width: 42px;
+  height: 42px;
+  border-radius: 9999px;
+  object-fit: cover;
+  border: 1px solid #e2e8f0;
+  flex-shrink: 0;
+}
+
+.v-follow-modal-meta {
+  min-width: 0;
+  flex: 1;
+  display: grid;
+  gap: 2px;
+  text-align: left;
+}
+
+.v-follow-modal-meta strong {
+  font-size: 14px;
+  color: #0f172a;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.v-follow-modal-meta span {
+  font-size: 12px;
+  color: #64748b;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.v-follow-modal-chip {
+  border-radius: 9999px;
+  padding: 4px 8px;
+  background: #eff6ff;
+  color: #1d4ed8;
+  font-size: 11px;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+@media (max-width: 767px) {
+  .v-follow-modal-backdrop {
+    padding: 0;
+  }
+
+  .v-follow-modal {
+    max-width: 100vw;
+    max-height: 100vh;
+    height: 100%;
+    border-radius: 0;
+  }
+
+  .v-follow-modal-head {
+    padding: 14px 12px;
+  }
+
+  .v-follow-modal-tab {
+    font-size: 13px;
+    padding: 7px 10px;
+  }
 }
 
 .v-profile-log-empty {
