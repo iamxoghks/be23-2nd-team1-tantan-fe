@@ -37,6 +37,10 @@ export const userApi = {
     return apiClient.post('/user/login', payload);
   },
 
+  oauth2Token() {
+    return apiClient.post('/user/oauth2/token', null, { withCredentials: true });
+  },
+
   findAll(params) {
     return apiClient.get('/user/findAll', { params });
   },

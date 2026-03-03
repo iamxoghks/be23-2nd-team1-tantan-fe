@@ -911,7 +911,7 @@ const applyGymOwnerData = (payload = {}) => {
         ...merged[idx],
         openTime: toHHmm(item.openTime, merged[idx].openTime),
         closeTime: toHHmm(item.closeTime, merged[idx].closeTime),
-        isClosed: Boolean(item.isClosed),
+        isClosed: Boolean(item.isClosed ?? item.closed),
       };
     });
     gymOwnerHours.value = merged;
@@ -986,7 +986,7 @@ const saveGymOwnerHours = async () => {
       dayOfWeek: item.dayOfWeek,
       openTime: toHHmmss(item.openTime, '06:00:00'),
       closeTime: toHHmmss(item.closeTime, '23:00:00'),
-      isClosed: Boolean(item.isClosed),
+      closed: Boolean(item.isClosed),
     })));
     gymOwnerMessage.value = '영업 시간이 저장되었습니다.';
   } catch (error) {
@@ -1117,7 +1117,7 @@ const createGymOwnerException = async () => {
       specificDate: gymOwnerExceptionForm.value.specificDate,
       openTime: gymOwnerExceptionForm.value.isClosed ? null : toHHmmss(gymOwnerExceptionForm.value.openTime, '09:00:00'),
       closeTime: gymOwnerExceptionForm.value.isClosed ? null : toHHmmss(gymOwnerExceptionForm.value.closeTime, '18:00:00'),
-      isClosed: gymOwnerExceptionForm.value.isClosed,
+      closed: gymOwnerExceptionForm.value.isClosed,
       description: gymOwnerExceptionForm.value.description || null,
     });
     gymOwnerExceptionForm.value.specificDate = '';

@@ -22,6 +22,8 @@
           :favorite-gym-ids="favoriteGymIds"
           :on-toggle-favorite-gym="toggleFavoriteGym"
           :on-arrive-direction="openArriveDirection"
+          :on-require-auth="openAuthModal"
+          :on-sync-gym="syncGymFromDetail"
         />
       </div>
 
@@ -109,9 +111,10 @@ import MapCanvasContainer from '@/components/sections/MapCanvasContainer.vue';
 import MapControlsOverlay from '@/components/sections/MapControlsOverlay.vue';
 import CategoryPills from '@/components/sections/CategoryPills.vue';
 import { Search, X } from 'lucide-vue-next';
-import { gymApi, gymFavoriteApi, mapApi } from '@/services/apis';
+import { gymApi, gymFavoriteApi, mapApi, reviewApi } from '@/services/apis';
 import { getAccessToken } from '@/services/token';
 import { useAuthModal } from '@/composables/useAuthModal';
+import { extractList, extractPayload } from '@/utils/api';
 
 const { openAuthModal } = useAuthModal();
 const isSearchPanelCollapsed = ref(false);
@@ -465,17 +468,134 @@ const normalizeGym = (gym) => ({
   color: gym.color || '#1a1a1a',
 });
 
-onMounted(async () => {
+const syncGymFromDetail = (detail) => {
+  const targetId = String(detail?.id ?? detail?.gymId ?? '').trim();
+  if (!targetId) return;
+
+  const imageList = Array.isArray(detail?.images) ? detail.images : [];
+  const firstImage = imageList.find((item) => {
+    if (typeof item === 'string') return Boolean(item);
+    return Boolean(item?.imageUrl || item?.url || item?.path || item?.src);
+  });
+  const imageUrl = typeof firstImage === 'string'
+    ? firstImage
+    : firstImage?.imageUrl || firstImage?.url || firstImage?.path || firstImage?.src || '';
+
+  gyms.value = gyms.value.map((gym) => {
+    if (String(gym.id) !== targetId) return gym;
+    return {
+      ...gym,
+      name: detail?.name ?? gym.name,
+      about: detail?.description ?? gym.about,
+      address: detail?.address ?? gym.address,
+      location: detail?.location ?? detail?.address ?? gym.location,
+      phone: detail?.tel ?? gym.phone,
+      type: detail?.categoryName ?? detail?.category ?? gym.type,
+      category: detail?.categoryName ?? detail?.category ?? gym.category,
+      rating: Number(detail?.rating ?? detail?.avgRating ?? gym.rating ?? 0),
+      reviews: Number(detail?.reviewCount ?? detail?.reviewCnt ?? detail?.reviews ?? gym.reviews ?? 0),
+      image: imageUrl || gym.image,
+      images: imageList.length > 0 ? imageList : (gym.images || []),
+    };
+  });
+};
+
+const refreshGymSummariesFromDetails = async () => {
+  const gymIds = gyms.value
+    .map((gym) => String(gym.id || '').trim())
+    .filter(Boolean)
+    .slice(0, 30);
+
+  if (gymIds.length === 0) return;
+
+  await Promise.allSettled(gymIds.map(async (gymId) => {
+    try {
+      const response = await gymApi.detail(gymId);
+      const payload = response.data?.data || response.data?.result || response.data;
+      if (payload) {
+        syncGymFromDetail(payload);
+      }
+    } catch (error) {
+      // keep list data as-is when one detail request fails
+    }
+  }));
+};
+
+const refreshGymReviewStatsFromReviews = async () => {
+  const targetGymIds = new Set(
+    gyms.value
+      .map((gym) => String(gym.id || '').trim())
+      .filter(Boolean),
+  );
+  if (targetGymIds.size === 0) return;
+
+  const statsByGymId = new Map();
+  const pageSize = 100;
+  const maxPages = 50;
+  let page = 0;
+  let totalPages = null;
+
+  while (page < maxPages) {
+    let list = [];
+
+    try {
+      const response = await reviewApi.listPage({ page, size: pageSize });
+      const payload = extractPayload(response, {});
+      list = extractList(payload);
+      const parsedTotalPages = Number(payload?.totalPages);
+      if (Number.isFinite(parsedTotalPages) && parsedTotalPages > 0) {
+        totalPages = parsedTotalPages;
+      }
+    } catch (error) {
+      break;
+    }
+
+    if (list.length === 0) break;
+
+    list.forEach((item) => {
+      const gymId = String(item?.gymId ?? item?.gym?.id ?? '').trim();
+      if (!gymId || !targetGymIds.has(gymId)) return;
+
+      const current = statsByGymId.get(gymId) || { sum: 0, count: 0 };
+      const rating = Number(item?.rating || 0);
+      statsByGymId.set(gymId, {
+        sum: current.sum + (Number.isFinite(rating) ? rating : 0),
+        count: current.count + 1,
+      });
+    });
+
+    if (totalPages != null && page >= totalPages - 1) break;
+    if (list.length < pageSize) break;
+    page += 1;
+  }
+
+  if (statsByGymId.size === 0) return;
+
+  gyms.value = gyms.value.map((gym) => {
+    const gymId = String(gym.id || '').trim();
+    const stat = statsByGymId.get(gymId);
+    if (!stat || stat.count <= 0) return gym;
+    return {
+      ...gym,
+      rating: stat.sum / stat.count,
+      reviews: stat.count,
+    };
+  });
+};
+
+const loadGyms = async () => {
   try {
     const response = await gymApi.list();
     const list = response.data?.data || response.data?.result || response.data;
-    if (Array.isArray(list) && list.length > 0) {
-      gyms.value = list.map((gym) => normalizeGym(gym));
-    }
+    gyms.value = (Array.isArray(list) ? list : []).map((gym) => normalizeGym(gym));
+    await refreshGymSummariesFromDetails();
+    await refreshGymReviewStatsFromReviews();
   } catch (error) {
     console.error('Failed to load gyms:', error);
   }
+};
 
+const loadFavoriteGyms = async () => {
   if (!getAccessToken()) return;
 
   try {
@@ -488,5 +608,10 @@ onMounted(async () => {
   } catch (error) {
     console.error('Failed to load favorite gyms:', error);
   }
+};
+
+onMounted(async () => {
+  await loadGyms();
+  await loadFavoriteGyms();
 });
 </script>
