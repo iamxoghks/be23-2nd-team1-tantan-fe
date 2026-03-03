@@ -7,7 +7,7 @@
 
       <template v-if="loginStep === 'email'">
         <div class="v-login-head">
-          <span class="v-auth-brand-badge v-auth-brand-badge-green">
+          <span class="v-auth-brand-badge v-auth-brand-badge-blue">
             <Dumbbell class="u-icon-24" />
           </span>
           <h2 class="sx-views-user-loginview-001">로그인</h2>
@@ -43,7 +43,7 @@
 
       <template v-else>
         <div class="v-login-head v-login-head-tight">
-          <span class="v-auth-brand-badge v-auth-brand-badge-green">
+          <span class="v-auth-brand-badge v-auth-brand-badge-blue">
             <Dumbbell class="u-icon-24" />
           </span>
           <h2 class="sx-views-user-loginview-001">비밀번호 입력</h2>
@@ -53,7 +53,7 @@
         <form class="v-auth-form" @submit.prevent="handleLogin">
           <label class="v-auth-form-label">비밀번호<input v-model="password" type="password" placeholder="비밀번호를 입력하세요" class="v-auth-input" /></label>
           <p v-if="errorMessage" class="u-text-error-xs">{{ errorMessage }}</p>
-          <button :disabled="isSubmitting" type="submit" class="v-auth-submit v-auth-submit-green">
+          <button :disabled="isSubmitting" type="submit" class="v-auth-submit v-auth-submit-blue">
             {{ isSubmitting ? '로그인 중...' : '로그인' }}<ArrowRight class="u-icon-16" />
           </button>
           <button type="button" class="v-login-forgot-btn" @click="goToPasswordReset">
