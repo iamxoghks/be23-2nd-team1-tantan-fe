@@ -1,4 +1,5 @@
 import LoginView from '@/views/user/LoginView.vue';
+import LoginSuccessView from '@/views/user/LoginSuccessView.vue';
 import SignupView from '@/views/user/SignupView.vue';
 import SignupCreateView from '@/views/user/SignupCreateView.vue';
 import PasswordResetView from '@/views/user/PasswordResetView.vue';
@@ -8,6 +9,7 @@ import ProfileDayWorkoutsView from '@/views/user/profile/ProfileDayWorkoutsView.
 
 export const userRoutes = [
   { path: '/login', component: LoginView },
+  { path: '/login/success', component: LoginSuccessView },
   { path: '/signup', component: SignupView },
   { path: '/signup/new', component: SignupCreateView },
   { path: '/reset-password', component: PasswordResetView },

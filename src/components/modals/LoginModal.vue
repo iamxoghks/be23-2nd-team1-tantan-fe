@@ -89,6 +89,10 @@ const errorMessage = ref('');
 
 const { isAuthModalOpen, closeAuthModal } = useAuthModal();
 const { syncSessionFromServer } = useSession();
+const API_BASE_URL =
+  import.meta.env.VUE_APP_API_BASE_URL ||
+  import.meta.env.VITE_API_BASE_URL ||
+  'http://localhost:8080';
 
 watch(isAuthModalOpen, (isOpen) => {
   if (!isOpen) return;
@@ -98,7 +102,15 @@ watch(isAuthModalOpen, (isOpen) => {
 });
 
 const handleSocialLogin = (provider) => {
-  errorMessage.value = `${provider.toUpperCase()} 로그인은 준비 중입니다.`;
+  const normalizedProvider = String(provider || '').trim().toLowerCase();
+  if (!['google', 'kakao', 'naver'].includes(normalizedProvider)) {
+    errorMessage.value = '지원하지 않는 소셜 로그인입니다.';
+    return;
+  }
+
+  const normalizedApiBaseUrl = String(API_BASE_URL).replace(/\/+$/, '');
+  const redirectUrl = `${normalizedApiBaseUrl}/oauth2/authorization/${normalizedProvider}`;
+  window.location.href = redirectUrl;
 };
 
 const goToPasswordStep = () => {

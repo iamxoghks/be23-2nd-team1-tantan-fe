@@ -278,7 +278,7 @@ const loadMyGym = async () => {
         ...merged[idx],
         openTime: toHHmm(item.openTime, merged[idx].openTime),
         closeTime: toHHmm(item.closeTime, merged[idx].closeTime),
-        isClosed: Boolean(item.isClosed),
+        isClosed: Boolean(item.isClosed ?? item.closed),
       };
     });
     hours.value = merged;
@@ -327,7 +327,7 @@ const saveHours = async () => {
       dayOfWeek: item.dayOfWeek,
       openTime: toHHmmss(item.openTime, '00:00:00'),
       closeTime: toHHmmss(item.closeTime, '00:00:00'),
-      isClosed: Boolean(item.isClosed),
+      closed: Boolean(item.isClosed),
     })));
     message.value = '영업 시간이 저장되었습니다.';
   } catch (error) {
@@ -398,7 +398,7 @@ const createException = async () => {
       specificDate: exceptionForm.value.specificDate,
       openTime: exceptionForm.value.isClosed ? null : toHHmmss(exceptionForm.value.openTime, '09:00:00'),
       closeTime: exceptionForm.value.isClosed ? null : toHHmmss(exceptionForm.value.closeTime, '18:00:00'),
-      isClosed: exceptionForm.value.isClosed,
+      closed: exceptionForm.value.isClosed,
       description: exceptionForm.value.description || null,
     });
     exceptionForm.value.specificDate = '';

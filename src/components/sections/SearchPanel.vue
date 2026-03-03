@@ -107,9 +107,7 @@
                   </div>
                   <p class="search-panel-list-desc">"{{ truncateText(gym.about, 40) }}"</p>
                   <div class="search-panel-list-open-row">
-                    <span class="ux-components-sections-searchpanel-024">영업 중</span>
-                    <span class="u-text-gray-300">·</span>
-                    <span class="ux-components-sections-searchpanel-025">23:00 영업 종료</span>
+                    <span :class="getOpenStatusClass(gym?.openStatus)">{{ getOpenStatusLabel(gym?.openStatus) }}</span>
                   </div>
                 </div>
               </div>
@@ -170,6 +168,9 @@
                   <span class="ux-components-sections-searchpanel-005">★</span>
                   <span class="ux-components-sections-searchpanel-006">{{ formatRating(selectedGymRating) }}</span>
                   <span class="u-text-gray-400">리뷰 {{ selectedGymReviewCount }}</span>
+                </div>
+                <div class="search-panel-list-open-row">
+                  <span :class="getOpenStatusClass(selectedGymOpenStatus)">{{ getOpenStatusLabel(selectedGymOpenStatus) }}</span>
                 </div>
 
                 <div class="search-panel-route-btns">
@@ -251,6 +252,18 @@
                 </div>
 
                 <div v-else-if="activeTab === '리뷰'" class="search-panel-tab-content">
+                  <div class="search-panel-review-toolbar">
+                    <button
+                      v-if="canWriteReview"
+                      type="button"
+                      class="search-panel-review-write-btn"
+                      @click="openReviewModal"
+                    >
+                      리뷰 작성
+                    </button>
+                    <p v-else class="search-panel-review-toolbar-hint">리뷰 작성은 일반 사용자 계정만 가능합니다.</p>
+                  </div>
+
                   <div v-if="tabLoading" class="search-panel-empty">
                     <div class="search-panel-empty-icon">
                       <MessageSquare :size="32" />
@@ -333,11 +346,113 @@
       <ChevronRight v-if="isCollapsed" :size="16" class="u-text-666" />
       <ChevronLeft v-else :size="16" class="u-text-666" />
     </button>
+
+    <Teleport to="body">
+      <div
+        v-if="isReviewModalOpen"
+        class="search-panel-review-modal-backdrop"
+        @click.self="closeReviewModal"
+      >
+        <div class="search-panel-review-modal">
+          <div class="search-panel-review-modal-head">
+            <h3>리뷰 작성</h3>
+            <button type="button" class="search-panel-review-modal-close" @click="closeReviewModal">
+              <X :size="20" />
+            </button>
+          </div>
+          <p class="search-panel-review-modal-gym">{{ selectedGym?.name }}</p>
+
+          <div class="search-panel-review-modal-rating">
+            <span>평점</span>
+            <div class="search-panel-review-modal-rating-row">
+              <button
+                v-for="score in [1, 2, 3, 4, 5]"
+                :key="score"
+                type="button"
+                class="search-panel-review-score-btn"
+                :class="reviewForm.rating >= score ? 'search-panel-review-score-btn-active' : ''"
+                @click="reviewForm.rating = score"
+              >
+                ★
+              </button>
+            </div>
+          </div>
+
+          <div class="search-panel-review-modal-upload">
+            <div class="search-panel-review-modal-upload-head">
+              <span>사진</span>
+              <span class="search-panel-review-modal-upload-count">{{ reviewForm.images.length }}/10</span>
+            </div>
+            <input
+              ref="reviewImageInputRef"
+              type="file"
+              class="search-panel-review-file-input"
+              accept="image/jpeg,image/jpg,image/png"
+              multiple
+              @change="onReviewFilesChange"
+            />
+            <button
+              type="button"
+              class="search-panel-review-file-btn"
+              :disabled="reviewForm.images.length >= maxReviewImageCount"
+              @click="openReviewFilePicker"
+            >
+              사진 선택
+            </button>
+            <p class="search-panel-review-modal-upload-help">최대 10장, JPG/PNG 형식만 업로드할 수 있습니다.</p>
+            <div v-if="reviewForm.images.length > 0" class="search-panel-review-preview-grid">
+              <div
+                v-for="(image, index) in reviewForm.images"
+                :key="`${image.name}-${index}`"
+                class="search-panel-review-preview-item"
+              >
+                <img :src="image.previewUrl" alt="리뷰 업로드 이미지" class="search-panel-review-preview-image" />
+                <button
+                  type="button"
+                  class="search-panel-review-preview-remove"
+                  @click="removeReviewFile(index)"
+                >
+                  <X :size="14" />
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <textarea
+            v-model="reviewForm.comment"
+            class="search-panel-review-modal-textarea"
+            maxlength="1000"
+            placeholder="시설, 청결, 서비스 경험을 자유롭게 남겨주세요."
+          />
+          <p class="search-panel-review-modal-count">{{ reviewForm.comment.length }}/1000</p>
+          <p v-if="reviewSubmitError" class="search-panel-review-modal-error">{{ reviewSubmitError }}</p>
+
+          <div class="search-panel-review-modal-actions">
+            <button
+              type="button"
+              class="search-panel-review-modal-cancel"
+              :disabled="isReviewSubmitting"
+              @click="closeReviewModal"
+            >
+              취소
+            </button>
+            <button
+              type="button"
+              class="search-panel-review-modal-submit"
+              :disabled="isReviewSubmitting || !reviewForm.comment.trim()"
+              @click="submitReview"
+            >
+              {{ isReviewSubmitting ? '등록 중...' : '등록하기' }}
+            </button>
+          </div>
+        </div>
+      </div>
+    </Teleport>
   </div>
 </template>
 
 <script setup>
-import { computed, nextTick, ref, watch } from 'vue';
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import {
   Search,
   ChevronRight,
@@ -358,6 +473,8 @@ import {
 } from 'lucide-vue-next';
 import UiIconButton from '@/components/ui/UiIconButton.vue';
 import { gymApi, reviewApi } from '@/services/apis';
+import { useSession } from '@/composables/useSession';
+import { getAccessToken, normalizeRole } from '@/services/token';
 import { extractList, extractPayload } from '@/utils/api';
 
 const defaultGymImage = 'https://images.unsplash.com/photo-1534438327276-14e5300c3a48?q=80&w=400&auto=format&fit=crop';
@@ -370,6 +487,20 @@ const tabLoading = ref(false);
 const tabError = ref('');
 const gymDetailMap = ref({});
 const reviewMap = ref({});
+const photoMap = ref({});
+const isReviewModalOpen = ref(false);
+const isReviewSubmitting = ref(false);
+const reviewSubmitError = ref('');
+const reviewImageInputRef = ref(null);
+const maxReviewImageCount = 10;
+const allowedReviewImageMimeTypes = new Set(['image/jpeg', 'image/jpg', 'image/png']);
+const allowedReviewImageExtensions = new Set(['jpg', 'jpeg', 'png']);
+const reviewForm = ref({
+  rating: 5,
+  comment: '',
+  images: [],
+});
+const { sessionProfile, primeSessionFromToken, syncSessionFromServer } = useSession();
 
 const amenityLabelMap = {
   FREE_WIFI: '무료 Wi-Fi',
@@ -400,6 +531,8 @@ const props = defineProps({
   favoriteGymIds: { type: Array, required: true },
   onToggleFavoriteGym: { type: Function, required: true },
   onArriveDirection: { type: Function, default: null },
+  onRequireAuth: { type: Function, default: null },
+  onSyncGym: { type: Function, default: null },
 });
 
 const handleTouchStartY = ref(null);
@@ -414,6 +547,11 @@ const selectedGymReviewCount = computed(() => {
   if (reviewItems.value.length > 0) return reviewItems.value.length;
   return formatCount(props.selectedGym?.reviews);
 });
+const selectedGymOpenStatus = computed(() =>
+  String(selectedGymDetail.value?.openStatus ?? props.selectedGym?.openStatus ?? 'UNKNOWN').toUpperCase(),
+);
+const sessionRole = computed(() => normalizeRole(sessionProfile.value?.role));
+const canWriteReview = computed(() => Boolean(getAccessToken()) && sessionRole.value === 'USER');
 
 const selectedGymType = computed(() =>
   selectedGymDetail.value?.categoryName
@@ -421,7 +559,17 @@ const selectedGymType = computed(() =>
     || props.selectedGym?.categoryName
     || '-');
 
-const selectedGymRating = computed(() => Number(props.selectedGym?.rating ?? 0));
+const selectedGymRating = computed(() => {
+  if (reviewItems.value.length > 0) {
+    const sum = reviewItems.value.reduce((acc, item) => acc + Number(item?.rating || 0), 0);
+    return sum / reviewItems.value.length;
+  }
+  return Number(
+    selectedGymDetail.value?.rating
+      ?? props.selectedGym?.rating
+      ?? 0,
+  );
+});
 const selectedGymAbout = computed(() =>
   selectedGymDetail.value?.description
     || props.selectedGym?.about
@@ -444,7 +592,7 @@ const toImageUrls = (rawImages) => {
     .filter(Boolean);
 };
 
-const photoItems = computed(() => {
+const selectedGymDefaultPhotos = computed(() => {
   const detailImages = toImageUrls(selectedGymDetail.value?.images);
   if (detailImages.length > 0) return detailImages;
   const listImages = toImageUrls(props.selectedGym?.images);
@@ -452,8 +600,16 @@ const photoItems = computed(() => {
   return toImageUrls(props.selectedGym?.image);
 });
 
+const uniquePhotoUrls = (items = []) => Array.from(new Set(items.filter(Boolean)));
+
+const photoItems = computed(() => {
+  const eventImages = uniquePhotoUrls(photoMap.value[selectedGymId.value] || []);
+  if (eventImages.length > 0) return eventImages;
+  return selectedGymDefaultPhotos.value;
+});
+
 const selectedGymHeroImage = computed(() =>
-  photoItems.value[0]
+  selectedGymDefaultPhotos.value[0]
     || props.selectedGym?.image
     || defaultGymImage);
 
@@ -512,6 +668,23 @@ const formatCount = (value) => {
   return Math.round(numeric);
 };
 
+const getOpenStatusLabel = (status) => {
+  const normalized = String(status || 'UNKNOWN').toUpperCase();
+  if (normalized === 'OPEN') return '영업 중';
+  if (normalized === 'CLOSED') return '영업 종료';
+  if (normalized === 'CLOSED_EXCEPTION' || normalized === 'CLOSED_REGULAR') return '금일 휴무';
+  return '운영 정보 없음';
+};
+
+const getOpenStatusClass = (status) => {
+  const normalized = String(status || 'UNKNOWN').toUpperCase();
+  if (normalized === 'OPEN') return 'ux-components-sections-searchpanel-024';
+  if (normalized === 'CLOSED' || normalized === 'CLOSED_EXCEPTION' || normalized === 'CLOSED_REGULAR') {
+    return 'ux-components-sections-searchpanel-027';
+  }
+  return 'u-text-gray-400';
+};
+
 const truncateText = (text, maxLength = 40) => {
   const value = String(text || '').trim();
   if (!value) return '';
@@ -519,8 +692,10 @@ const truncateText = (text, maxLength = 40) => {
   return `${value.slice(0, maxLength)}...`;
 };
 
-const ensureGymDetail = async (gymId) => {
-  if (!gymId || gymDetailMap.value[gymId]) {
+const ensureGymDetail = async (gymId, options = {}) => {
+  const { force = false } = options;
+  if (!gymId) return null;
+  if (!force && gymDetailMap.value[gymId]) {
     return gymDetailMap.value[gymId] || null;
   }
 
@@ -530,12 +705,35 @@ const ensureGymDetail = async (gymId) => {
     ...gymDetailMap.value,
     [gymId]: payload || {},
   };
+  if (typeof props.onSyncGym === 'function' && payload) {
+    props.onSyncGym(payload);
+  }
   return gymDetailMap.value[gymId];
 };
 
-const ensureGymReviews = async (gymId) => {
-  if (!gymId || reviewMap.value[gymId]) {
-    return reviewMap.value[gymId] || [];
+const syncGymReviewStats = (gymId, reviews = []) => {
+  if (typeof props.onSyncGym !== 'function') return;
+  const list = Array.isArray(reviews) ? reviews : [];
+  const reviewCount = list.length;
+  const rating = reviewCount > 0
+    ? list.reduce((acc, item) => acc + Number(item?.rating || 0), 0) / reviewCount
+    : 0;
+
+  props.onSyncGym({
+    id: gymId,
+    rating,
+    reviewCount,
+    reviews: reviewCount,
+  });
+};
+
+const ensureGymReviews = async (gymId, options = {}) => {
+  const { force = false } = options;
+  if (!gymId) return [];
+  if (!force && reviewMap.value[gymId]) {
+    const cached = reviewMap.value[gymId] || [];
+    syncGymReviewStats(gymId, cached);
+    return cached;
   }
 
   const response = await reviewApi.listPage({ gymId, page: 0, size: 50 });
@@ -554,7 +752,199 @@ const ensureGymReviews = async (gymId) => {
     ...reviewMap.value,
     [gymId]: filtered,
   };
+  syncGymReviewStats(gymId, filtered);
   return filtered;
+};
+
+const ensureGymPhotos = async (gymId, options = {}) => {
+  const { force = false } = options;
+  if (!gymId) return [];
+  if (!force && photoMap.value[gymId]) {
+    return photoMap.value[gymId] || [];
+  }
+
+  const response = await gymApi.gymImagesCombinedReview(gymId);
+  const payload = extractPayload(response, {});
+  const photos = uniquePhotoUrls(toImageUrls(payload?.images));
+
+  photoMap.value = {
+    ...photoMap.value,
+    [gymId]: photos,
+  };
+  return photos;
+};
+
+const toApiErrorMessage = (error, fallback = '리뷰 등록에 실패했습니다.') => {
+  const status = Number(error?.response?.status || 0);
+  const message = String(
+    error?.response?.data?.message
+    || error?.response?.data?.error
+    || error?.response?.data?.result
+    || '',
+  ).trim();
+  if (status === 401) return '로그인이 필요합니다.';
+  if (status === 403) return '일반 사용자(USER)만 리뷰를 작성할 수 있습니다.';
+  return message || fallback;
+};
+
+const revokeReviewImageUrls = (items = reviewForm.value.images || []) => {
+  items.forEach((item) => {
+    if (item?.previewUrl) {
+      URL.revokeObjectURL(item.previewUrl);
+    }
+  });
+};
+
+const resetReviewForm = () => {
+  revokeReviewImageUrls();
+  reviewForm.value = {
+    rating: 5,
+    comment: '',
+    images: [],
+  };
+  if (reviewImageInputRef.value) {
+    reviewImageInputRef.value.value = '';
+  }
+};
+
+const openReviewFilePicker = () => {
+  reviewImageInputRef.value?.click();
+};
+
+const getFileExtension = (filename = '') => {
+  const normalized = String(filename || '').trim().toLowerCase();
+  const lastDotIndex = normalized.lastIndexOf('.');
+  if (lastDotIndex < 0) return '';
+  return normalized.slice(lastDotIndex + 1);
+};
+
+const isHeicFamilyFile = (file) => {
+  const contentType = String(file?.type || '').toLowerCase();
+  const ext = getFileExtension(file?.name || '');
+  return contentType.includes('heic')
+    || contentType.includes('heif')
+    || ext === 'heic'
+    || ext === 'heif';
+};
+
+const isSupportedReviewImage = (file) => {
+  const contentType = String(file?.type || '').toLowerCase();
+  const ext = getFileExtension(file?.name || '');
+  return allowedReviewImageMimeTypes.has(contentType) || allowedReviewImageExtensions.has(ext);
+};
+
+const onReviewFilesChange = (event) => {
+  const incomingFiles = Array.from(event?.target?.files || []);
+  if (incomingFiles.length === 0) return;
+
+  const heicFiles = incomingFiles.filter((file) => isHeicFamilyFile(file));
+  const unsupportedFiles = incomingFiles.filter((file) => !isHeicFamilyFile(file) && !isSupportedReviewImage(file));
+  const validFiles = incomingFiles.filter((file) => isSupportedReviewImage(file));
+
+  if (heicFiles.length > 0 || unsupportedFiles.length > 0) {
+    const messages = [];
+    if (heicFiles.length > 0) {
+      messages.push('HEIC/HEIF 형식은 지원되지 않습니다. 아이폰은 카메라 설정에서 "높은 호환성(JPG)"으로 변경해주세요.');
+    }
+    if (unsupportedFiles.length > 0) {
+      messages.push('JPG/PNG 형식만 업로드할 수 있습니다.');
+    }
+    reviewSubmitError.value = messages.join(' ');
+  }
+
+  if (validFiles.length === 0) {
+    if (reviewImageInputRef.value) {
+      reviewImageInputRef.value.value = '';
+    }
+    return;
+  }
+
+  const remaining = maxReviewImageCount - reviewForm.value.images.length;
+  if (remaining <= 0) {
+    reviewSubmitError.value = '사진은 최대 10장까지 업로드할 수 있습니다.';
+    if (reviewImageInputRef.value) {
+      reviewImageInputRef.value.value = '';
+    }
+    return;
+  }
+
+  const selected = validFiles.slice(0, remaining).map((file) => ({
+    file,
+    name: file.name,
+    previewUrl: URL.createObjectURL(file),
+  }));
+
+  reviewForm.value.images = [...reviewForm.value.images, ...selected];
+  if (validFiles.length > remaining) {
+    reviewSubmitError.value = '사진은 최대 10장까지 업로드할 수 있습니다.';
+  } else if (reviewSubmitError.value === '') {
+    reviewSubmitError.value = '';
+  }
+  if (reviewImageInputRef.value) {
+    reviewImageInputRef.value.value = '';
+  }
+};
+
+const removeReviewFile = (index) => {
+  const target = reviewForm.value.images[index];
+  if (target?.previewUrl) {
+    URL.revokeObjectURL(target.previewUrl);
+  }
+  reviewForm.value.images = reviewForm.value.images.filter((_, imageIndex) => imageIndex !== index);
+};
+
+const openReviewModal = () => {
+  if (!getAccessToken()) {
+    if (typeof props.onRequireAuth === 'function') {
+      props.onRequireAuth();
+      return;
+    }
+    window.alert('로그인이 필요합니다.');
+    return;
+  }
+  if (!canWriteReview.value) {
+    window.alert('일반 사용자(USER)만 리뷰를 작성할 수 있습니다.');
+    return;
+  }
+  reviewSubmitError.value = '';
+  resetReviewForm();
+  isReviewModalOpen.value = true;
+};
+
+const closeReviewModal = () => {
+  if (isReviewSubmitting.value) return;
+  isReviewModalOpen.value = false;
+  reviewSubmitError.value = '';
+  resetReviewForm();
+};
+
+const submitReview = async () => {
+  const gymId = Number(selectedGymId.value || 0);
+  const comment = String(reviewForm.value.comment || '').trim();
+  if (!gymId || !comment) return;
+
+  isReviewSubmitting.value = true;
+  reviewSubmitError.value = '';
+  try {
+    await reviewApi.create({
+      review: {
+        gymId,
+        rating: Number(reviewForm.value.rating || 5),
+        comment,
+      },
+      images: reviewForm.value.images.map((item) => item.file),
+    });
+
+    isReviewModalOpen.value = false;
+    resetReviewForm();
+    await ensureGymDetail(String(gymId), { force: true });
+    await ensureGymReviews(String(gymId), { force: true });
+    await ensureGymPhotos(String(gymId), { force: true });
+  } catch (error) {
+    reviewSubmitError.value = toApiErrorMessage(error);
+  } finally {
+    isReviewSubmitting.value = false;
+  }
 };
 
 const submitSearch = () => {
@@ -639,7 +1029,9 @@ const loadTabData = async (tab) => {
 
   if (tab === '홈') {
     try {
-      await ensureGymDetail(gymId);
+      await ensureGymDetail(gymId, { force: true });
+      await ensureGymReviews(gymId, { force: true });
+      await ensureGymPhotos(gymId, { force: true });
     } catch (error) {
       console.error('Failed to load gym detail:', error);
     }
@@ -654,7 +1046,7 @@ const loadTabData = async (tab) => {
     }
 
     if (tab === '사진') {
-      await ensureGymDetail(gymId);
+      await ensureGymPhotos(gymId, { force: true });
     }
   } catch (error) {
     console.error(`Failed to load ${tab} tab data:`, error);
@@ -683,6 +1075,9 @@ const filteredGyms = computed(() => {
 watch(selectedGymId, async (nextGymId, prevGymId) => {
   tabError.value = '';
   tabLoading.value = false;
+  if (nextGymId !== prevGymId && isReviewModalOpen.value) {
+    closeReviewModal();
+  }
 
   if (!nextGymId) return;
   if (nextGymId !== prevGymId) {
@@ -694,5 +1089,16 @@ watch(selectedGymId, async (nextGymId, prevGymId) => {
 
 watch(activeTab, async (tab) => {
   await loadTabData(tab);
+});
+
+onMounted(() => {
+  primeSessionFromToken();
+  if (getAccessToken()) {
+    syncSessionFromServer().catch(() => {});
+  }
+});
+
+onBeforeUnmount(() => {
+  revokeReviewImageUrls();
 });
 </script>

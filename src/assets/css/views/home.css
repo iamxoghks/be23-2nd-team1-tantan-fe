@@ -942,6 +942,29 @@
   flex-direction: column;
 }
 
+.search-panel-review-toolbar {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 12px;
+}
+
+.search-panel-review-write-btn {
+  height: 34px;
+  padding: 0 12px;
+  border: 1px solid #bfdbfe;
+  border-radius: 10px;
+  background: #eff6ff;
+  color: #1d4ed8;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.search-panel-review-toolbar-hint {
+  margin: 0;
+  font-size: 12px;
+  color: var(--color-text-muted);
+}
+
 .search-panel-review-list {
   display: flex;
   flex-direction: column;
@@ -1021,6 +1044,240 @@
   justify-content: center;
   border-radius: 9999px;
   background: var(--color-surface-soft);
+}
+
+.search-panel-review-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 3200;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  background: rgba(15, 23, 42, 0.5);
+}
+
+.search-panel-review-modal {
+  width: 100%;
+  max-width: 480px;
+  max-height: calc(100vh - 40px);
+  border-radius: 16px;
+  background: #ffffff;
+  box-shadow: 0 20px 32px rgba(15, 23, 42, 0.24);
+  padding: 18px;
+  display: grid;
+  gap: 12px;
+  overflow-y: auto;
+}
+
+.search-panel-review-modal-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.search-panel-review-modal-head h3 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 800;
+  color: #0f172a;
+}
+
+.search-panel-review-modal-close {
+  width: 32px;
+  height: 32px;
+  border: 0;
+  border-radius: 10px;
+  background: #f8fafc;
+  color: #475569;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.search-panel-review-modal-gym {
+  margin: 0;
+  font-size: 13px;
+  color: #64748b;
+}
+
+.search-panel-review-modal-rating {
+  display: grid;
+  gap: 8px;
+}
+
+.search-panel-review-modal-rating > span {
+  font-size: 13px;
+  font-weight: 700;
+  color: #334155;
+}
+
+.search-panel-review-modal-rating-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.search-panel-review-modal-upload {
+  display: grid;
+  gap: 8px;
+}
+
+.search-panel-review-modal-upload-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.search-panel-review-modal-upload-head > span {
+  font-size: 13px;
+  font-weight: 700;
+  color: #334155;
+}
+
+.search-panel-review-modal-upload-count {
+  font-size: 12px;
+  color: #64748b;
+}
+
+.search-panel-review-file-input {
+  display: none;
+}
+
+.search-panel-review-file-btn {
+  width: 100%;
+  min-height: 38px;
+  border: 1px dashed #93c5fd;
+  border-radius: 10px;
+  background: #f8fbff;
+  color: #2563eb;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.search-panel-review-file-btn:disabled {
+  opacity: 0.5;
+}
+
+.search-panel-review-modal-upload-help {
+  margin: 0;
+  font-size: 11px;
+  color: #94a3b8;
+}
+
+.search-panel-review-preview-grid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.search-panel-review-preview-item {
+  position: relative;
+  border-radius: 10px;
+  overflow: hidden;
+  border: 1px solid #e2e8f0;
+  background: #ffffff;
+}
+
+.search-panel-review-preview-image {
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  object-fit: cover;
+}
+
+.search-panel-review-preview-remove {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  width: 20px;
+  height: 20px;
+  border: 0;
+  border-radius: 9999px;
+  background: rgba(15, 23, 42, 0.7);
+  color: #ffffff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+@media (max-width: 767px) {
+  .search-panel-review-preview-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+.search-panel-review-score-btn {
+  width: 34px;
+  height: 34px;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  background: #ffffff;
+  color: #cbd5e1;
+  font-size: 18px;
+  line-height: 1;
+}
+
+.search-panel-review-score-btn-active {
+  color: #f59e0b;
+  border-color: #fcd34d;
+  background: #fffbeb;
+}
+
+.search-panel-review-modal-textarea {
+  width: 100%;
+  min-height: 140px;
+  resize: vertical;
+  border: 1px solid #dbeafe;
+  border-radius: 12px;
+  background: #f8fafc;
+  padding: 12px;
+  font-size: 14px;
+  color: #1e293b;
+  line-height: 1.5;
+}
+
+.search-panel-review-modal-count {
+  margin: 0;
+  text-align: right;
+  font-size: 12px;
+  color: #94a3b8;
+}
+
+.search-panel-review-modal-error {
+  margin: 0;
+  font-size: 12px;
+  color: #dc2626;
+}
+
+.search-panel-review-modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.search-panel-review-modal-cancel,
+.search-panel-review-modal-submit {
+  min-width: 92px;
+  height: 38px;
+  border-radius: 10px;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.search-panel-review-modal-cancel {
+  border: 1px solid #e2e8f0;
+  background: #ffffff;
+  color: #475569;
+}
+
+.search-panel-review-modal-submit {
+  border: 0;
+  background: #2563eb;
+  color: #ffffff;
+}
+
+.search-panel-review-modal-submit:disabled {
+  opacity: 0.5;
 }
 
 .search-panel-search-wrap {
@@ -1447,6 +1704,7 @@
 .ux-components-sections-searchpanel-024 { @apply text-[13px] font-bold text-[#00c73c]; }
 .ux-components-sections-searchpanel-025 { @apply text-[13px] text-gray-500; }
 .ux-components-sections-searchpanel-026 { @apply md:right-auto; }
+.ux-components-sections-searchpanel-027 { @apply text-[13px] font-bold text-red-500; }
 
 @media (max-width: 767px) {
   .map-controls-zoom {

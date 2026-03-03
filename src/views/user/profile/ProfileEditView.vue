@@ -647,7 +647,7 @@ const applyGymData = (payload = {}) => {
         ...merged[idx],
         openTime: toHHmm(item.openTime, merged[idx].openTime),
         closeTime: toHHmm(item.closeTime, merged[idx].closeTime),
-        isClosed: Boolean(item.isClosed),
+        isClosed: Boolean(item.isClosed ?? item.closed),
       };
     });
     gymHours.value = merged;
@@ -843,7 +843,10 @@ const loadExceptions = async () => {
         : Array.isArray(payload?.list)
           ? payload.list
           : [];
-    exceptions.value = list;
+    exceptions.value = list.map((item) => ({
+      ...item,
+      isClosed: Boolean(item?.isClosed ?? item?.closed),
+    }));
   } catch (error) {
     exceptions.value = [];
   }
@@ -888,7 +891,7 @@ const saveGymHours = async () => {
       dayOfWeek: item.dayOfWeek,
       openTime: toHHmmss(item.openTime, '06:00:00'),
       closeTime: toHHmmss(item.closeTime, '23:00:00'),
-      isClosed: Boolean(item.isClosed),
+      closed: Boolean(item.isClosed),
     })));
     ownerMessage.value = '영업 시간이 저장되었습니다.';
   } catch (error) {
@@ -954,11 +957,14 @@ const createException = async () => {
   ownerMessage.value = '';
   ownerError.value = '';
   try {
+    const openTime = exceptionForm.value.isClosed ? null : toHHmmss(exceptionForm.value.openTime, '09:00:00');
+    const closeTime = exceptionForm.value.isClosed ? null : toHHmmss(exceptionForm.value.closeTime, '18:00:00');
+
     await gymApi.createException({
       specificDate: exceptionForm.value.specificDate,
-      openTime: exceptionForm.value.isClosed ? null : toHHmmss(exceptionForm.value.openTime, '09:00:00'),
-      closeTime: exceptionForm.value.isClosed ? null : toHHmmss(exceptionForm.value.closeTime, '18:00:00'),
-      isClosed: exceptionForm.value.isClosed,
+      openTime,
+      closeTime,
+      closed: exceptionForm.value.isClosed,
       description: exceptionForm.value.description || null,
     });
     exceptionForm.value.specificDate = '';
