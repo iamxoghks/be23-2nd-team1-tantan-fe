@@ -1274,8 +1274,8 @@
 }
 
 .v-login-continue-btn {
-  background: #111827;
-  box-shadow: 0 6px 18px rgba(15, 23, 42, 0.35);
+  background: #0068ff;
+  box-shadow: 0 6px 18px rgba(0, 104, 255, 0.35);
 }
 
 .v-login-alt-method-btn {

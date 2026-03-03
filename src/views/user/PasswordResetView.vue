@@ -8,7 +8,7 @@
         <RouterLink to="/" class="v-auth-back-link">홈으로 돌아가기<ArrowRight class="u-icon-16" /></RouterLink>
 
         <div class="v-auth-brand-row">
-          <span class="v-auth-brand-badge v-auth-brand-badge-green"><Dumbbell class="u-icon-24" /></span>
+          <span class="v-auth-brand-badge v-auth-brand-badge-blue"><Dumbbell class="u-icon-24" /></span>
           <div>
             <p class="v-auth-kicker">짐맵</p>
             <h1 class="v-auth-title">{{ hasToken ? '비밀번호 재설정' : '비밀번호 찾기' }}</h1>
@@ -33,7 +33,7 @@
           </label>
           <p v-if="errorMessage" class="u-text-error-xs">{{ errorMessage }}</p>
           <p v-if="successMessage" class="v-reset-success-msg">{{ successMessage }}</p>
-          <button :disabled="isSubmitting" type="submit" class="v-auth-submit v-auth-submit-green">
+          <button :disabled="isSubmitting" type="submit" class="v-auth-submit v-auth-submit-blue">
             {{ isSubmitting ? '전송 중...' : '재설정 메일 보내기' }}<ArrowRight class="u-icon-16" />
           </button>
         </form>
@@ -59,12 +59,12 @@
           </label>
           <p v-if="errorMessage" class="u-text-error-xs">{{ errorMessage }}</p>
           <p v-if="successMessage" class="v-reset-success-msg">{{ successMessage }}</p>
-          <button :disabled="isSubmitting" type="submit" class="v-auth-submit v-auth-submit-green">
+          <button :disabled="isSubmitting" type="submit" class="v-auth-submit v-auth-submit-blue">
             {{ isSubmitting ? '변경 중...' : '비밀번호 변경 완료' }}<ArrowRight class="u-icon-16" />
           </button>
         </form>
 
-        <button type="button" class="v-auth-outline-link v-auth-outline-link-green" @click="goToLogin">
+        <button type="button" class="v-auth-outline-link v-auth-outline-link-blue" @click="goToLogin">
           로그인으로 돌아가기
         </button>
       </section>
@@ -190,6 +190,6 @@ const goToLogin = () => {
   margin: 0;
   font-size: 13px;
   font-weight: 600;
-  color: #16a34a;
+  color: #2563eb;
 }
 </style>

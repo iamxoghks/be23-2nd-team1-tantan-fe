@@ -110,7 +110,7 @@
           </button>
         </form>
 
-        <button type="button" class="v-auth-outline-link v-auth-outline-link-green" @click="openAuthModal">로그인 하러가기</button>
+        <button type="button" class="v-auth-outline-link v-auth-outline-link-blue" @click="openAuthModal">로그인 하기</button>
       </section>
     </div>
   </div>

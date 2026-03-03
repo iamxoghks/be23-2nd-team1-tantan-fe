@@ -46,7 +46,7 @@
         </button>
 
         <p v-if="errorMessage" class="u-text-error-xs">{{ errorMessage }}</p>
-        <button type="button" class="v-auth-outline-link v-auth-outline-link-green" @click="openAuthModal">로그인 하러가기</button>
+        <button type="button" class="v-auth-outline-link v-auth-outline-link-blue" @click="openAuthModal">로그인 하기</button>
       </section>
     </div>
   </div>
@@ -63,27 +63,23 @@ const checklist = ['운동 히스토리 기록', '근처 체육관 찾기 및 �
 const router = useRouter();
 const { openAuthModal } = useAuthModal();
 const errorMessage = ref('');
+const API_BASE_URL =
+  import.meta.env.VUE_APP_API_BASE_URL ||
+  import.meta.env.VITE_API_BASE_URL ||
+  'http://localhost:8080';
 
 const startSocialSignUp = async (provider) => {
   errorMessage.value = '';
   try {
-    // TODO: SNS OAuth 연동 시 실제 인증 결과로 교체
-    const prefillByProvider = {
-      google: { email: 'google_user@gmail.com', userName: '구글 사용자', nickName: 'google_user' },
-      kakao: { email: 'kakao_user@kakao.com', userName: '카카오 사용자', nickName: 'kakao_user' },
-      naver: { email: 'naver_user@naver.com', userName: '네이버 사용자', nickName: 'naver_user' },
-    };
-    const prefill = prefillByProvider[provider] || {};
-    await router.push({
-      path: '/signup/new',
-      query: {
-        provider,
-        socialVerified: '1',
-        email: prefill.email,
-        userName: prefill.userName,
-        nickName: prefill.nickName,
-      },
-    });
+    const normalizedProvider = String(provider || '').trim().toLowerCase();
+    if (!['google', 'kakao', 'naver'].includes(normalizedProvider)) {
+      errorMessage.value = '지원하지 않는 소셜 가입입니다.';
+      return;
+    }
+
+    const normalizedApiBaseUrl = String(API_BASE_URL).replace(/\/+$/, '');
+    const redirectUrl = `${normalizedApiBaseUrl}/oauth2/authorization/${normalizedProvider}`;
+    window.location.href = redirectUrl;
   } catch (error) {
     errorMessage.value = 'SNS 가입 진행 중 오류가 발생했습니다.';
     console.error('SNS signup redirect failed:', error);
