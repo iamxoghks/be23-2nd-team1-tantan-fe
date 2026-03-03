@@ -13,12 +13,12 @@
         :class="`rail-item ${item.className || ''}`"
       >
         <button
-          v-if="item.id === 'auth'"
+          v-if="item.action"
           type="button"
           :aria-label="item.label"
           :title="item.label"
           :class="`rail-item-link rail-item-link-inactive`"
-          @click="openAuthModal"
+          @click="item.action()"
         >
           <div class="rail-item-icon-wrap">
             <div class="rail-item-icon-box">
@@ -70,16 +70,32 @@ import {
   onMounted,
   watch,
 } from 'vue';
-import { RouterLink, useRoute } from 'vue-router';
-import { Home, MessageCircle, Users, Bell, User, Dumbbell, LogIn, Shield } from 'lucide-vue-next';
+import { RouterLink, useRoute, useRouter } from 'vue-router';
+import { Home, Send, Share2, Bell, User, Dumbbell, LogIn, LogOut, Shield } from 'lucide-vue-next';
 import { useAuthModal } from '@/composables/useAuthModal';
 import { useSession } from '@/composables/useSession';
 import { useNotificationCenter } from '@/composables/useNotificationCenter';
+import { userApi } from '@/services/apis';
+import { clearAuthTokens } from '@/services/token';
 
 const route = useRoute();
+const router = useRouter();
 const { openAuthModal } = useAuthModal();
-const { sessionProfile, isAuthenticated, syncSessionFromServer, primeSessionFromToken } = useSession();
+const { sessionProfile, isAuthenticated, syncSessionFromServer, primeSessionFromToken, resetSession } = useSession();
 const { hasUnread, clearUnread, syncUnreadCount } = useNotificationCenter();
+
+const logout = async () => {
+  try {
+    await userApi.logout();
+  } catch (error) {
+    // ignore logout API failure and continue local logout
+  } finally {
+    clearAuthTokens();
+    resetSession();
+    clearUnread();
+    router.push('/');
+  }
+};
 
 const refreshUnreadBadge = async ({ force = false } = {}) => {
   if (!isAuthenticated.value) {
@@ -96,13 +112,22 @@ const refreshUnreadBadge = async ({ force = false } = {}) => {
 const items = computed(() => {
   const base = [
     { id: 'home', icon: Home, label: '홈', to: '/' },
-    { id: 'chat', icon: MessageCircle, label: '채팅', to: '/chat' },
-    { id: 'community', icon: Users, label: '커뮤니티', to: '/community' },
+    { id: 'chat', icon: Send, label: '채팅', to: '/chat' },
+    { id: 'community', icon: Share2, label: '커뮤니티', to: '/community' },
     { id: 'notifications', icon: Bell, label: '알림', to: '/notifications', hasDot: hasUnread.value },
     isAuthenticated.value
       ? { id: 'profile', icon: User, label: '프로필', to: '/profile' }
-      : { id: 'auth', icon: LogIn, label: '로그인/가입', className: '' },
+      : { id: 'auth', icon: LogIn, label: '로그인/가입', action: openAuthModal, className: '' },
   ];
+
+  if (isAuthenticated.value) {
+    base.push({
+      id: 'logout',
+      icon: LogOut,
+      label: '로그아웃',
+      action: logout,
+    });
+  }
 
   if (sessionProfile.value?.role === 'ADMIN') {
     base.splice(base.length - 1, 0, {
