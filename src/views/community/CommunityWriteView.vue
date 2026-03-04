@@ -718,6 +718,7 @@ const handleSubmitPost = async () => {
 
     if (isEditMode.value) {
       if (hasImageChanges()) {
+        postPayload.replaceImages = true;
         const updateImages = await buildUpdateImages();
         await communityPostApi.update(editPostId.value, {
           post: postPayload,
