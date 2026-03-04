@@ -505,11 +505,11 @@ const fetchTodayWorkouts = async () => {
       page: 0,
       size: 20,
       sort: 'workoutDate,desc',
+      attachableOnly: true,
     });
     const list = extractListPayload(response.data);
     if (!Array.isArray(list) || list.length === 0) {
       todayWorkoutOptions.value = [];
-      if (attachedWorkout.value) attachedWorkout.value = null;
       return;
     }
     const onlyTodayList = list.map((item, index) => normalizeTodayWorkout(item, index));
@@ -518,7 +518,7 @@ const fetchTodayWorkouts = async () => {
 
     if (attachedWorkout.value) {
       const matched = onlyTodayList.find((item) => String(item.id) === String(attachedWorkout.value.id));
-      attachedWorkout.value = matched || null;
+      if (matched) attachedWorkout.value = matched;
     }
   } catch (error) {
     todayWorkoutOptions.value = [];
