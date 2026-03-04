@@ -4,7 +4,7 @@
 
     <div class="app-main-column app-main-column-no-scroll">
       <main class="sx-views-community-communityview-004 v-community-detail-main">
-        <div class="v-content-wrap">
+        <div class="v-community-detail-content">
           <div class="v-community-detail-head">
             <button class="v-community-detail-back" @click="goBackToList">← 목록으로</button>
           </div>
@@ -20,7 +20,7 @@
               <div class="sx-views-community-communityview-021">
                 <div>
                   <p class="ux-views-community-communityview-026">{{ showWorkoutPanel ? '운동 피드' : post.category }}</p>
-                  <h3 class="ux-views-community-communityview-027">{{ showWorkoutPanel ? `${post.author}님의 운동 기록` : post.title }}</h3>
+                  <h3 class="ux-views-community-communityview-027">{{ post.title }}</h3>
                 </div>
                 <div class="u-row-gap-2 v-post-action-wrap" ref="postActionMenuRef">
                   <template v-if="isMyPost">
@@ -77,8 +77,7 @@
 
               <div v-if="showWorkoutPanel" class="sx-views-community-communityview-025">
                 <div class="sx-views-community-communityview-026">
-                  <span class="sx-views-community-communityview-027"><MapPin :size="14" />{{ post.gymName || '운동 기록 첨부' }}</span>
-                  <span class="sx-views-community-communityview-028"><Clock :size="14" />총 시간: {{ post.duration && post.duration !== '-' ? post.duration : '정보 없음' }}</span>
+                  <span class="sx-views-community-communityview-027"><Zap :size="14" />{{ post.author }}님이 운동을 공유했어요!</span>
                   <span class="sx-views-community-communityview-029"><Zap :size="14" />{{ post.streak || 0 }}일 연속</span>
                 </div>
 
@@ -94,13 +93,12 @@
                     </div>
                   </template>
                   <div v-else class="sx-views-community-communityview-030">
-                    <span class="ux-views-community-communityview-033">운동 기록</span>
                     <span class="ux-views-community-communityview-034">요약 정보 없음</span>
                   </div>
                 </div>
               </div>
 
-              <div v-else class="sx-views-community-communityview-031">
+              <div class="sx-views-community-communityview-031">
                 {{ getPostBodyText(post) }}
               </div>
 
@@ -119,7 +117,6 @@
               <div class="sx-views-community-communityview-033">
                 <div class="sx-views-community-communityview-034">
                   <h4 class="ux-views-community-communityview-036">댓글 {{ totalCommentCount }}</h4>
-                  <button class="ux-views-community-communityview-037">최신순</button>
                 </div>
                 <div class="v-community-ig-list">
                   <article v-for="comment in comments" :key="comment.id" class="v-community-thread">
@@ -242,7 +239,7 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import NavigationRail from '@/components/sections/NavigationRail.vue';
-import { Heart, MapPin, Clock, Zap, Flag, Eye, MoreHorizontal } from 'lucide-vue-next';
+import { Heart, Zap, Flag, Eye, MoreHorizontal } from 'lucide-vue-next';
 import { communityCommentApi, communityLikeApi, communityPostApi, reportApi, workoutApi } from '@/services/apis';
 import { useSession } from '@/composables/useSession';
 import { normalizeCommunityPost } from '@/utils/postNormalizer';
@@ -808,7 +805,7 @@ onBeforeUnmount(() => {
 <style scoped>
 .v-community-detail-page,
 .v-community-detail-main,
-.v-community-detail-main .v-content-wrap,
+.v-community-detail-content,
 .v-community-detail-body,
 .v-community-detail-body .sx-views-community-communityview-020,
 .v-community-detail-body .sx-views-community-communityview-022,
@@ -826,7 +823,7 @@ onBeforeUnmount(() => {
   overflow-x: hidden;
 }
 
-.v-community-detail-main .v-content-wrap {
+.v-community-detail-content {
   width: 100%;
   max-width: none;
   margin: 0;
@@ -836,7 +833,21 @@ onBeforeUnmount(() => {
 }
 
 .v-community-detail-body .sx-views-community-communityview-021 > div:first-child {
+  flex: 1;
   min-width: 0;
+}
+
+.v-community-detail-body .sx-views-community-communityview-020,
+.v-community-detail-body .sx-views-community-communityview-021 {
+  overflow: visible;
+}
+
+.v-community-detail-body .ux-views-community-communityview-027 {
+  margin: 0;
+  white-space: normal;
+  overflow: visible;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .v-community-detail-head {
@@ -1112,7 +1123,7 @@ onBeforeUnmount(() => {
 }
 
 @media (max-width: 767px) {
-  .v-community-detail-main .v-content-wrap {
+  .v-community-detail-content {
     margin: 0;
     padding-left: 8px;
     padding-right: 8px;
