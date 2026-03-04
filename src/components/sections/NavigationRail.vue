@@ -110,11 +110,21 @@ const refreshUnreadBadge = async ({ force = false } = {}) => {
 };
 
 const items = computed(() => {
+  const chatItem = isAuthenticated.value
+    ? { id: 'chat', icon: Send, label: '채팅', to: '/chat' }
+    : { id: 'chat', icon: Send, label: '채팅', action: openAuthModal };
+  const communityItem = isAuthenticated.value
+    ? { id: 'community', icon: Share2, label: '커뮤니티', to: '/community' }
+    : { id: 'community', icon: Share2, label: '커뮤니티', action: openAuthModal };
+  const notificationItem = isAuthenticated.value
+    ? { id: 'notifications', icon: Bell, label: '알림', to: '/notifications', hasDot: hasUnread.value }
+    : { id: 'notifications', icon: Bell, label: '알림', action: openAuthModal };
+
   const base = [
     { id: 'home', icon: Home, label: '홈', to: '/' },
-    { id: 'chat', icon: Send, label: '채팅', to: '/chat' },
-    { id: 'community', icon: Share2, label: '커뮤니티', to: '/community' },
-    { id: 'notifications', icon: Bell, label: '알림', to: '/notifications', hasDot: hasUnread.value },
+    chatItem,
+    communityItem,
+    notificationItem,
     isAuthenticated.value
       ? { id: 'profile', icon: User, label: '프로필', to: '/profile' }
       : { id: 'auth', icon: LogIn, label: '로그인/가입', action: openAuthModal, className: '' },

@@ -74,16 +74,13 @@
                 class="sx-views-user-profile-profilehistoryview-004 v-history-log-item"
               >
                 <div class="sx-views-user-profile-profilehistoryview-005">
-                  <div class="v-history-log-icon-box" :style="logIconStyle(workout)">
-                    <Zap class="v-history-log-icon" />
-                  </div>
                   <div class="u-flex-1-min">
                     <div class="sx-views-user-profile-profilehistoryview-007">
                       <span class="v-profile-history-meta">{{ workout.date }} {{ workout.time }}</span>
                       <span class="v-profile-history-duration">{{ workout.duration || 'Daily' }}</span>
                     </div>
                     <h4 class="sx-views-user-profile-profilehistoryview-008">{{ workout.title }}</h4>
-                    <p class="u-text-meta-truncate">{{ workout.tags }}</p>
+                    <!-- <p class="u-text-meta-truncate">{{ workout.tags }}</p> -->
 
                     <div class="v-history-stat-row">
                       <div
@@ -97,9 +94,14 @@
                     </div>
                   </div>
                 </div>
-                <div class="v-history-delete-btn v-history-delete-btn-align v-day-history-badge">
-                  <CalendarDays class="v-icon-18-md20" />
-                </div>
+                <button
+                  type="button"
+                  class="v-history-delete-btn v-history-delete-btn-align v-day-history-delete-btn"
+                  :disabled="isDeletingWorkout(workout.id)"
+                  @click="deleteWorkout(workout.id)"
+                >
+                  <Trash2 class="v-icon-18-md20" />
+                </button>
               </div>
             </template>
 
@@ -141,7 +143,7 @@
 <script setup>
 import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue';
 import { RouterLink, useRoute } from 'vue-router';
-import { ArrowLeft, CalendarDays, Search, Calendar, Zap } from 'lucide-vue-next';
+import { ArrowLeft, CalendarDays, Search, Calendar, Trash2 } from 'lucide-vue-next';
 import NavigationRail from '@/components/sections/NavigationRail.vue';
 import { workoutApi } from '@/services/apis';
 
@@ -153,6 +155,7 @@ const isLoading = ref(false);
 const isLoadingMore = ref(false);
 const errorMessage = ref('');
 const workouts = ref([]);
+const deletingWorkoutIds = ref(new Set());
 const searchTerm = ref('');
 const currentPage = ref(-1);
 const hasNextPage = ref(false);
@@ -196,10 +199,7 @@ const filteredWorkouts = computed(() => {
   ));
 });
 
-const logIconStyle = (log) => ({
-  backgroundColor: log.bgColor || '#dbeafe',
-  color: log.fgColor || '#2563eb',
-});
+const isDeletingWorkout = (id) => deletingWorkoutIds.value.has(String(id));
 
 const formatDate = (value) => {
   if (!value) {
@@ -292,6 +292,24 @@ const disconnectInfiniteObserver = () => {
 
 const loadNextPage = async () => {
   await loadWorkouts({ reset: false });
+};
+
+const deleteWorkout = async (workoutId) => {
+  const normalizedId = Number(workoutId);
+  if (!Number.isFinite(normalizedId) || normalizedId <= 0) return;
+  if (isDeletingWorkout(normalizedId)) return;
+  if (!window.confirm('이 운동 기록을 삭제하시겠습니까?')) return;
+
+  const key = String(normalizedId);
+  deletingWorkoutIds.value.add(key);
+  try {
+    await workoutApi.delete(normalizedId);
+    workouts.value = workouts.value.filter((workout) => Number(workout.id) !== normalizedId);
+  } catch (error) {
+    window.alert('운동 기록 삭제에 실패했습니다.');
+  } finally {
+    deletingWorkoutIds.value.delete(key);
+  }
 };
 
 const refreshInfiniteObserver = () => {

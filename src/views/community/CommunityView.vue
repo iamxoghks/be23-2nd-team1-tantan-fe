@@ -5,11 +5,6 @@
     <div class="app-main-column app-main-column-no-scroll">
       <header class="sx-views-community-communityview-001">
         <div class="v-header-inner v-community-header-inline">
-          <div class="v-title-row v-community-header-title">
-            <MessageCircle class="ux-views-community-communityview-002" :size="24" />
-            <h1 class="v-title-text">커뮤니티</h1>
-          </div>
-
           <form class="v-search-pill v-community-header-search" @submit.prevent="applySearch">
             <input
               v-model="searchTerm"
@@ -122,6 +117,8 @@
                   </div>
                 </div>
 
+                <h3 class="v-community-card-title">{{ post.title }}</h3>
+
                 <div v-if="post.type === 'workout' || post.hasWorkout">
                   <div class="sx-views-community-communityview-009"><Zap :size="18" class="ux-views-community-communityview-008" /><span class="ux-views-community-communityview-009">{{ post.author }}님이 운동을 공유했어요!</span></div>
                   <div class="sx-views-community-communityview-010">
@@ -140,7 +137,6 @@
                 </div>
                 <div v-else>
                   <div v-if="post.image" class="sx-views-community-communityview-015"><img :src="post.image" alt="" class="ux-views-community-communityview-015" /></div>
-                  <p class="ux-views-community-communityview-016"><span class="ux-views-community-communityview-017">{{ post.author }}</span> {{ post.excerpt }}</p>
                 </div>
 
                 <div class="v-community-reaction-row">
@@ -165,6 +161,7 @@
                     </button>
                   </div>
                   <button
+                    v-if="!isMyPost(post)"
                     class="v-community-report-btn ux-views-community-communityview-022"
                     :disabled="isReportingPostId === post.id"
                     @click.stop="reportPost(post)"
@@ -190,12 +187,14 @@ import { RouterLink, useRoute, useRouter } from 'vue-router';
 import NavigationRail from '@/components/sections/NavigationRail.vue';
 import { Search, MessageCircle, Heart, ArrowUpDown, MapPin, Clock, Zap, Flag, X, Eye } from 'lucide-vue-next';
 import { communityLikeApi, communityPostApi, reportApi } from '@/services/apis';
+import { useSession } from '@/composables/useSession';
 import { normalizeCommunityPost } from '@/utils/postNormalizer';
 import { extractList, extractPayload } from '@/utils/api';
 
 const categories = ['전체', '자유게시판', '운동 공유', '운동 꿀팁', '헬스장 리뷰', '식단 공유', '질문게시판'];
 const route = useRoute();
 const router = useRouter();
+const { sessionProfile, primeSessionFromToken, syncSessionFromServer } = useSession();
 
 const posts = ref([]);
 const selectedCategory = ref('전체');
@@ -245,7 +244,30 @@ const resolveAuthorUserId = (post) => {
   const parsed = Number(post?.userId ?? post?.authorId ?? post?.writerId ?? 0);
   return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
 };
+const currentUserId = computed(() => {
+  const parsed = Number(
+    sessionProfile.value?.id
+    ?? sessionProfile.value?.userId
+    ?? sessionProfile.value?.raw?.id
+    ?? sessionProfile.value?.raw?.userId
+    ?? 0,
+  );
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
+});
 const canOpenAuthorProfile = (post) => Boolean(resolveAuthorUserId(post));
+const isMyPost = (post) => {
+  const authorId = resolveAuthorUserId(post);
+  if (!authorId || !currentUserId.value) return false;
+  return Number(authorId) === Number(currentUserId.value);
+};
+
+const formatPostCardTime = (post) => {
+  const raw = post?.createdTime || post?.createdAt || post?.createdDate;
+  if (!raw) return post?.time || '방금 전';
+  const date = new Date(raw);
+  if (Number.isNaN(date.getTime())) return post?.time || '방금 전';
+  return `${date.getMonth() + 1}월 ${date.getDate()}일`;
+};
 
 const compareByCreatedAndId = (a, b) => {
   const createdDiff = getPostCreatedTime(b) - getPostCreatedTime(a);
@@ -316,7 +338,7 @@ const hydrateWorkoutMetaFromDetail = async (normalizedList) => {
 
   const hydratedEntries = await Promise.all(targets.map(async (entry) => {
     try {
-      const response = await communityPostApi.detail(entry.id);
+      const response = await communityPostApi.detail(entry.id, { countView: false });
       const detailPayload = extractDetailPayload(response);
       const detailSource = detailPayload?.post && typeof detailPayload.post === 'object'
         ? { ...detailPayload, ...detailPayload.post }
@@ -377,7 +399,13 @@ const loadPosts = async (
     const list = extractList(extractPayload(response));
     if (list.length > 0) {
       const normalizedList = list.map((item, index) => normalizeCommunityPost(item, index));
+      normalizedList.forEach((entry) => {
+        entry.time = formatPostCardTime(entry);
+      });
       const hydratedList = await hydrateWorkoutMetaFromDetail(normalizedList);
+      hydratedList.forEach((entry) => {
+        entry.time = formatPostCardTime(entry);
+      });
       posts.value = sortPostsByType(hydratedList, normalizedSortType);
     } else {
       posts.value = [];
@@ -602,6 +630,10 @@ watch(searchTerm, (nextKeyword) => {
 });
 
 onMounted(() => {
+  primeSessionFromToken();
+  if (sessionProfile.value?.id == null) {
+    syncSessionFromServer().catch(() => {});
+  }
   document.addEventListener('click', handleOutsideClick);
   const refId = String(route.query?.refId || '').trim();
   const queryCategory = String(route.query?.category || '').trim();
@@ -665,5 +697,16 @@ onBeforeUnmount(() => {
 .v-user-profile-trigger-text:not(:disabled):hover .v-text-user {
   color: #2563eb;
   text-decoration: underline;
+}
+
+.v-community-card-title {
+  margin: 2px 0 10px;
+  font-size: 18px;
+  font-weight: 800;
+  color: #111827;
+  line-height: 1.35;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
 }
 </style>

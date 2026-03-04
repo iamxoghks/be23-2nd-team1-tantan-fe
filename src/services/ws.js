@@ -26,6 +26,7 @@ function normalizeWsBaseUrl(rawUrl) {
 export const wsConfig = {
   connectEndpoint: '/ws',
   sendDestination: '/app/send',
+  typingDestination: '/app/typing',
   roomTopic(roomId) {
     return `/user/queue/chat/rooms/${roomId}`;
   },

@@ -33,7 +33,7 @@
 
         <form class="v-auth-form" @submit.prevent="goToPasswordStep">
           <p class="v-login-email-label">이메일 로그인</p>
-          <label class="v-auth-form-label">이메일<input v-model="email" type="email" placeholder="example@email.com" class="v-auth-input" /></label>
+            <input v-model="email" type="email" placeholder="example@email.com" class="v-auth-input" />
           <p v-if="errorMessage" class="u-text-error-xs">{{ errorMessage }}</p>
           <button type="submit" class="v-auth-submit v-login-continue-btn">
             계속<ArrowRight class="u-icon-16" />

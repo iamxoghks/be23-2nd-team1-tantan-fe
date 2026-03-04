@@ -5,6 +5,12 @@
     <div class="app-main-column">
       <div class="view-wrap view-wrap-lg">
         <div class="view-card settings-page">
+          <div class="sx-views-community-communityview-016">
+            <RouterLink to="/profile" class="v-history-back-btn">
+              <ArrowLeft class="v-icon-18-md20" />
+            </RouterLink>
+          </div>
+
           <div class="settings-head">
             <h1>알림 설정</h1>
             <p>알림 수신 항목과 방해금지 시간을 관리합니다.</p>
@@ -45,6 +51,8 @@
 
 <script setup>
 import { onMounted, ref } from 'vue';
+import { RouterLink } from 'vue-router';
+import { ArrowLeft } from 'lucide-vue-next';
 import NavigationRail from '@/components/sections/NavigationRail.vue';
 import { notificationSettingsApi } from '@/services/apis';
 

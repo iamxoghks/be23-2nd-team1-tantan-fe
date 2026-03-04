@@ -22,8 +22,28 @@
                   <p class="ux-views-community-communityview-026">{{ showWorkoutPanel ? '운동 피드' : post.category }}</p>
                   <h3 class="ux-views-community-communityview-027">{{ showWorkoutPanel ? `${post.author}님의 운동 기록` : post.title }}</h3>
                 </div>
-                <div class="u-row-gap-2">
-                  <button class="ui-modal-icon-btn ui-modal-icon-btn-outline ux-views-community-communityview-028" @click="reportPost"><Flag :size="18" /></button>
+                <div class="u-row-gap-2 v-post-action-wrap" ref="postActionMenuRef">
+                  <template v-if="isMyPost">
+                    <button
+                      class="ui-modal-icon-btn ui-modal-icon-btn-outline ux-views-community-communityview-028"
+                      @click="togglePostActionMenu"
+                    >
+                      <MoreHorizontal :size="18" />
+                    </button>
+                    <div v-if="isPostActionMenuOpen" class="v-post-action-dropdown">
+                      <button type="button" class="v-post-action-item" @click="editPost">수정</button>
+                      <button type="button" class="v-post-action-item v-post-action-item-danger" @click="openDeleteConfirm">
+                        삭제
+                      </button>
+                    </div>
+                  </template>
+                  <button
+                    v-else
+                    class="ui-modal-icon-btn ui-modal-icon-btn-outline ux-views-community-communityview-028"
+                    @click="reportPost"
+                  >
+                    <Flag :size="18" />
+                  </button>
                 </div>
               </div>
             </div>
@@ -200,14 +220,29 @@
         </div>
       </main>
     </div>
+
+    <Teleport to="body">
+      <div v-if="isDeleteModalOpen" class="v-post-delete-backdrop" @click.self="closeDeleteConfirm">
+        <div class="v-post-delete-modal">
+          <h3 class="v-post-delete-title">게시글을 삭제할까요?</h3>
+          <p class="v-post-delete-desc">삭제 후에는 복구할 수 없습니다.</p>
+          <div class="v-post-delete-actions">
+            <button type="button" class="v-post-delete-cancel" :disabled="isDeletingPost" @click="closeDeleteConfirm">취소</button>
+            <button type="button" class="v-post-delete-confirm" :disabled="isDeletingPost" @click="confirmDeletePost">
+              {{ isDeletingPost ? '삭제 중...' : '확인' }}
+            </button>
+          </div>
+        </div>
+      </div>
+    </Teleport>
   </div>
 </template>
 
 <script setup>
-import { computed, nextTick, onMounted, ref } from 'vue';
+import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import NavigationRail from '@/components/sections/NavigationRail.vue';
-import { Heart, MapPin, Clock, Zap, Flag, Eye } from 'lucide-vue-next';
+import { Heart, MapPin, Clock, Zap, Flag, Eye, MoreHorizontal } from 'lucide-vue-next';
 import { communityCommentApi, communityLikeApi, communityPostApi, reportApi, workoutApi } from '@/services/apis';
 import { useSession } from '@/composables/useSession';
 import { normalizeCommunityPost } from '@/utils/postNormalizer';
@@ -238,6 +273,10 @@ const replyLoadingMap = ref({});
 const isLoading = ref(false);
 const errorMessage = ref('');
 const isLiked = ref(false);
+const isPostActionMenuOpen = ref(false);
+const postActionMenuRef = ref(null);
+const isDeleteModalOpen = ref(false);
+const isDeletingPost = ref(false);
 const myProfileImage = computed(() => (
   sessionProfile.value?.raw?.profileImageUrl
   || sessionProfile.value?.raw?.profileImage
@@ -248,6 +287,17 @@ const authorUserId = computed(() => {
   return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
 });
 const canOpenAuthorProfile = computed(() => Boolean(authorUserId.value));
+const myUserId = computed(() => {
+  const parsed = Number(
+    sessionProfile.value?.id
+      ?? sessionProfile.value?.userId
+      ?? sessionProfile.value?.raw?.id
+      ?? sessionProfile.value?.raw?.userId
+      ?? 0,
+  );
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
+});
+const isMyPost = computed(() => Boolean(myUserId.value) && Boolean(authorUserId.value) && myUserId.value === authorUserId.value);
 const showWorkoutPanel = computed(() => Boolean(post.value?.type === 'workout' || post.value?.hasWorkout));
 const totalCommentCount = computed(() => {
   const serverCount = Number(post.value?.comments ?? post.value?.commentCount);
@@ -509,12 +559,52 @@ const loadComments = async () => {
   replyLoadingMap.value = {};
 };
 
-const goBackToList = async () => {
-  if (window.history.length > 1) {
-    await router.back();
-    return;
-  }
+const goBackToList = () => {
   router.push({ path: '/community', query: listQuery.value });
+};
+
+const togglePostActionMenu = () => {
+  if (!isMyPost.value) return;
+  isPostActionMenuOpen.value = !isPostActionMenuOpen.value;
+};
+
+const closePostActionMenu = () => {
+  isPostActionMenuOpen.value = false;
+};
+
+const editPost = () => {
+  if (!post.value?.id) return;
+  closePostActionMenu();
+  router.push({
+    path: '/community/write',
+    query: {
+      editId: String(post.value.id),
+    },
+  });
+};
+
+const openDeleteConfirm = () => {
+  closePostActionMenu();
+  isDeleteModalOpen.value = true;
+};
+
+const closeDeleteConfirm = () => {
+  if (isDeletingPost.value) return;
+  isDeleteModalOpen.value = false;
+};
+
+const confirmDeletePost = async () => {
+  if (!post.value?.id) return;
+  isDeletingPost.value = true;
+  try {
+    await communityPostApi.delete(post.value.id);
+    isDeleteModalOpen.value = false;
+    goBackToList();
+  } catch (error) {
+    window.alert('게시글 삭제에 실패했습니다.');
+  } finally {
+    isDeletingPost.value = false;
+  }
 };
 
 const openAuthorProfile = () => {
@@ -563,9 +653,10 @@ const toggleCommentLike = (rootCommentId, replyId = null) => {
 const startReply = async (rootComment, targetComment = rootComment) => {
   const nickName = String(targetComment?.author || '').trim();
   if (!nickName) return;
+  const targetCommentId = targetComment?.id ?? rootComment.id;
   replyTarget.value = {
     rootCommentId: rootComment.id,
-    parentCommentId: rootComment.id,
+    parentCommentId: targetCommentId,
     replyToUserId: targetComment?.userId ?? null,
     nickName,
   };
@@ -696,7 +787,22 @@ const reportComment = async (commentId) => {
   }
 };
 
-onMounted(loadDetail);
+const handleDocumentPointerDown = (event) => {
+  if (!isPostActionMenuOpen.value) return;
+  const root = postActionMenuRef.value;
+  if (!root) return;
+  if (root.contains(event.target)) return;
+  closePostActionMenu();
+};
+
+onMounted(() => {
+  loadDetail();
+  window.addEventListener('pointerdown', handleDocumentPointerDown);
+});
+
+onBeforeUnmount(() => {
+  window.removeEventListener('pointerdown', handleDocumentPointerDown);
+});
 </script>
 
 <style scoped>
@@ -736,6 +842,102 @@ onMounted(loadDetail);
 .v-community-detail-head {
   display: flex;
   margin-bottom: 12px;
+}
+
+.v-post-action-wrap {
+  position: relative;
+}
+
+.v-post-action-dropdown {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 8px);
+  z-index: 20;
+  min-width: 120px;
+  border-radius: 10px;
+  border: 1px solid #e2e8f0;
+  background: #ffffff;
+  box-shadow: 0 12px 24px rgba(15, 23, 42, 0.12);
+  padding: 6px;
+  display: grid;
+  gap: 4px;
+}
+
+.v-post-action-item {
+  border: none;
+  background: transparent;
+  text-align: left;
+  font-size: 13px;
+  font-weight: 600;
+  color: #334155;
+  border-radius: 8px;
+  padding: 8px 10px;
+}
+
+.v-post-action-item:hover {
+  background: #f8fafc;
+}
+
+.v-post-action-item-danger {
+  color: #ef4444;
+}
+
+.v-post-delete-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  background: rgba(15, 23, 42, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+}
+
+.v-post-delete-modal {
+  width: min(360px, 100%);
+  border-radius: 16px;
+  background: #ffffff;
+  padding: 20px;
+  box-shadow: 0 24px 48px rgba(15, 23, 42, 0.2);
+}
+
+.v-post-delete-title {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 800;
+  color: #0f172a;
+}
+
+.v-post-delete-desc {
+  margin: 10px 0 0;
+  font-size: 14px;
+  color: #64748b;
+}
+
+.v-post-delete-actions {
+  margin-top: 18px;
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.v-post-delete-cancel,
+.v-post-delete-confirm {
+  border: none;
+  border-radius: 10px;
+  font-size: 14px;
+  font-weight: 700;
+  padding: 10px 14px;
+}
+
+.v-post-delete-cancel {
+  background: #f1f5f9;
+  color: #475569;
+}
+
+.v-post-delete-confirm {
+  background: #ef4444;
+  color: #ffffff;
 }
 
 .v-community-detail-back {

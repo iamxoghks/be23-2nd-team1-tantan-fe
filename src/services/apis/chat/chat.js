@@ -24,4 +24,8 @@ export const chatApi = {
   leave(roomKey) {
     return apiClient.post(`/chat/rooms/${roomKey}/leave`);
   },
+
+  reportMessage(roomKey, messageId, payload) {
+    return apiClient.post(`/chat/rooms/${roomKey}/messages/${messageId}/report`, payload);
+  },
 };
