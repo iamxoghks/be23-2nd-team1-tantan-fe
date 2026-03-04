@@ -28,12 +28,39 @@
   background: #ffffff;
   overflow: hidden;
   cursor: pointer;
-  transition: box-shadow 0.25s ease;
-  align-self: start;
+  transition: border-color 0.2s ease;
+  display: inline-block;
+  width: 100%;
+  margin: 0 0 16px;
+  break-inside: avoid;
+  break-inside: avoid-column;
+  -webkit-column-break-inside: avoid;
+  page-break-inside: avoid;
+  vertical-align: top;
+  position: relative;
+  z-index: 0;
+}
+
+.v-community-post-card::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.08);
+  opacity: 0;
+  transition: opacity 0.25s ease;
+  pointer-events: none;
 }
 
 .v-community-post-card:hover {
-  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.08);
+  transform: none;
+  margin-top: 0;
+  margin-bottom: 16px;
+  z-index: 1;
+}
+
+.v-community-post-card:hover::after {
+  opacity: 1;
 }
 
 .v-community-report-btn {
@@ -101,7 +128,11 @@
 .sx-views-community-communityview-004 { @apply flex-1 overflow-y-auto bg-[#fcfcfc]; overflow-x: hidden; }
 .sx-views-community-communityview-005 { @apply flex items-center gap-2 mb-6 md:mb-8 overflow-x-auto pb-2; }
 .sx-views-community-communityview-006 { @apply w-8 h-8 flex items-center justify-center bg-white border border-[#e5e7eb] rounded-full shrink-0; }
-.sx-views-community-communityview-007 { @apply grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6; align-items: start; }
+.sx-views-community-communityview-007 {
+  column-count: 1;
+  column-gap: 16px;
+  column-fill: balance;
+}
 .sx-views-community-communityview-008 { @apply flex items-center justify-between mb-4 md:mb-5; }
 .sx-views-community-communityview-009 { @apply flex items-center gap-2 mb-4; }
 .sx-views-community-communityview-010 { @apply flex flex-col sm:flex-row gap-4 mb-4 md:mb-5; }
@@ -432,6 +463,20 @@
 
   .v-community-ig-submit-btn {
     font-size: 12px;
+  }
+}
+
+@media (min-width: 900px) {
+  .sx-views-community-communityview-007 {
+    column-count: 2;
+    column-gap: 20px;
+  }
+}
+
+@media (min-width: 1400px) {
+  .sx-views-community-communityview-007 {
+    column-count: 3;
+    column-gap: 20px;
   }
 }
 
