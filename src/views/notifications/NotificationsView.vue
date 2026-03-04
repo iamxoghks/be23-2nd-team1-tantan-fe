@@ -76,7 +76,7 @@
 
                 <div class="u-flex-1-min">
                   <div class="v-noti-content-line ux-views-notifications-notificationsview-004">
-                    <span class="ux-views-notifications-notificationsview-005">{{ notif.actor.name }}</span>
+                    <span v-if="notif.actor.name" class="ux-views-notifications-notificationsview-005">{{ notif.actor.name }}</span>
                     <span class="ux-views-notifications-notificationsview-006">{{ notif.content }}</span>
                   </div>
                   <div class="v-noti-meta-line">
@@ -92,9 +92,23 @@
                   <img :src="notif.targetImage" alt="" class="v-noti-target-image" />
                 </div>
 
-                <button class="v-noti-read-btn" :disabled="notif.isRead" @click.stop="markAsRead(notif.id)">
-                  <Trash2 :size="18" />
-                </button>
+                <div class="v-noti-item-actions" @click.stop>
+                  <button
+                    class="v-noti-read-btn"
+                    :disabled="notif.isRead"
+                    @click.stop="markAsRead(notif.id)"
+                    aria-label="읽음 처리"
+                  >
+                    <Check :size="18" />
+                  </button>
+                  <button
+                    class="v-noti-read-btn v-noti-delete-btn"
+                    @click.stop="deleteNotification(notif.id)"
+                    aria-label="알림 삭제"
+                  >
+                    <Trash2 :size="18" />
+                  </button>
+                </div>
               </div>
 
               <div v-if="filteredNotifications.length === 0" class="v-noti-empty">
@@ -104,12 +118,30 @@
             </template>
           </div>
 
-          <div v-if="!isLoading && !errorMessage && filteredNotifications.length > 0" class="v-noti-load-more-wrap">
-            <button class="v-noti-load-more-btn">이전 알림 더보기</button>
+          <div v-if="!isLoading && !errorMessage && filteredNotifications.length > 0 && hasMoreNotifications" class="v-noti-load-more-wrap">
+            <button class="v-noti-load-more-btn" :disabled="isLoadingMore" @click="loadMoreNotifications">
+              {{ isLoadingMore ? '불러오는 중...' : '이전 알림 더보기' }}
+            </button>
           </div>
         </div>
       </main>
     </div>
+
+    <Teleport to="body">
+      <div
+        v-if="isBlockedTargetModalOpen"
+        class="v-noti-blocked-backdrop"
+        @click.self="closeBlockedTargetModal"
+      >
+        <div class="v-noti-blocked-modal">
+          <h3 class="v-noti-blocked-title">이동할 수 없어요</h3>
+          <p class="v-noti-blocked-desc">{{ blockedTargetMessage }}</p>
+          <div class="v-noti-blocked-actions">
+            <button type="button" class="v-noti-blocked-confirm" @click="closeBlockedTargetModal">확인</button>
+          </div>
+        </div>
+      </div>
+    </Teleport>
   </div>
 </template>
 
@@ -117,8 +149,8 @@
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 import { useRouter } from 'vue-router';
 import NavigationRail from '@/components/sections/NavigationRail.vue';
-import { Bell, Settings, CheckCheck, Heart, MessageSquare, UserPlus, Zap, Trophy, Info, Trash2 } from 'lucide-vue-next';
-import { notificationApi } from '@/services/apis';
+import { Bell, Settings, CheckCheck, Check, Heart, MessageSquare, UserPlus, Zap, Trophy, Info, Trash2 } from 'lucide-vue-next';
+import { communityPostApi, notificationApi } from '@/services/apis';
 import { extractList, extractPayload } from '@/utils/api';
 import { useNotificationCenter } from '@/composables/useNotificationCenter';
 
@@ -133,8 +165,14 @@ const router = useRouter();
 const activeTab = ref('all');
 const notifications = ref([]);
 const isLoading = ref(false);
+const isLoadingMore = ref(false);
 const isMarkingAll = ref(false);
+const hasMoreNotifications = ref(false);
+const currentPage = ref(0);
+const PAGE_SIZE = 20;
 const errorMessage = ref('');
+const isBlockedTargetModalOpen = ref(false);
+const blockedTargetMessage = ref('삭제되었거나 접근 권한이 없는 게시글입니다.');
 let stopSse = null;
 const { setUnreadFromList } = useNotificationCenter();
 
@@ -222,26 +260,72 @@ const fallbackMessageByRefType = (refTypeRaw) => {
 
 const fallbackAvatar = (seed) => `https://api.dicebear.com/9.x/initials/svg?seed=${encodeURIComponent(seed || 'user')}&backgroundType=gradientLinear`;
 
+const splitActorFromMessage = (message) => {
+  const normalized = typeof message === 'string' ? message.trim() : '';
+  if (!normalized) return { actor: '', content: '' };
+
+  const actorPrefixMatch = normalized.match(/^(.+?)님이\s+(.+)$/);
+  if (actorPrefixMatch) {
+    return {
+      actor: actorPrefixMatch[1]?.trim() || '',
+      content: actorPrefixMatch[2]?.trim() || normalized,
+    };
+  }
+
+  return { actor: '', content: normalized };
+};
+
 const normalizeNotification = (item, index) => {
-  const actorName = item?.actorName || item?.senderName || item?.fromUserName || item?.userName || '시스템';
+  const type = inferType(item);
   const rawMessage = typeof item?.message === 'string' ? item.message.trim() : '';
   const fallbackMessage = fallbackMessageByRefType(item?.refType || item?.type || item?.notificationType);
+  const messageForDisplay = rawMessage || fallbackMessage;
+  const parsed = splitActorFromMessage(messageForDisplay);
+  const explicitActorName = (
+    item?.actorName
+    || item?.senderName
+    || item?.fromUserName
+    || item?.userName
+    || ''
+  ).trim();
+  const actorName = explicitActorName || (type !== 'system' ? parsed.actor : '시스템');
+  const content = (!explicitActorName && parsed.actor && type !== 'system')
+    ? parsed.content
+    : messageForDisplay;
+  const actorImageSeed = actorName || type || 'user';
 
   return {
     id: String(item?.id ?? item?.notificationId ?? index),
     refType: item?.refType || '',
     refId: item?.refId ?? null,
-    type: inferType(item),
+    type,
     actor: {
       name: actorName,
-      image: item?.actorImage || item?.senderImage || item?.profileImage || fallbackAvatar(actorName),
+      image: item?.actorImage || item?.senderImage || item?.profileImage || fallbackAvatar(actorImageSeed),
     },
-    content: rawMessage || fallbackMessage,
+    content,
     timestamp: toTimeAgo(item?.createdTime || item?.createdAt || item?.timestamp || item?.sentAt),
+    rawCreatedTime: item?.createdTime || item?.createdAt || item?.timestamp || item?.sentAt || null,
     isRead: Boolean(item?.isRead || item?.read),
     targetContent: item?.targetContent || item?.targetTitle || '',
     targetImage: item?.targetImage || '',
   };
+};
+
+const mergeNotifications = (base, incoming) => {
+  if (!Array.isArray(base) || base.length === 0) return [...incoming];
+  if (!Array.isArray(incoming) || incoming.length === 0) return [...base];
+
+  const mergedById = new Map(base.map((item) => [String(item.id), item]));
+  incoming.forEach((item) => {
+    mergedById.set(String(item.id), item);
+  });
+
+  return Array.from(mergedById.values()).sort((a, b) => {
+    const aTime = new Date(a?.rawCreatedTime || 0).getTime();
+    const bTime = new Date(b?.rawCreatedTime || 0).getTime();
+    return bTime - aTime;
+  });
 };
 
 const upsertNotification = (incomingRaw) => {
@@ -259,20 +343,51 @@ const upsertNotification = (incomingRaw) => {
   setUnreadFromList(notifications.value);
 };
 
-const loadNotifications = async () => {
-  isLoading.value = true;
-  errorMessage.value = '';
+const fetchNotificationPage = async (page, { append = false } = {}) => {
+  if (append) {
+    isLoadingMore.value = true;
+  } else {
+    isLoading.value = true;
+    errorMessage.value = '';
+  }
+
   try {
-    const response = await notificationApi.list({ unreadOnly: false });
-    const payload = extractPayload(response);
-    notifications.value = extractList(payload).map(normalizeNotification);
+    const response = await notificationApi.listPaged({
+      unreadOnly: false,
+      page,
+      size: PAGE_SIZE,
+      sort: 'createdTime,DESC',
+    });
+    const payload = extractPayload(response, {});
+    const pageItems = extractList(payload).map(normalizeNotification);
+
+    notifications.value = append
+      ? mergeNotifications(notifications.value, pageItems)
+      : pageItems;
+
+    hasMoreNotifications.value = Boolean(payload?.hasNext);
+    currentPage.value = Number(payload?.number ?? page);
     setUnreadFromList(notifications.value);
   } catch (error) {
-    notifications.value = [];
-    errorMessage.value = '알림 목록을 불러오지 못했습니다.';
+    if (!append) {
+      notifications.value = [];
+      errorMessage.value = '알림 목록을 불러오지 못했습니다.';
+    }
   } finally {
     isLoading.value = false;
+    isLoadingMore.value = false;
   }
+};
+
+const loadNotifications = async () => {
+  hasMoreNotifications.value = false;
+  currentPage.value = 0;
+  await fetchNotificationPage(0, { append: false });
+};
+
+const loadMoreNotifications = async () => {
+  if (isLoadingMore.value || !hasMoreNotifications.value) return;
+  await fetchNotificationPage(currentPage.value + 1, { append: true });
 };
 
 const markAsRead = async (id) => {
@@ -286,6 +401,16 @@ const markAsRead = async (id) => {
     setUnreadFromList(notifications.value);
   } catch (error) {
     errorMessage.value = '알림 읽음 처리에 실패했습니다.';
+  }
+};
+
+const deleteNotification = async (id) => {
+  try {
+    await notificationApi.delete(id);
+    notifications.value = notifications.value.filter((item) => String(item.id) !== String(id));
+    setUnreadFromList(notifications.value);
+  } catch (error) {
+    errorMessage.value = '알림 삭제에 실패했습니다.';
   }
 };
 
@@ -310,6 +435,41 @@ const resolveNotificationTarget = (notification) => {
   return { path: '/notifications' };
 };
 
+const closeBlockedTargetModal = () => {
+  isBlockedTargetModalOpen.value = false;
+};
+
+const openBlockedTargetModal = (message) => {
+  blockedTargetMessage.value = String(message || '').trim() || '삭제되었거나 접근 권한이 없는 게시글입니다.';
+  isBlockedTargetModalOpen.value = true;
+};
+
+const ensureNotificationTargetAccessible = async (notification, target) => {
+  if (!target?.path || !String(target.path).startsWith('/community/')) {
+    return true;
+  }
+  const refId = Number(notification?.refId || 0);
+  if (!Number.isFinite(refId) || refId <= 0) {
+    return true;
+  }
+  try {
+    await communityPostApi.detail(refId, { countView: false });
+    return true;
+  } catch (error) {
+    const status = Number(error?.response?.status || 0);
+    if (status === 403) {
+      openBlockedTargetModal('접근 권한이 없는 게시글입니다.');
+      return false;
+    }
+    if (status === 404) {
+      openBlockedTargetModal('삭제되었거나 존재하지 않는 게시글입니다.');
+      return false;
+    }
+    openBlockedTargetModal('현재 게시글에 접근할 수 없습니다.');
+    return false;
+  }
+};
+
 const openNotificationTarget = async (notification) => {
   if (!notification) return;
 
@@ -318,6 +478,8 @@ const openNotificationTarget = async (notification) => {
   }
 
   const target = resolveNotificationTarget(notification);
+  const canMove = await ensureNotificationTargetAccessible(notification, target);
+  if (!canMove) return;
   router.push(target);
 };
 
@@ -386,3 +548,56 @@ onBeforeUnmount(() => {
   }
 });
 </script>
+
+<style scoped>
+.v-noti-blocked-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 2300;
+  background: rgba(15, 23, 42, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+
+.v-noti-blocked-modal {
+  width: min(420px, 100%);
+  border-radius: 16px;
+  background: #ffffff;
+  box-shadow: 0 20px 40px rgba(15, 23, 42, 0.25);
+  border: 1px solid #e2e8f0;
+  padding: 22px 20px 18px;
+}
+
+.v-noti-blocked-title {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 800;
+  color: #0f172a;
+}
+
+.v-noti-blocked-desc {
+  margin: 10px 0 0;
+  font-size: 14px;
+  line-height: 1.6;
+  color: #475569;
+}
+
+.v-noti-blocked-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 18px;
+}
+
+.v-noti-blocked-confirm {
+  min-width: 88px;
+  height: 38px;
+  border-radius: 10px;
+  border: 1px solid #2563eb;
+  background: #2563eb;
+  color: #ffffff;
+  font-size: 14px;
+  font-weight: 700;
+}
+</style>

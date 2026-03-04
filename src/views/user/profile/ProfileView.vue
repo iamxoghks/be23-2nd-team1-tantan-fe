@@ -157,7 +157,7 @@
             <div v-if="!shouldMaskPrivateProfile" class="sx-views-user-profile-profileview-005">
               <template v-if="isOwnProfile">
                 <RouterLink to="/profile/edit" class="v-profile-action-secondary v-profile-action-btn v-profile-edit-link-btn">
-                  프로필 수정
+                  프로필 관리
                 </RouterLink>
                 <button class="v-profile-action-primary v-profile-action-btn" @click="openWorkoutModal">
                   <Plus :size="18" />
@@ -186,7 +186,7 @@
 
           <div v-if="!shouldMaskPrivateProfile" class="sx-views-user-profile-profileview-006">
             <div class="sx-views-user-profile-profileview-007">
-              <h3 class="v-profile-section-title">운동 활동</h3>
+              <h3 class="v-profile-section-title">{{ selectedHeatmapYear }}년 운동 기록</h3>
               <div class="sx-views-user-profile-profileview-008">
                 <span>적음</span>
                 <div class="sx-views-user-profile-profileview-009">
@@ -200,30 +200,74 @@
               </div>
             </div>
 
-            <div class="u-gap-2">
-              <div class="sx-views-user-profile-profileview-010">
-                <span v-for="day in days" :key="day">{{ day }}</span>
-              </div>
-              <div class="sx-views-user-profile-profileview-011">
-                <div class="sx-views-user-profile-profileview-012">
-                  <div v-for="(week, i) in heatmapData" :key="i" class="sx-views-user-profile-profileview-013">
+            <div class="v-profile-activity-wrap">
+              <div class="v-profile-activity-main">
+                <div class="v-profile-activity-summary-row">
+                  <div class="v-profile-activity-pill-row">
+                    <span class="v-profile-activity-pill v-profile-activity-pill-green">
+                      {{ heatmapWorkoutDayTotal }}일 운동
+                    </span>
+                    <span class="v-profile-activity-pill v-profile-activity-pill-orange">
+                      🔥 {{ heatmapCurrentStreak }}일 연속
+                    </span>
+                    <span class="v-profile-activity-pill v-profile-activity-pill-gray">
+                      총 {{ heatmapContributionTotal }}회 기록
+                    </span>
+                  </div>
+                  <div ref="heatmapYearDropdownRef" class="v-profile-activity-years">
                     <button
-                      v-for="(val, j) in week"
-                      :key="j"
                       type="button"
-                      class="v-heatmap-cell"
-                      :class="[
-                        heatmapColorClass(val),
-                        isHeatmapCellClickable(i, j, val) ? 'v-heatmap-cell-clickable' : 'v-heatmap-cell-disabled',
-                      ]"
-                      :title="getHeatmapCellDate(i, j) || ''"
-                      :disabled="!isHeatmapCellClickable(i, j, val)"
-                      @click="openWorkoutByDate(i, j, val)"
-                    />
+                      class="v-profile-year-button v-profile-year-button-active"
+                      @click="toggleHeatmapYearDropdown"
+                    >
+                      {{ selectedHeatmapYear }}
+                    </button>
+                    <div v-if="isHeatmapYearDropdownOpen" class="v-profile-year-dropdown">
+                      <button
+                        v-for="year in heatmapYearOptions"
+                        :key="year"
+                        type="button"
+                        class="v-profile-year-option"
+                        :class="{ 'v-profile-year-option-active': year === selectedHeatmapYear }"
+                        @click="changeHeatmapYear(year)"
+                      >
+                        {{ year }}
+                      </button>
+                    </div>
                   </div>
                 </div>
-                <div class="sx-views-user-profile-profileview-014">
-                  <span v-for="month in months" :key="month">{{ month }}</span>
+                <div class="v-profile-activity-grid-wrap">
+                  <div class="sx-views-user-profile-profileview-010 v-profile-activity-days">
+                    <span v-for="day in days" :key="day">{{ day }}</span>
+                  </div>
+                  <div class="sx-views-user-profile-profileview-011 v-profile-activity-grid-scroll">
+                    <div class="v-profile-heatmap-month-row" :style="{ '--heatmap-week-count': heatmapWeekCount }">
+                      <span
+                        v-for="(label, index) in heatmapMonthLabelByWeek"
+                        :key="`month-${index}`"
+                        class="v-profile-heatmap-month-cell"
+                      >
+                        {{ label }}
+                      </span>
+                    </div>
+                    <div class="sx-views-user-profile-profileview-012" :style="{ '--heatmap-week-count': heatmapWeekCount }">
+                      <div v-for="(week, i) in heatmapData" :key="i" class="sx-views-user-profile-profileview-013">
+                        <button
+                          v-for="(val, j) in week"
+                          :key="j"
+                          type="button"
+                          class="v-heatmap-cell"
+                          :class="[
+                            heatmapColorClass(val),
+                            isHeatmapCellClickable(i, j, val) ? 'v-heatmap-cell-clickable' : 'v-heatmap-cell-disabled',
+                          ]"
+                          :title="getHeatmapCellDate(i, j) || ''"
+                          :disabled="!isHeatmapCellClickable(i, j, val)"
+                          @click="openWorkoutByDate(i, j, val)"
+                        />
+                      </div>
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
@@ -248,12 +292,8 @@
                 </p>
                 <div v-for="log in logs" :key="log.id" class="sx-views-user-profile-profileview-018 v-profile-log-item v-profile-log-item-group">
                   <div class="sx-views-user-profile-profileview-019">
-                    <div :class="['v-profile-log-icon', log.color]">
-                      <Zap :size="20" class="v-icon-20-md24" />
-                    </div>
                     <div class="u-flex-1-min">
-                      <h4 class="sx-views-user-profile-profileview-020 v-profile-log-title-hover">{{ log.title }}</h4>
-                      <p class="u-text-meta-truncate">{{ log.tags }} • {{ log.duration || '' }}</p>
+                      <h4 class="sx-views-user-profile-profileview-020 v-profile-log-title-hover">{{ log.exerciseName }}</h4>
                       <div class="sx-views-user-profile-profileview-021">
                         <div v-for="([key, val]) in Object.entries(log.stats || {})" :key="key" class="v-profile-log-stat-chip">
                           <span class="v-profile-log-stat-key">{{ key }}</span>
@@ -298,8 +338,7 @@
 
         <footer class="v-page-footer">
           <div class="sx-views-user-profile-profileview-027">
-            <span>© 2026 탄탄 짐 탐색</span>
-            <RouterLink to="/settings" class="v-footer-link">설정</RouterLink>
+            <span>© 2026 tantan</span>
             <RouterLink to="/legal/terms" class="v-footer-link">이용약관</RouterLink>
             <RouterLink to="/legal/privacy" class="v-footer-link">개인정보처리방침</RouterLink>
             <button
@@ -400,27 +439,40 @@
             </div>
 
             <div class="u-col-gap-3">
-              <div v-for="(exercise, idx) in workoutForm.exercises" :key="idx" class="v-profile-exercise-row">
-                <div class="v-profile-exercise-inputs">
-                  <div class="v-profile-exercise-name">
-                    <input v-model="exercise.name" type="text" placeholder="운동명" class="v-modal-line-input sx-views-user-profile-profileview-038" />
-                  </div>
-                  <div class="v-profile-exercise-metric"><input v-model="exercise.weight" type="text" placeholder="중량" class="v-modal-line-input sx-views-user-profile-profileview-038" /></div>
-                  <div class="v-profile-exercise-metric"><input v-model="exercise.sets" type="text" placeholder="세트" class="v-modal-line-input sx-views-user-profile-profileview-038" /></div>
-                  <div class="v-profile-exercise-metric"><input v-model="exercise.reps" type="text" placeholder="횟수" class="v-modal-line-input sx-views-user-profile-profileview-038" /></div>
-                </div>
-                <div class="u-gap-2">
+              <div v-for="(exercise, idx) in workoutForm.exercises" :key="idx" class="v-profile-exercise-item">
+                <div class="v-profile-exercise-row">
+                  <input v-model="exercise.name" type="text" placeholder="운동명" class="v-modal-line-input sx-views-user-profile-profileview-038 v-profile-exercise-name-input" />
+                  <input
+                    v-model="exercise.weight"
+                    type="text"
+                    inputmode="numeric"
+                    placeholder="중량(kg)"
+                    class="v-modal-line-input sx-views-user-profile-profileview-038"
+                    @input="handleExerciseNumberInput(idx, 'weight', $event)"
+                  />
+                  <input
+                    v-model="exercise.sets"
+                    type="text"
+                    inputmode="numeric"
+                    placeholder="세트"
+                    class="v-modal-line-input sx-views-user-profile-profileview-038"
+                    @input="handleExerciseNumberInput(idx, 'sets', $event)"
+                  />
+                  <input
+                    v-model="exercise.reps"
+                    type="text"
+                    inputmode="numeric"
+                    placeholder="횟수"
+                    class="v-modal-line-input sx-views-user-profile-profileview-038"
+                    @input="handleExerciseNumberInput(idx, 'reps', $event)"
+                  />
                   <button class="sx-views-user-profile-profileview-039" @click="removeExercise(idx)">
                     <Trash2 :size="18" />
                   </button>
                 </div>
+                <p v-if="exerciseInputErrors[idx]" class="v-profile-exercise-error">숫자만 입력해주세요.</p>
               </div>
             </div>
-          </div>
-
-          <div class="u-col-gap-2">
-            <label class="v-form-label">오늘의 기록 & 느낌</label>
-            <textarea v-model="workoutForm.notes" placeholder="오늘 운동 컨디션은 어땠나요?" class="sx-views-user-profile-profileview-040" />
           </div>
 
           <!-- <div class="sx-views-user-profile-profileview-041">
@@ -504,17 +556,68 @@
 </template>
 
 <script setup>
-import { computed, onMounted, ref, watch } from 'vue';
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { RouterLink, useRoute, useRouter } from 'vue-router';
 import NavigationRail from '@/components/sections/NavigationRail.vue';
-import { Plus, History, Zap, Trash2, X, CheckCircle2 } from 'lucide-vue-next';
+import { Plus, History, Trash2, X, CheckCircle2 } from 'lucide-vue-next';
 import { chatApi, followApi, gymApi, gymFavoriteApi, userApi, workoutApi } from '@/services/apis';
 import { useSession } from '@/composables/useSession';
 import { normalizeRole } from '@/services/token';
 import { formatTimeAgo } from '@/utils/time';
 
-const months = ref([]);
 const days = ['월', '수', '금'];
+const selectedHeatmapYear = ref(new Date().getFullYear());
+const earliestHeatmapYear = ref(new Date().getFullYear());
+const heatmapContributionTotal = ref(0);
+const heatmapMonthLabelByWeek = ref([]);
+const heatmapWeekCount = computed(() => Math.max(1, Number(heatmapData.value?.length || heatmapMonthLabelByWeek.value?.length || 0)));
+const heatmapWorkoutDayTotal = computed(() => (
+  (Array.isArray(heatmapData.value) ? heatmapData.value : []).reduce((total, week) => (
+    total + (Array.isArray(week) ? week.filter((value) => Number(value || 0) > 0).length : 0)
+  ), 0)
+));
+const heatmapCurrentStreak = computed(() => {
+  const activeDates = [];
+  for (let weekIndex = 0; weekIndex < heatmapData.value.length; weekIndex += 1) {
+    const weekValues = Array.isArray(heatmapData.value[weekIndex]) ? heatmapData.value[weekIndex] : [];
+    for (let dayIndex = 0; dayIndex < weekValues.length; dayIndex += 1) {
+      const value = Number(weekValues[dayIndex] || 0);
+      if (value <= 0) continue;
+      const date = getHeatmapCellDate(weekIndex, dayIndex);
+      if (date) activeDates.push(date);
+    }
+  }
+
+  if (activeDates.length === 0) return 0;
+
+  const sorted = [...new Set(activeDates)].sort((a, b) => new Date(a).getTime() - new Date(b).getTime());
+  let streak = 1;
+  for (let index = sorted.length - 1; index > 0; index -= 1) {
+    const current = new Date(`${sorted[index]}T00:00:00`);
+    const previous = new Date(`${sorted[index - 1]}T00:00:00`);
+    const dayDiff = (current.getTime() - previous.getTime()) / (24 * 60 * 60 * 1000);
+    if (dayDiff === 1) {
+      streak += 1;
+      continue;
+    }
+    break;
+  }
+  return streak;
+});
+const heatmapYearOptions = computed(() => {
+  const currentYear = new Date().getFullYear();
+  const startYear = Math.max(2000, Number(earliestHeatmapYear.value || currentYear));
+  const yearCount = Math.max(1, currentYear - startYear + 1);
+  const years = Array.from({ length: yearCount }, (_, index) => currentYear - index);
+  if (!years.includes(selectedHeatmapYear.value)) {
+    years.push(selectedHeatmapYear.value);
+    years.sort((a, b) => b - a);
+  }
+  return years;
+});
+const isHeatmapYearDropdownOpen = ref(false);
+const heatmapYearDropdownRef = ref(null);
+const exerciseInputErrors = ref([]);
 const achievements = [
   { id: 1, icon: '🏆', status: 'unlocked' },
   { id: 2, icon: '🔒', status: 'locked' },
@@ -694,9 +797,7 @@ const createEmptyExercise = () => ({
 });
 
 const createEmptyWorkoutForm = () => ({
-  title: '',
   dateTime: toDateTimeInputValue(new Date()),
-  notes: '',
   exercises: [createEmptyExercise()],
 });
 
@@ -706,10 +807,12 @@ const workoutForm = ref({
 
 const openWorkoutModal = () => {
   workoutForm.value = createEmptyWorkoutForm();
+  exerciseInputErrors.value = workoutForm.value.exercises.map(() => false);
   isModalOpen.value = true;
 };
 
 const closeWorkoutModal = () => {
+  exerciseInputErrors.value = [];
   isModalOpen.value = false;
 };
 
@@ -839,22 +942,42 @@ const moveToProfile = (userId) => {
   });
 };
 
-const normalizeWorkout = (item, index) => ({
-  ...item,
-  id: item.workoutId ?? item.id ?? `workout-${index + 1}`,
-  title: item.workoutCondition || item.title || item.name || `운동 기록 ${index + 1}`,
-  tags: item.workoutDetailList?.map((detail) => detail.workoutName).filter(Boolean).join(', ')
-    || item.workoutDetailCreateDtoList?.map((detail) => detail.workoutName).filter(Boolean).join(', ')
-    || item.tags
-    || '운동',
-  duration: item.duration || item.totalTime || '',
-  timeAgo: item.timeAgo || formatTimeAgo(item.workoutDate || item.createdTime || item.createdAt),
-  stats: {
-    볼륨: `${Number(item.totalVolume || 0).toLocaleString()}kg`,
-    세트: Number(item.totalSets || item.setCount || 0),
-  },
-  color: 'v-profile-log-color-strength',
-});
+const normalizeWorkout = (item, index) => {
+  const details = Array.isArray(item?.workoutDetails)
+    ? item.workoutDetails
+    : Array.isArray(item?.workoutDetailList)
+    ? item.workoutDetailList
+    : Array.isArray(item?.workoutDetailCreateDtoList)
+      ? item.workoutDetailCreateDtoList
+      : [];
+  const firstNamedDetail = details.find((detail) => String(
+    detail?.workoutName || detail?.exerciseName || detail?.name || '',
+  ).trim());
+  const totalWeight = details.reduce((sum, detail) => sum + Number(
+    detail?.weight ?? detail?.totalWeight ?? detail?.volume ?? detail?.kg ?? 0,
+  ), 0);
+  const totalSets = details.reduce((sum, detail) => sum + Number(
+    detail?.setCount ?? detail?.sets ?? detail?.set ?? 0,
+  ), 0);
+  const totalReps = details.reduce((sum, detail) => sum + Number(
+    detail?.rep ?? detail?.reps ?? detail?.repCount ?? detail?.count ?? 0,
+  ), 0);
+  const fallbackWeight = Number(item?.totalVolume ?? item?.totalWeight ?? item?.weight ?? 0);
+  const fallbackSets = Number(item?.totalSets ?? item?.setCount ?? item?.sets ?? 0);
+  const fallbackReps = Number(item?.totalReps ?? item?.rep ?? item?.reps ?? item?.repCount ?? 0);
+
+  return {
+    ...item,
+    id: item.workoutId ?? item.id ?? `workout-${index + 1}`,
+    exerciseName: String(firstNamedDetail?.workoutName || item.workoutCondition || item.title || item.name || `운동 ${index + 1}`).trim(),
+    timeAgo: item.timeAgo || formatTimeAgo(item.workoutDate || item.createdTime || item.createdAt),
+    stats: {
+      중량: `${Number(totalWeight || fallbackWeight || 0).toLocaleString()}kg`,
+      세트: Number(totalSets || fallbackSets || 0),
+      횟수: Number(totalReps || fallbackReps || 0),
+    },
+  };
+};
 
 const heatmapColorClass = (value) => {
   if (value === 0) return 'v-heatmap-level-0';
@@ -872,10 +995,20 @@ const achievementClass = (status) => (
 
 const addExercise = () => {
   workoutForm.value.exercises.push(createEmptyExercise());
+  exerciseInputErrors.value.push(false);
 };
 
 const removeExercise = (index) => {
   workoutForm.value.exercises = workoutForm.value.exercises.filter((_, idx) => idx !== index);
+  exerciseInputErrors.value = exerciseInputErrors.value.filter((_, idx) => idx !== index);
+};
+
+const handleExerciseNumberInput = (index, field, event) => {
+  const rawValue = String(event?.target?.value ?? '');
+  const digitsOnly = rawValue.replace(/\D/g, '');
+  exerciseInputErrors.value[index] = rawValue !== digitsOnly;
+  workoutForm.value.exercises[index][field] = digitsOnly;
+  if (event?.target) event.target.value = digitsOnly;
 };
 
 const toHHmm = (value, fallback = '00:00') => {
@@ -1214,10 +1347,13 @@ const loadProfileData = async () => {
       isFavoriteGym.value = false;
     }
 
+    earliestHeatmapYear.value = await resolveEarliestWorkoutYear();
+    if (!heatmapYearOptions.value.includes(selectedHeatmapYear.value)) {
+      selectedHeatmapYear.value = heatmapYearOptions.value[0] || new Date().getFullYear();
+    }
+
     if (shouldMaskPrivateProfile.value) {
-      const today = new Date();
-      months.value = [`${today.getMonth() + 1}월`];
-      applyHeatmap(createEmptyMonthlyHeatmap(today));
+      applyHeatmap(createEmptyYearlyHeatmap(selectedHeatmapYear.value));
     } else {
       await loadHeatmapData();
     }
@@ -1337,21 +1473,22 @@ const toDateParam = (date) => {
   return `${year}-${month}-${day}`;
 };
 
-const createMonthlyHeatmapGrid = (list, baseDate = new Date()) => {
-  const year = baseDate.getFullYear();
-  const month = baseDate.getMonth();
-  const firstDay = new Date(year, month, 1);
-  const lastDay = new Date(year, month + 1, 0);
+const createYearlyHeatmapGrid = (list, targetYear) => {
+  const firstDay = new Date(targetYear, 0, 1);
+  const lastDay = new Date(targetYear, 11, 31);
   const mondayStartOffset = (firstDay.getDay() + 6) % 7;
-  const daysInMonth = lastDay.getDate();
-  const totalCells = Math.ceil((mondayStartOffset + daysInMonth) / 7) * 7;
+  const daysInYear = Math.floor((lastDay - firstDay) / (24 * 60 * 60 * 1000)) + 1;
+  const totalCells = Math.ceil((mondayStartOffset + daysInYear) / 7) * 7;
   const normalizedCells = Array.from({ length: totalCells }, () => 0);
   const normalizedDates = Array.from({ length: totalCells }, () => null);
+  const monthLabelByWeek = Array.from({ length: totalCells / 7 }, () => '');
+  let contributionTotal = 0;
 
   const dateCountMap = new Map();
-  for (let day = 1; day <= daysInMonth; day += 1) {
-    const cellDate = toDateParam(new Date(year, month, day));
-    const targetIndex = mondayStartOffset + day - 1;
+  for (let day = 0; day < daysInYear; day += 1) {
+    const currentDate = new Date(targetYear, 0, day + 1);
+    const cellDate = toDateParam(currentDate);
+    const targetIndex = mondayStartOffset + day;
     normalizedDates[targetIndex] = cellDate;
   }
 
@@ -1359,21 +1496,41 @@ const createMonthlyHeatmapGrid = (list, baseDate = new Date()) => {
     list.forEach((item) => {
       const dateKey = String(item?.date || item?.workoutDate || item?.targetDate || '').slice(0, 10);
       if (!dateKey) return;
-      dateCountMap.set(dateKey, Number(item?.count || item?.value || item?.workoutCount || 0));
+      const count = Number(item?.count || item?.value || item?.workoutCount || 0);
+      dateCountMap.set(dateKey, count);
+      contributionTotal += count;
     });
   }
 
   if (dateCountMap.size > 0) {
-    for (let day = 1; day <= daysInMonth; day += 1) {
-      const cellDate = toDateParam(new Date(year, month, day));
-      normalizedCells[mondayStartOffset + day - 1] = Number(dateCountMap.get(cellDate) || 0);
+    for (let day = 0; day < daysInYear; day += 1) {
+      const cellDate = toDateParam(new Date(targetYear, 0, day + 1));
+      normalizedCells[mondayStartOffset + day] = Number(dateCountMap.get(cellDate) || 0);
     }
   } else {
     const values = Array.isArray(list)
       ? list.map((item) => Number(item?.count || item?.value || item?.workoutCount || item || 0))
       : [];
-    for (let day = 1; day <= daysInMonth; day += 1) {
-      normalizedCells[mondayStartOffset + day - 1] = Number(values[day - 1] || 0);
+    for (let day = 0; day < daysInYear; day += 1) {
+      const value = Number(values[day] || 0);
+      normalizedCells[mondayStartOffset + day] = value;
+      contributionTotal += value;
+    }
+  }
+
+  let lastMonth = -1;
+  for (let week = 0; week < monthLabelByWeek.length; week += 1) {
+    for (let day = 0; day < 7; day += 1) {
+      const dateString = normalizedDates[week * 7 + day];
+      if (!dateString) continue;
+      const parsed = new Date(`${dateString}T00:00:00`);
+      if (Number.isNaN(parsed.getTime())) continue;
+      const month = parsed.getMonth();
+      if (month !== lastMonth) {
+        monthLabelByWeek[week] = `${month + 1}월`;
+        lastMonth = month;
+      }
+      break;
     }
   }
 
@@ -1385,14 +1542,18 @@ const createMonthlyHeatmapGrid = (list, baseDate = new Date()) => {
     dates: Array.from({ length: weekCount }, (_, week) => (
       Array.from({ length: 7 }, (_, day) => normalizedDates[week * 7 + day] || null)
     )),
+    monthLabelByWeek,
+    totalContributions: contributionTotal,
   };
 };
 
-const createEmptyMonthlyHeatmap = (baseDate = new Date()) => createMonthlyHeatmapGrid([], baseDate);
+const createEmptyYearlyHeatmap = (targetYear = new Date().getFullYear()) => createYearlyHeatmapGrid([], targetYear);
 
 const applyHeatmap = (payload = {}) => {
   heatmapData.value = Array.isArray(payload.values) ? payload.values : [];
   heatmapDateData.value = Array.isArray(payload.dates) ? payload.dates : [];
+  heatmapMonthLabelByWeek.value = Array.isArray(payload.monthLabelByWeek) ? payload.monthLabelByWeek : [];
+  heatmapContributionTotal.value = Number(payload.totalContributions || 0);
 };
 
 const getHeatmapCellDate = (weekIndex, dayIndex) => (
@@ -1412,33 +1573,90 @@ const openWorkoutByDate = (weekIndex, dayIndex, value) => {
 };
 
 const loadHeatmapData = async () => {
-  const today = new Date();
-  months.value = [`${today.getMonth() + 1}월`];
+  const targetYear = Number(selectedHeatmapYear.value || new Date().getFullYear());
 
   if (isGymOwner.value) {
-    applyHeatmap(createEmptyMonthlyHeatmap(today));
+    applyHeatmap(createEmptyYearlyHeatmap(targetYear));
     return;
   }
 
   try {
-    const from = new Date(today.getFullYear(), today.getMonth(), 1);
-    const to = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+    const from = new Date(targetYear, 0, 1);
+    const to = new Date(targetYear, 11, 31);
+    const requestedUserId = Number(normalizedProfileUserId.value || 0) || null;
 
     const response = await workoutApi.heatmap({
       from: toDateParam(from),
       to: toDateParam(to),
+      ...(requestedUserId ? { userId: requestedUserId } : {}),
     });
     const payload = response?.data?.data || response?.data?.result || response?.data || [];
     const list = Array.isArray(payload)
       ? payload
       : Array.isArray(payload?.content)
         ? payload.content
-      : Array.isArray(payload?.list)
+        : Array.isArray(payload?.list)
           ? payload.list
           : [];
-    applyHeatmap(createMonthlyHeatmapGrid(list, today));
+    applyHeatmap(createYearlyHeatmapGrid(list, targetYear));
   } catch (error) {
-    applyHeatmap(createEmptyMonthlyHeatmap(today));
+    applyHeatmap(createEmptyYearlyHeatmap(targetYear));
+  }
+};
+
+const changeHeatmapYear = async (year) => {
+  const normalizedYear = Number(year);
+  if (!Number.isFinite(normalizedYear) || normalizedYear <= 0) return;
+  if (normalizedYear === selectedHeatmapYear.value) {
+    isHeatmapYearDropdownOpen.value = false;
+    return;
+  }
+  selectedHeatmapYear.value = normalizedYear;
+  isHeatmapYearDropdownOpen.value = false;
+  await loadHeatmapData();
+};
+
+const toggleHeatmapYearDropdown = () => {
+  isHeatmapYearDropdownOpen.value = !isHeatmapYearDropdownOpen.value;
+};
+
+const handleDocumentClick = (event) => {
+  if (!isHeatmapYearDropdownOpen.value) return;
+  const root = heatmapYearDropdownRef.value;
+  if (!root) return;
+  if (root.contains(event.target)) return;
+  isHeatmapYearDropdownOpen.value = false;
+};
+
+const resolveEarliestWorkoutYear = async () => {
+  const currentYear = new Date().getFullYear();
+  if (isGymOwner.value || shouldMaskPrivateProfile.value) return currentYear;
+
+  try {
+    const requestedUserId = Number(normalizedProfileUserId.value || 0) || null;
+    const response = await workoutApi.heatmap({
+      from: '2000-01-01',
+      to: `${currentYear}-12-31`,
+      ...(requestedUserId ? { userId: requestedUserId } : {}),
+    });
+    const payload = response?.data?.data || response?.data?.result || response?.data || [];
+    const list = Array.isArray(payload)
+      ? payload
+      : Array.isArray(payload?.content)
+        ? payload.content
+        : Array.isArray(payload?.list)
+          ? payload.list
+          : [];
+
+    const validYears = list
+      .map((item) => String(item?.date || item?.workoutDate || item?.targetDate || '').slice(0, 4))
+      .map((yearText) => Number(yearText))
+      .filter((year) => Number.isFinite(year) && year >= 2000 && year <= currentYear);
+
+    if (validYears.length === 0) return currentYear;
+    return Math.min(...validYears);
+  } catch (error) {
+    return currentYear;
   }
 };
 
@@ -1466,7 +1684,6 @@ const createWorkout = async () => {
       }));
     await workoutApi.create({
       workoutDate,
-      workoutCondition: workoutForm.value.title || workoutForm.value.notes || '운동 기록',
       workoutDetailCreateDtoList: details,
     });
     closeWorkoutModal();
@@ -1485,7 +1702,12 @@ watch(
 );
 
 onMounted(() => {
+  document.addEventListener('click', handleDocumentClick);
   loadProfileData();
+});
+
+onBeforeUnmount(() => {
+  document.removeEventListener('click', handleDocumentClick);
 });
 </script>
 
@@ -1504,6 +1726,191 @@ onMounted(() => {
 
 .v-profile-stat-button:hover .v-profile-stat-value {
   color: #2563eb;
+}
+
+.v-profile-activity-wrap {
+  display: block;
+  align-items: start;
+}
+
+.v-profile-activity-main {
+  min-width: 0;
+}
+
+.v-profile-activity-summary-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 10px;
+}
+
+.v-profile-activity-pill-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.v-profile-activity-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 36px;
+  padding: 0 16px;
+  border-radius: 9999px;
+  font-size: 13px;
+  font-weight: 800;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.v-profile-activity-pill-green {
+  border: 1px solid #b7e8cb;
+  color: #16a34a;
+  background: #effcf4;
+}
+
+.v-profile-activity-pill-orange {
+  border: 1px solid #fdcf9d;
+  color: #f97316;
+  background: #fff7ed;
+}
+
+.v-profile-activity-pill-gray {
+  border: 1px solid #e2e8f0;
+  color: #475569;
+  background: #f8fafc;
+}
+
+.v-profile-activity-grid-wrap {
+  display: flex;
+  gap: 8px;
+  min-width: 0;
+}
+
+.v-profile-activity-days {
+  padding-top: 24px;
+  flex-shrink: 0;
+}
+
+.v-profile-activity-grid-scroll {
+  overflow-x: hidden;
+  padding-bottom: 2px;
+  width: 100%;
+}
+
+.v-profile-heatmap-month-row {
+  display: grid;
+  grid-template-columns: repeat(var(--heatmap-week-count, 53), minmax(0, 1fr));
+  gap: 4px;
+  margin-bottom: 6px;
+  min-width: 0;
+  width: 100%;
+}
+
+.v-profile-heatmap-month-cell {
+  width: auto;
+  min-width: 0;
+  font-size: 10px;
+  line-height: 1.2;
+  color: #94a3b8;
+  white-space: nowrap;
+}
+
+.v-profile-activity-years {
+  position: relative;
+  width: auto;
+  flex-shrink: 0;
+}
+
+.v-profile-year-button {
+  width: auto;
+  border: 0;
+  background: transparent;
+  border-radius: 0;
+  min-height: auto;
+  padding: 0;
+  color: #1e293b;
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1.4;
+  transition: all 0.2s ease;
+}
+
+.v-profile-year-button:hover {
+  color: #1d4ed8;
+}
+
+.v-profile-year-button-active {
+  color: #1e293b;
+}
+
+.v-profile-year-dropdown {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  left: auto;
+  min-width: 120px;
+  max-height: 260px;
+  overflow-y: auto;
+  padding: 6px;
+  border-radius: 12px;
+  border: 1px solid #dbe3ef;
+  background: #ffffff;
+  box-shadow: 0 12px 28px rgba(15, 23, 42, 0.14);
+  z-index: 30;
+  display: grid;
+  gap: 4px;
+}
+
+.v-profile-year-option {
+  width: 100%;
+  min-height: 46px;
+  border: 0;
+  border-radius: 9px;
+  background: #ffffff;
+  color: #475569;
+  font-size: 18px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.v-profile-year-option:hover {
+  background: #eff6ff;
+  color: #1d4ed8;
+}
+
+.v-profile-year-option-active {
+  background: #e0ecff;
+  color: #1d4ed8;
+}
+
+.v-profile-activity-grid-scroll .sx-views-user-profile-profileview-012 {
+  display: grid;
+  grid-template-columns: repeat(var(--heatmap-week-count, 53), minmax(0, 1fr));
+  gap: 4px;
+  width: 100%;
+  min-width: 0;
+}
+
+.v-profile-activity-grid-scroll .sx-views-user-profile-profileview-013 {
+  display: grid;
+  grid-template-rows: repeat(7, minmax(0, 1fr));
+  gap: 4px;
+}
+
+.v-profile-activity-main .v-heatmap-legend-cell,
+.v-profile-activity-main .v-heatmap-cell {
+  width: 100%;
+  height: auto;
+  aspect-ratio: 1 / 1;
+  border-radius: 3px;
+}
+
+.v-profile-activity-main .v-profile-heatmap-month-cell {
+  width: 14px;
+  min-width: 14px;
 }
 
 .v-follow-modal-backdrop {
@@ -1656,6 +2063,19 @@ onMounted(() => {
 }
 
 @media (max-width: 767px) {
+  .v-profile-year-button {
+    width: auto;
+    min-height: auto;
+    padding: 0;
+  }
+
+  .v-profile-year-dropdown {
+    position: absolute;
+    right: 0;
+    margin-top: 8px;
+    max-height: 200px;
+  }
+
   .v-follow-modal-backdrop {
     padding: 0;
   }

@@ -11,10 +11,10 @@
           <div>
             <h1 class="v-history-title">
               <UserRound class="v-history-title-icon" />
-              {{ isGymOwner ? '시설 정보 수정' : '프로필 편집' }}
+              {{ isGymOwner ? '시설 정보 수정' : '프로필 관리' }}
             </h1>
             <p class="v-profile-history-subtitle">
-              {{ isGymOwner ? '헬스장 운영 정보를 수정하세요.' : '프로필 정보와 공개 설정을 관리하세요.' }}
+              {{ isGymOwner ? '헬스장 운영 정보를 수정하세요.' : '프로필 정보와 계정을 관리하세요.' }}
             </p>
           </div>
         </div>
@@ -206,33 +206,32 @@
                         type="email"
                         class="v-history-search-input v-profile-edit-input v-profile-edit-input-left"
                         placeholder="이메일을 입력하세요"
-                        :readonly="isEmailVerifiedForCurrent"
                       />
                       <button
                         type="button"
                         class="v-profile-email-btn"
-                        :disabled="isSendingEmailCode || !isEmailChangeRequested || isEmailVerifiedForCurrent"
+                        :disabled="isSendingEmailCode || !isEmailChangeRequested || isEmailChangeVerifiedForCurrent"
                         @click="sendEmailVerificationCode"
                       >
                         {{ isSendingEmailCode ? '발송 중...' : (isEmailCodeSent ? '재전송' : '인증') }}
                       </button>
                     </div>
 
-                    <div v-if="isEmailCodeSent || isEmailVerifiedForCurrent" class="v-profile-email-row">
+                    <div v-if="isEmailCodeSent || isEmailChangeVerifiedForCurrent" class="v-profile-email-row">
                       <input
                         v-model="emailVerificationCode"
                         type="text"
                         class="v-history-search-input v-profile-edit-input v-profile-edit-input-left"
                         placeholder="인증코드 입력"
-                        :disabled="isEmailVerifiedForCurrent"
+                        :disabled="isEmailChangeVerifiedForCurrent"
                       />
                       <button
                         type="button"
                         class="v-profile-email-btn v-profile-email-btn-verify"
-                        :disabled="!isEmailCodeSent || isVerifyingEmailCode || isEmailVerifiedForCurrent"
+                        :disabled="!isEmailCodeSent || isVerifyingEmailCode || isEmailChangeVerifiedForCurrent"
                         @click="verifyEmailCode"
                       >
-                        {{ isEmailVerifiedForCurrent ? '인증 완료' : (isVerifyingEmailCode ? '확인 중...' : '인증') }}
+                        {{ isEmailChangeVerifiedForCurrent ? '인증 완료' : (isVerifyingEmailCode ? '확인 중...' : '인증') }}
                       </button>
                     </div>
 
@@ -316,11 +315,20 @@
                 </button>
               </div>
             </div>
+            <div class="v-profile-edit-actions">
+              <RouterLink :to="profileLink" class="v-modal-cancel-btn v-profile-edit-action-btn">취소</RouterLink>
+              <button class="v-modal-save-btn v-profile-edit-action-btn" type="button" :disabled="isBioOverLimit" @click="saveProfile">수정하기</button>
+            </div>
           </div>
-
-          <div class="v-profile-edit-actions">
-            <RouterLink :to="profileLink" class="v-modal-cancel-btn v-profile-edit-action-btn">취소</RouterLink>
-            <button class="v-modal-save-btn v-profile-edit-action-btn" type="button" :disabled="isBioOverLimit" @click="saveProfile">저장하기</button>
+          <div class="v-profile-edit-account-bottom">
+            <button
+              type="button"
+              class="v-profile-delete-link"
+              :disabled="isProcessingAccountAction"
+              @click="deleteAccount"
+            >
+              회원탈퇴
+            </button>
           </div>
         </template>
       </div>
@@ -340,13 +348,13 @@ import { useRouter, RouterLink, useRoute } from 'vue-router';
 import NavigationRail from '@/components/sections/NavigationRail.vue';
 import { ArrowLeft, UserRound, Camera } from 'lucide-vue-next';
 import { gymApi, userApi } from '@/services/apis';
-import { normalizeRole } from '@/services/token';
+import { clearAuthTokens, normalizeRole } from '@/services/token';
 import { extractPayload } from '@/utils/api';
 import { useSession } from '@/composables/useSession';
 
 const router = useRouter();
 const route = useRoute();
-const { sessionProfile, primeSessionFromToken, syncSessionFromServer } = useSession();
+const { sessionProfile, primeSessionFromToken, syncSessionFromServer, resetSession } = useSession();
 const PROFILE_BIO_MAX_LENGTH = 120;
 const BIO_CIRCLE_RADIUS = 10;
 const BIO_CIRCLE_CIRCUMFERENCE = 2 * Math.PI * BIO_CIRCLE_RADIUS;
@@ -400,6 +408,9 @@ const isEmailChangeRequested = computed(() => (
 const isEmailVerifiedForCurrent = computed(() => (
   Boolean(normalizedCurrentEmail.value)
   && normalizedCurrentEmail.value === verifiedEmail.value
+));
+const isEmailChangeVerifiedForCurrent = computed(() => (
+  isEmailChangeRequested.value && isEmailVerifiedForCurrent.value
 ));
 
 const normalizeBioText = (value) => (
@@ -614,6 +625,7 @@ const isUploadingImages = ref(false);
 const isDeletingImage = ref(false);
 const ownerMessage = ref('');
 const ownerError = ref('');
+const isProcessingAccountAction = ref(false);
 
 const toHHmm = (value, fallback = '00:00') => {
   if (!value) return fallback;
@@ -809,7 +821,7 @@ watch(
 const saveProfile = async () => {
   syncBioFromEditor({ preserveSelection: false });
   if (isBioOverLimit.value) return;
-  if (isEmailChangeRequested.value && !isEmailVerifiedForCurrent.value) {
+  if (isEmailChangeRequested.value && !isEmailChangeVerifiedForCurrent.value) {
     emailVerifyError.value = '이메일 변경 시 인증을 완료해주세요.';
     emailVerifyMessage.value = '';
     return;
@@ -829,6 +841,22 @@ const saveProfile = async () => {
   } catch (error) {
     console.error('Failed to update profile:', error);
     router.push(profileLink.value);
+  }
+};
+
+const deleteAccount = async () => {
+  if (isProcessingAccountAction.value) return;
+  if (!window.confirm('정말 회원탈퇴를 진행하시겠습니까?')) return;
+
+  isProcessingAccountAction.value = true;
+  try {
+    await userApi.delete();
+    clearAuthTokens();
+    resetSession();
+    router.push('/');
+  } catch (error) {
+    isProcessingAccountAction.value = false;
+    window.alert('회원탈퇴에 실패했습니다.');
   }
 };
 
@@ -1260,6 +1288,33 @@ onMounted(async () => {
   margin: 0;
   font-size: 13px;
   color: #dc2626;
+}
+
+.v-profile-edit-account-bottom {
+  margin-top: 10px;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.v-profile-delete-link {
+  border: 0;
+  background: transparent;
+  color: #94a3b8;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.2;
+  padding: 4px 2px;
+}
+
+.v-profile-delete-link:hover {
+  color: #64748b;
+  text-decoration: underline;
+}
+
+.v-profile-delete-link:disabled {
+  opacity: 0.6;
+  cursor: default;
+  text-decoration: none;
 }
 
 @media (min-width: 900px) {

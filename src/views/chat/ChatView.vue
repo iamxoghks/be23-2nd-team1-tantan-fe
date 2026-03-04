@@ -45,7 +45,15 @@
               :class="selectedRoomId === room.id ? 'chat-room-item-active' : 'chat-room-item-hover'"
               @click="selectedRoomId = room.id"
             >
-              <div class="v-chat-room-avatar" :style="roomAvatarStyle(room)">{{ room.avatar }}</div>
+              <div class="v-chat-room-avatar" :style="roomAvatarStyle(room)">
+                <img
+                  v-if="room.avatarImageUrl"
+                  :src="room.avatarImageUrl"
+                  :alt="`${room.name} 프로필`"
+                  class="v-chat-room-avatar-image"
+                />
+                <span v-else>{{ room.avatar }}</span>
+              </div>
               <div class="chat-room-content">
                 <div class="chat-room-head">
                   <div class="chat-room-title-wrap">
@@ -66,8 +74,30 @@
             <div class="chat-main-header">
               <div class="chat-main-head-left">
                 <button class="chat-back-btn chat-back-btn-mobile" @click="selectedRoomId = null"><ChevronLeft :size="24" /></button>
-                <div class="v-chat-room-avatar-sm" :style="roomAvatarStyle(selectedRoom)">{{ selectedRoom.avatar }}</div>
-                <div class="v-chat-room-meta"><span class="v-chat-room-name">{{ selectedRoom.name }}</span><span class="v-chat-room-status">상담원 연결 중</span></div>
+                <button class="v-chat-room-avatar-sm v-chat-avatar-btn" :style="roomAvatarStyle(selectedRoom)" @click="goToCounterpartProfile">
+                  <img
+                    v-if="selectedRoom.avatarImageUrl"
+                    :src="selectedRoom.avatarImageUrl"
+                    :alt="`${selectedRoom.name} 프로필`"
+                    class="v-chat-room-avatar-image"
+                  />
+                  <span v-else>{{ selectedRoom.avatar }}</span>
+                </button>
+                <div class="v-chat-room-meta">
+                  <span class="v-chat-room-name">{{ selectedRoom.name }}</span>
+                  <span class="v-chat-room-status" :aria-label="counterpartStatusLabel">
+                    <span v-if="counterpartStatus === 'typing'" class="chat-presence-typing">
+                      <span class="chat-presence-dot"></span>
+                      <span class="chat-presence-dot"></span>
+                      <span class="chat-presence-dot"></span>
+                    </span>
+                    <span
+                      v-else
+                      class="chat-presence-single"
+                      :class="counterpartStatus === 'online' ? 'chat-presence-single-online' : 'chat-presence-single-offline'"
+                    ></span>
+                  </span>
+                </div>
               </div>
               <div class="v-chat-header-actions">
                 <div v-if="isMessageSearchOpen" class="chat-main-search-shell">
@@ -93,11 +123,18 @@
                 <button type="button" class="v-chat-header-icon-btn" @click="toggleMessageSearch">
                   <Search :size="20" class="v-chat-action-icon" />
                 </button>
-                <MoreHorizontal :size="20" class="v-chat-action-icon" />
+                <div ref="roomMenuRef" class="chat-room-menu-wrap">
+                  <button type="button" class="v-chat-header-icon-btn" @click="toggleRoomMenu">
+                    <MoreHorizontal :size="20" class="v-chat-action-icon" />
+                  </button>
+                  <div v-if="isRoomMenuOpen" class="chat-room-menu-dropdown">
+                    <button type="button" class="chat-room-menu-item" @click="leaveSelectedRoom">채팅방 나가기</button>
+                  </div>
+                </div>
               </div>
             </div>
 
-            <div class="chat-message-area">
+            <div ref="chatMessageAreaRef" class="chat-message-area">
               <div class="chat-date-row"><span class="chat-date-chip">2026년 1월 28일 수요일</span></div>
               <div
                 v-for="message in filteredSelectedMessages"
@@ -106,21 +143,31 @@
                 class="chat-msg-row"
               >
                 <template v-if="!message.isMine">
-                  <div class="chat-msg-avatar">
-                    {{ selectedRoom?.avatar }}
-                  </div>
+                  <button class="chat-msg-avatar chat-msg-avatar-btn" @click="goToCounterpartProfile">
+                    <img
+                      v-if="selectedRoom?.avatarImageUrl"
+                      :src="selectedRoom.avatarImageUrl"
+                      :alt="`${selectedRoom?.name || '상대방'} 프로필`"
+                      class="chat-msg-avatar-image"
+                    />
+                    <span v-else>{{ selectedRoom?.avatar }}</span>
+                  </button>
                   <div class="chat-msg-col">
                     <span class="chat-msg-sender">{{ selectedRoom?.name }}</span>
                     <div class="chat-msg-bubble-row chat-msg-bubble-row-other">
                       <div class="chat-bubble chat-bubble-other">{{ message.text }}</div>
-                      <span class="chat-msg-time">{{ message.time || '방금 전' }}</span>
+                      <span class="chat-msg-time">{{ formatMessageDisplayTime(message) }}</span>
+                      <button type="button" class="chat-msg-report-btn" @click="reportChatMessage(message)">
+                        <Flag :size="10" />
+                      </button>
                     </div>
                   </div>
                 </template>
                 <template v-else>
                   <div class="chat-msg-col chat-msg-col-mine">
                     <div class="chat-msg-bubble-row chat-msg-bubble-row-mine">
-                      <span class="chat-msg-time">{{ message.time || '방금 전' }}</span>
+                      <span v-if="isLastReadMyMessage(message)" class="chat-msg-read-label">읽음</span>
+                      <span class="chat-msg-time">{{ formatMessageDisplayTime(message) }}</span>
                       <div class="chat-bubble chat-bubble-mine">{{ message.text }}</div>
                     </div>
                   </div>
@@ -135,6 +182,8 @@
                   v-model="messageInput"
                   placeholder="메시지를 입력하세요..."
                   class="v-chat-input-box"
+                  @input="handleInputTyping"
+                  @blur="stopTypingForRoom(selectedRoom?.roomKey || selectedRoomId)"
                   @keydown.enter.exact.prevent="sendMessage"
                 />
                 <button class="v-chat-send-btn" @click="sendMessage"><Send :size="16" /></button>
@@ -155,11 +204,12 @@
 import { ref, computed, onMounted, onBeforeUnmount, watch, nextTick } from 'vue';
 import { Client } from '@stomp/stompjs';
 import NavigationRail from '@/components/sections/NavigationRail.vue';
-import { Search, MessageSquare, MoreHorizontal, Send, Smile, Paperclip, ChevronLeft, X } from 'lucide-vue-next';
+import { Search, MessageSquare, MoreHorizontal, Send, Smile, Paperclip, ChevronLeft, X, Flag } from 'lucide-vue-next';
 import { chatApi, userApi } from '@/services/apis';
 import { extractList, extractPayload } from '@/utils/api';
 import { getAccessToken } from '@/services/token';
 import { wsConfig } from '@/services/ws';
+import { useRouter } from 'vue-router';
 
 const chatRoomsData = ref([]);
 const selectedRoomId = ref(null);
@@ -175,8 +225,19 @@ const chatLoadError = ref('');
 const chatConnectionState = ref('disconnected');
 const stompClient = ref(null);
 const roomSubscriptions = ref([]);
+const nowTick = ref(Date.now());
+let timeTicker = null;
+const router = useRouter();
 
 const messagesByRoom = ref({});
+const presenceByRoom = ref({});
+const isRoomMenuOpen = ref(false);
+const isReportingMessageId = ref(null);
+const roomMenuRef = ref(null);
+const chatMessageAreaRef = ref(null);
+const typingStopTimerByRoom = new Map();
+const typingStateByRoom = new Map();
+const presenceTimeoutByRoom = new Map();
 const hasRoomSearchTerm = computed(() => String(roomSearchTerm.value || '').trim().length > 0);
 const hasMessageSearchTerm = computed(() => String(messageSearchTerm.value || '').trim().length > 0);
 
@@ -207,6 +268,17 @@ const roomAvatarStyle = (room) => ({
   backgroundColor: room?.colorHex || '#1a1a1a',
 });
 
+const counterpartStatus = computed(() => {
+  if (!selectedRoomId.value) return 'offline';
+  return presenceByRoom.value[selectedRoomId.value] || 'offline';
+});
+
+const counterpartStatusLabel = computed(() => {
+  if (counterpartStatus.value === 'typing') return '상대방 입력 중';
+  if (counterpartStatus.value === 'online') return '상대방 접속 중';
+  return '상대방 미접속';
+});
+
 const clearRoomSearch = () => {
   if (!hasRoomSearchTerm.value) return;
   roomSearchTerm.value = '';
@@ -225,6 +297,25 @@ const toggleMessageSearch = async () => {
   }
   await nextTick();
   messageSearchInputRef.value?.focus?.();
+};
+
+const toggleRoomMenu = () => {
+  isRoomMenuOpen.value = !isRoomMenuOpen.value;
+};
+
+const scrollMessagesToBottom = async () => {
+  await nextTick();
+  const container = chatMessageAreaRef.value;
+  if (!container) return;
+  container.scrollTop = container.scrollHeight;
+};
+
+const handleDocumentPointerDown = (event) => {
+  if (!isRoomMenuOpen.value) return;
+  const root = roomMenuRef.value;
+  if (!root) return;
+  if (root.contains(event.target)) return;
+  isRoomMenuOpen.value = false;
 };
 
 const toFriendlyApiError = (error, defaultMessage = '요청 처리에 실패했습니다.') => {
@@ -246,14 +337,16 @@ const sendMessage = () => {
     id: `m-${Date.now()}`,
     text,
     isMine: true,
-    time: '방금 전',
+    pending: true,
+    sentAt: new Date().toISOString(),
+    isRead: false,
   };
 
   const canSendViaStomp = stompClient.value?.connected && chatConnectionState.value === 'connected';
   if (!canSendViaStomp) {
     const next = messagesByRoom.value[roomKey] ? [...messagesByRoom.value[roomKey]] : [...selectedMessages.value];
     next.push(optimistic);
-    messagesByRoom.value[roomKey] = next;
+    messagesByRoom.value[roomKey] = sortMessagesByTimeAsc(next);
     messageInput.value = '';
     return;
   }
@@ -269,14 +362,15 @@ const sendMessage = () => {
 
     const next = messagesByRoom.value[roomKey] ? [...messagesByRoom.value[roomKey]] : [...selectedMessages.value];
     next.push(optimistic);
-    messagesByRoom.value[roomKey] = next;
+    messagesByRoom.value[roomKey] = sortMessagesByTimeAsc(next);
   } catch (error) {
     const next = messagesByRoom.value[roomKey] ? [...messagesByRoom.value[roomKey]] : [...selectedMessages.value];
     next.push(optimistic);
-    messagesByRoom.value[roomKey] = next;
+    messagesByRoom.value[roomKey] = sortMessagesByTimeAsc(next);
   }
 
   messageInput.value = '';
+  stopTypingForRoom(roomKey);
 };
 
 const formatRoomDate = (value) => {
@@ -286,21 +380,39 @@ const formatRoomDate = (value) => {
   return `${parsed.getMonth() + 1}월 ${parsed.getDate()}일`;
 };
 
+const toRoomLastMessageEpoch = (room) => {
+  const epoch = toEpochMs(room?.lastMessageAt);
+  if (epoch != null) return epoch;
+  const fallback = toEpochMs(room?.updatedAt || room?.createdAt);
+  if (fallback != null) return fallback;
+  return 0;
+};
+
+const sortRoomsByLastMessageDesc = (rooms = []) => (
+  [...rooms].sort((a, b) => toRoomLastMessageEpoch(b) - toRoomLastMessageEpoch(a))
+);
+
 const mapRoom = (room, index) => {
   const roomKey = room.roomKey || room.id || room.roomId || `room-${index + 1}`;
-  const roomName = room.roomName || room.otherUserName || room.name || `채팅방 ${index + 1}`;
+  const otherProfile = room.otherProfile || {};
+  const roomName = otherProfile.displayName || room.roomName || room.otherUserName || room.name || `채팅방 ${index + 1}`;
   const lastMsg = room.lastMessage || room.lastMsg || '대화를 시작해보세요.';
   const unread = Number(room.unreadCount ?? room.unread ?? 0);
   const avatar = String(roomName).slice(0, 2).toUpperCase();
+  const lastMessageAt = room.lastMessageAt || room.lastMessageCreatedAt || room.updatedAt || room.createdAt || null;
+  const avatarImageUrl = otherProfile.profileImageUrl || room.profileImageUrl || room.otherUserProfileImageUrl || null;
 
   return {
     id: String(roomKey),
     roomKey: String(roomKey),
+    otherUserId: room.otherUserId || otherProfile.userId || null,
     name: roomName,
     lastMsg,
-    date: formatRoomDate(room.lastMessageCreatedAt || room.updatedAt || room.createdAt),
+    date: formatRoomDate(lastMessageAt),
+    lastMessageAt,
     unread,
     avatar,
+    avatarImageUrl,
     verified: false,
     colorHex: room.colorHex || '#1a1a1a',
   };
@@ -314,6 +426,72 @@ const formatMessageTime = (value) => {
   const period = hours < 12 ? '오전' : '오후';
   const displayHours = hours % 12 || 12;
   return `${period} ${String(displayHours).padStart(2, '0')}:${String(parsed.getMinutes()).padStart(2, '0')}`;
+};
+
+const toEpochMs = (value) => {
+  const parsed = new Date(value || '');
+  const epoch = parsed.getTime();
+  return Number.isNaN(epoch) ? null : epoch;
+};
+
+const formatMessageDisplayTime = (message) => {
+  const sentAt = message?.sentAt || message?.createdAt || null;
+  const epoch = toEpochMs(sentAt);
+  if (epoch == null) return message?.time || '방금 전';
+
+  const elapsed = nowTick.value - epoch;
+  if (elapsed < 60 * 1000) return '방금 전';
+  return formatMessageTime(sentAt);
+};
+
+const toMessageSortKey = (message) => {
+  const sentAt = message?.sentAt || message?.createdAt || null;
+  const epoch = toEpochMs(sentAt);
+  if (epoch != null) return epoch;
+  const idEpoch = Number(String(message?.id || '').replace(/\D/g, ''));
+  return Number.isFinite(idEpoch) ? idEpoch : 0;
+};
+
+const sortMessagesByTimeAsc = (list = []) => (
+  [...list].sort((a, b) => toMessageSortKey(a) - toMessageSortKey(b))
+);
+
+const isReadFlagTrue = (value) => value === true || value === 'Y' || value === 'READ';
+
+const selectedLastReadMyMessageId = computed(() => {
+  let target = null;
+  selectedMessages.value.forEach((message) => {
+    if (!message?.isMine) return;
+    if (!message?.isRead) return;
+    target = message.id;
+  });
+  return target;
+});
+
+const isLastReadMyMessage = (message) => String(message?.id || '') === String(selectedLastReadMyMessageId.value || '');
+
+const setRoomPresence = (roomKey, status, ttlMs = 12000) => {
+  if (!roomKey) return;
+  const key = String(roomKey);
+  presenceByRoom.value = {
+    ...presenceByRoom.value,
+    [key]: status,
+  };
+  if (presenceTimeoutByRoom.has(key)) {
+    window.clearTimeout(presenceTimeoutByRoom.get(key));
+  }
+  if (status === 'offline') {
+    presenceTimeoutByRoom.delete(key);
+    return;
+  }
+  const timeout = window.setTimeout(() => {
+    presenceByRoom.value = {
+      ...presenceByRoom.value,
+      [key]: 'offline',
+    };
+    presenceTimeoutByRoom.delete(key);
+  }, ttlMs);
+  presenceTimeoutByRoom.set(key, timeout);
 };
 
 const normalizeIncomingMessage = (payload, fallbackRoomKey) => {
@@ -331,11 +509,14 @@ const normalizeIncomingMessage = (payload, fallbackRoomKey) => {
 
   return {
     roomKey,
+    type: String(payload?.type || 'MESSAGE'),
     message: {
       id: payload?.messageId ?? payload?.id ?? `ws-${Date.now()}-${Math.random().toString(16).slice(2, 8)}`,
       text: String(text || ''),
       isMine,
       time,
+      sentAt: createdAt,
+      isRead: isReadFlagTrue(payload?.isRead),
     },
   };
 };
@@ -352,14 +533,15 @@ const upsertRoomMeta = (roomKey, messageText) => {
   const updated = {
     ...room,
     lastMsg: messageText || room.lastMsg,
-    date: '방금',
+    date: '방금 전',
+    lastMessageAt: new Date().toISOString(),
     unread,
   };
 
   const nextRooms = [...chatRoomsData.value];
   nextRooms.splice(roomIndex, 1);
-  nextRooms.unshift(updated);
-  chatRoomsData.value = nextRooms;
+  nextRooms.push(updated);
+  chatRoomsData.value = sortRoomsByLastMessageDesc(nextRooms);
 };
 
 const handleStompFrame = (rawBody, fallbackRoomKey) => {
@@ -370,17 +552,161 @@ const handleStompFrame = (rawBody, fallbackRoomKey) => {
     payload = { message: String(rawBody || '') };
   }
 
-  const { roomKey, message } = normalizeIncomingMessage(payload, fallbackRoomKey);
-  if (!roomKey || !message.text) return;
+  const { roomKey, type, message } = normalizeIncomingMessage(payload, fallbackRoomKey);
+  if (!roomKey) return;
+
+  if (type === 'TYPING_START' && !message.isMine) {
+    setRoomPresence(roomKey, 'typing');
+    return;
+  }
+
+  if (type === 'TYPING_STOP' && !message.isMine) {
+    setRoomPresence(roomKey, 'online');
+    return;
+  }
+
+  if (!message.text) return;
 
   const current = messagesByRoom.value[roomKey] ? [...messagesByRoom.value[roomKey]] : [];
+
+  if (message.isMine) {
+    const pendingIndex = current.findIndex((item) => item?.pending && item?.isMine && String(item?.text || '') === message.text);
+    if (pendingIndex >= 0) {
+      current[pendingIndex] = {
+        ...message,
+        pending: false,
+      };
+      messagesByRoom.value[roomKey] = sortMessagesByTimeAsc(current);
+      upsertRoomMeta(roomKey, message.text);
+      if (message.isRead) {
+        setRoomPresence(roomKey, 'online');
+      }
+      return;
+    }
+  }
+
   const exists = current.some((item) => String(item.id) === String(message.id));
   if (!exists) {
     current.push(message);
-    messagesByRoom.value[roomKey] = current;
+    messagesByRoom.value[roomKey] = sortMessagesByTimeAsc(current);
   }
 
+  if (!message.isMine) {
+    setRoomPresence(roomKey, 'online');
+  } else if (message.isRead) {
+    setRoomPresence(roomKey, 'online');
+  }
   upsertRoomMeta(roomKey, message.text);
+};
+
+const publishTyping = (roomKey, typing) => {
+  if (!roomKey) return;
+  if (!stompClient.value?.connected || chatConnectionState.value !== 'connected') return;
+  try {
+    stompClient.value.publish({
+      destination: wsConfig.typingDestination,
+      body: JSON.stringify({
+        roomKey,
+        typing: Boolean(typing),
+      }),
+    });
+  } catch (error) {
+    // ignore
+  }
+};
+
+const handleInputTyping = () => {
+  if (!selectedRoomId.value) return;
+  const roomKey = String(selectedRoom.value?.roomKey || selectedRoomId.value);
+  const hasText = String(messageInput.value || '').trim().length > 0;
+
+  if (hasText && !typingStateByRoom.get(roomKey)) {
+    typingStateByRoom.set(roomKey, true);
+    publishTyping(roomKey, true);
+  }
+
+  if (!hasText && typingStateByRoom.get(roomKey)) {
+    typingStateByRoom.set(roomKey, false);
+    publishTyping(roomKey, false);
+  }
+
+  if (typingStopTimerByRoom.has(roomKey)) {
+    window.clearTimeout(typingStopTimerByRoom.get(roomKey));
+  }
+
+  if (hasText) {
+    const timer = window.setTimeout(() => {
+      if (typingStateByRoom.get(roomKey)) {
+        typingStateByRoom.set(roomKey, false);
+        publishTyping(roomKey, false);
+      }
+      typingStopTimerByRoom.delete(roomKey);
+    }, 1200);
+    typingStopTimerByRoom.set(roomKey, timer);
+  }
+};
+
+const stopTypingForRoom = (roomKey) => {
+  if (!roomKey) return;
+  const key = String(roomKey);
+  if (typingStopTimerByRoom.has(key)) {
+    window.clearTimeout(typingStopTimerByRoom.get(key));
+    typingStopTimerByRoom.delete(key);
+  }
+  if (typingStateByRoom.get(key)) {
+    typingStateByRoom.set(key, false);
+    publishTyping(key, false);
+  }
+};
+
+const goToCounterpartProfile = () => {
+  const userId = Number(selectedRoom.value?.otherUserId || 0);
+  if (!Number.isFinite(userId) || userId <= 0) return;
+  router.push({ path: '/profile', query: { userId: String(userId) } });
+};
+
+const leaveSelectedRoom = async () => {
+  const room = selectedRoom.value;
+  if (!room) return;
+  const ok = window.confirm('채팅방을 나가시겠습니까?');
+  if (!ok) return;
+
+  try {
+    await chatApi.leave(room.roomKey || room.id);
+    isRoomMenuOpen.value = false;
+    chatRoomsData.value = chatRoomsData.value.filter((item) => String(item.id) !== String(room.id));
+    const nextMessagesByRoom = { ...messagesByRoom.value };
+    delete nextMessagesByRoom[room.roomKey || room.id];
+    messagesByRoom.value = nextMessagesByRoom;
+    selectedRoomId.value = chatRoomsData.value[0]?.id || null;
+  } catch (error) {
+    window.alert(toFriendlyApiError(error, '채팅방 나가기에 실패했습니다.'));
+  }
+};
+
+const reportChatMessage = async (message) => {
+  if (!selectedRoom.value) return;
+  if (message?.isMine) return;
+  if (!message?.id || String(message.id).startsWith('m-') || String(message.id).startsWith('ws-')) return;
+  if (isReportingMessageId.value) return;
+
+  const reasonInput = window.prompt('신고 사유를 입력해주세요. (5~500자)');
+  const reason = String(reasonInput || '').trim();
+  if (!reason) return;
+  if (reason.length < 5 || reason.length > 500) {
+    window.alert('신고 사유는 5자 이상 500자 이하로 입력해주세요.');
+    return;
+  }
+
+  isReportingMessageId.value = String(message.id);
+  try {
+    await chatApi.reportMessage(selectedRoom.value.roomKey || selectedRoom.value.id, message.id, { reason });
+    window.alert('신고가 접수되었습니다.');
+  } catch (error) {
+    window.alert(toFriendlyApiError(error, '신고 처리에 실패했습니다.'));
+  } finally {
+    isReportingMessageId.value = null;
+  }
 };
 
 const clearRoomSubscriptions = () => {
@@ -466,7 +792,7 @@ const loadRooms = async () => {
     const roomsPayload = extractPayload(roomsResponse);
     const roomList = extractList(roomsPayload);
     if (roomList.length > 0) {
-      chatRoomsData.value = roomList.map(mapRoom);
+      chatRoomsData.value = sortRoomsByLastMessageDesc(roomList.map(mapRoom));
     } else {
       chatRoomsData.value = [];
     }
@@ -489,7 +815,7 @@ const loadMessages = async (roomId) => {
     const list = extractList(payload);
     if (!Array.isArray(list) || list.length === 0) return;
 
-    messagesByRoom.value[roomId] = list.map((message, index) => {
+    const mapped = list.map((message, index) => {
       const senderId = message.senderId ?? message.userId ?? message.fromUserId ?? null;
       const isMine = currentUserId.value != null
         ? Number(senderId) === Number(currentUserId.value)
@@ -499,8 +825,11 @@ const loadMessages = async (roomId) => {
         text: message.message || message.content || message.contents || '',
         isMine,
         time: formatMessageTime(message.createdAt || message.sentAt || message.timestamp),
+        sentAt: message.createdAt || message.sentAt || message.timestamp || null,
+        isRead: isReadFlagTrue(message.isRead),
       };
     });
+    messagesByRoom.value[roomId] = sortMessagesByTimeAsc(mapped);
 
     try {
       await chatApi.markRead(roomId);
@@ -513,20 +842,46 @@ const loadMessages = async (roomId) => {
   }
 };
 
-watch(selectedRoomId, (next) => {
+watch(selectedRoomId, (next, prev) => {
+  isRoomMenuOpen.value = false;
+  if (prev) {
+    const prevRoom = chatRoomsData.value.find((room) => String(room.id) === String(prev));
+    stopTypingForRoom(prevRoom?.roomKey || prev);
+  }
   if (!next) return;
   loadMessages(next);
   if (chatConnectionState.value === 'connected') {
     subscribeRoom(next);
   }
+  scrollMessagesToBottom();
 });
 
+watch(
+  () => selectedMessages.value.map((message) => `${message.id}-${message.sentAt || ''}-${message.text || ''}`).join('|'),
+  () => {
+    scrollMessagesToBottom();
+  }
+);
+
 onMounted(() => {
+  timeTicker = window.setInterval(() => {
+    nowTick.value = Date.now();
+  }, 15000);
+  window.addEventListener('pointerdown', handleDocumentPointerDown);
   loadRooms();
   connectStomp();
 });
 
 onBeforeUnmount(() => {
+  if (timeTicker) {
+    window.clearInterval(timeTicker);
+    timeTicker = null;
+  }
+  typingStopTimerByRoom.forEach((timer) => window.clearTimeout(timer));
+  presenceTimeoutByRoom.forEach((timer) => window.clearTimeout(timer));
+  typingStopTimerByRoom.clear();
+  presenceTimeoutByRoom.clear();
+  window.removeEventListener('pointerdown', handleDocumentPointerDown);
   disconnectStomp();
 });
 </script>

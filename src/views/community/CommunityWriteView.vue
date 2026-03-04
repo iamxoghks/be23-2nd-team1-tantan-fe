@@ -3,13 +3,13 @@
     <div class="sx-views-community-communitywriteview-001">
       <header class="v-write-header">
         <div class="v-layer-10">
-          <RouterLink to="/community" class="sx-views-community-communitywriteview-002">
+          <button type="button" class="sx-views-community-communitywriteview-002" @click="goBackFromWrite">
             <X class="v-icon-24-dark" />
-          </RouterLink>
+          </button>
         </div>
-        <h1 class="v-write-header-title">글쓰기</h1>
-        <button :disabled="isSubmitting || isContentOverLimit" class="v-write-submit-btn v-layer-10" @click="handleCreatePost">
-          {{ isSubmitting ? '등록 중...' : '등록' }}
+        <h1 class="v-write-header-title">{{ isEditMode ? '게시글 수정' : '글쓰기' }}</h1>
+        <button :disabled="isSubmitting || isContentOverLimit || isInitializingEdit" class="v-write-submit-btn v-layer-10" @click="handleSubmitPost">
+          {{ isSubmitting ? (isEditMode ? '수정 중...' : '등록 중...') : (isEditMode ? '수정' : '등록') }}
         </button>
       </header>
 
@@ -27,7 +27,7 @@
         </div>
 
         <div class="v-community-write-form">
-          <input v-model="title" type="text" placeholder="제목을 입력하세요" class="v-write-title-input v-focus-ring-0 v-placeholder-title" />
+          <input v-model="title" type="text" :maxlength="TITLE_MAX_LENGTH" placeholder="제목을 입력하세요" class="v-write-title-input v-focus-ring-0 v-placeholder-title" />
           <div class="v-write-divider" />
           <div
             ref="contentEditorRef"
@@ -74,7 +74,15 @@
           </div>
 
           <p v-if="errorMessage" class="u-text-error-xs">{{ errorMessage }}</p>
-          <p v-if="selectedImages.length > 0" class="v-write-selected-count">{{ selectedImages.length }}개 이미지 선택됨</p>
+          <p v-if="selectedImageTotalCount > 0" class="v-write-selected-count">{{ selectedImageTotalCount }}개 이미지 선택됨</p>
+          <div v-if="existingImagePreviews.length > 0" class="sx-views-community-communitywriteview-005">
+            <div v-for="(preview, index) in existingImagePreviews" :key="preview.id" class="sx-views-community-communitywriteview-006">
+              <img :src="preview.url" alt="기존 이미지 미리보기" class="v-cover-image" />
+              <button class="ui-thumb-delete v-thumb-delete-hover" @click="removeExistingImage(index)">
+                <X class="v-icon-14" />
+              </button>
+            </div>
+          </div>
           <div v-if="imagePreviews.length > 0" class="sx-views-community-communitywriteview-005">
             <div v-for="(preview, index) in imagePreviews" :key="preview.id" class="sx-views-community-communitywriteview-006">
               <img :src="preview.url" alt="첨부 이미지 미리보기" class="v-cover-image" />
@@ -138,10 +146,12 @@
 </template>
 
 <script setup>
-import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue';
-import { useRoute, useRouter, RouterLink } from 'vue-router';
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
+import { useRoute, useRouter } from 'vue-router';
 import { X, Image as ImageIcon, Film, Link as LinkIcon, Grid, ChevronRight, Calendar } from 'lucide-vue-next';
 import { communityPostApi, workoutApi } from '@/services/apis';
+import { extractPayload } from '@/utils/api';
+import { normalizeCommunityPost } from '@/utils/postNormalizer';
 
 const categoryPills = [
   '자유게시판',
@@ -161,7 +171,10 @@ const contentEditorRef = ref(null);
 const isContentComposing = ref(false);
 const selectedImages = ref([]);
 const imagePreviews = ref([]);
+const existingImagePreviews = ref([]);
+const originalExistingImageUrls = ref([]);
 const isSubmitting = ref(false);
+const isInitializingEdit = ref(false);
 const errorMessage = ref('');
 const todayWorkoutOptions = ref([]);
 const isLoadingTodayWorkouts = ref(false);
@@ -169,6 +182,9 @@ const workoutSelectorError = ref('');
 const route = useRoute();
 const router = useRouter();
 const CONTENT_MAX_LENGTH = 3000;
+const TITLE_MAX_LENGTH = 40;
+const editPostId = computed(() => String(route.query?.editId || '').trim());
+const isEditMode = computed(() => Boolean(editPostId.value));
 
 const contentChars = computed(() => Array.from(String(content.value || '')));
 const contentLength = computed(() => contentChars.value.length);
@@ -176,6 +192,15 @@ const contentRemaining = computed(() => CONTENT_MAX_LENGTH - contentLength.value
 const isContentOverLimit = computed(() => contentRemaining.value < 0);
 const contentSafeText = computed(() => contentChars.value.slice(0, CONTENT_MAX_LENGTH).join(''));
 const contentOverflowText = computed(() => contentChars.value.slice(CONTENT_MAX_LENGTH).join(''));
+const selectedImageTotalCount = computed(() => existingImagePreviews.value.length + selectedImages.value.length);
+
+watch(title, (next) => {
+  const normalized = String(next || '');
+  const sliced = Array.from(normalized).slice(0, TITLE_MAX_LENGTH).join('');
+  if (normalized !== sliced) {
+    title.value = sliced;
+  }
+});
 
 const normalizePostContent = (value) => (
   String(value || '')
@@ -563,7 +588,108 @@ const removeSelectedImage = (index) => {
   selectedImages.value = selectedImages.value.filter((_, idx) => idx !== index);
 };
 
-const handleCreatePost = async () => {
+const removeExistingImage = (index) => {
+  existingImagePreviews.value = existingImagePreviews.value.filter((_, idx) => idx !== index);
+};
+
+const resolveImageUrls = (source) => {
+  const candidates = Array.isArray(source?.images) ? source.images : [];
+  const fromList = candidates
+    .map((item) => {
+      if (typeof item === 'string') return item;
+      return item?.imageUrl || item?.url || item?.path || item?.src || '';
+    })
+    .filter(Boolean);
+  if (fromList.length > 0) return fromList;
+  const single = source?.image || source?.imageUrl || '';
+  return single ? [single] : [];
+};
+
+const urlToFile = async (url, index) => {
+  const response = await fetch(url);
+  if (!response.ok) throw new Error(`Failed to fetch image: ${url}`);
+  const blob = await response.blob();
+  const mimeType = blob.type || 'image/jpeg';
+  const ext = mimeType.includes('/') ? mimeType.split('/')[1] : 'jpg';
+  return new File([blob], `existing-${index}.${ext}`, { type: mimeType });
+};
+
+const buildUpdateImages = async () => {
+  const remainingExistingUrls = existingImagePreviews.value.map((item) => item.url);
+  const originalUrls = originalExistingImageUrls.value;
+  const unchangedExisting =
+    remainingExistingUrls.length === originalUrls.length
+    && remainingExistingUrls.every((url, index) => url === originalUrls[index]);
+  const hasNewUploads = selectedImages.value.length > 0;
+
+  if (unchangedExisting && !hasNewUploads) {
+    return [];
+  }
+
+  const existingFiles = await Promise.all(
+    remainingExistingUrls.map((url, index) => urlToFile(url, index)),
+  );
+  return [...existingFiles, ...selectedImages.value];
+};
+
+const hasImageChanges = () => {
+  const remainingExistingUrls = existingImagePreviews.value.map((item) => item.url);
+  const originalUrls = originalExistingImageUrls.value;
+  const unchangedExisting =
+    remainingExistingUrls.length === originalUrls.length
+    && remainingExistingUrls.every((url, index) => url === originalUrls[index]);
+  return !unchangedExisting || selectedImages.value.length > 0;
+};
+
+const extractErrorMessage = (error, fallback) => {
+  const serverMessage = error?.response?.data?.error_message
+    || error?.response?.data?.message
+    || error?.response?.data?.error
+    || '';
+  if (typeof serverMessage === 'string' && serverMessage.trim()) {
+    return serverMessage.trim();
+  }
+  if (!error?.response && error?.message) {
+    return error.message;
+  }
+  return fallback;
+};
+
+const populateEditForm = async () => {
+  if (!isEditMode.value) return;
+  isInitializingEdit.value = true;
+  errorMessage.value = '';
+  try {
+    const response = await communityPostApi.detail(editPostId.value, { countView: false });
+    const payload = extractPayload(response, {});
+    const detailSource = payload?.post && typeof payload.post === 'object'
+      ? { ...payload, ...payload.post }
+      : payload;
+    const normalizedPost = normalizeCommunityPost(detailSource || {}, 0);
+
+    title.value = String(normalizedPost?.title || '').trim();
+    content.value = String(normalizedPost?.content || '').trim();
+    const targetCategory = String(normalizedPost?.category || '').trim();
+    if (targetCategory && categoryPills.includes(targetCategory)) {
+      selectedCategory.value = targetCategory;
+    }
+
+    const imageUrls = resolveImageUrls(detailSource || normalizedPost || {});
+    existingImagePreviews.value = imageUrls.map((url, index) => ({
+      id: `existing-${index}-${url}`,
+      url,
+    }));
+    originalExistingImageUrls.value = imageUrls.slice();
+
+    renderContentEditor({ preserveSelection: false });
+  } catch (error) {
+    errorMessage.value = '수정할 게시글 정보를 불러오지 못했습니다.';
+  } finally {
+    isInitializingEdit.value = false;
+  }
+};
+
+const handleSubmitPost = async () => {
   syncContentFromEditor({ preserveSelection: false });
 
   if (!title.value || !String(content.value || '').trim()) {
@@ -590,23 +716,47 @@ const handleCreatePost = async () => {
       postPayload.workoutId = selectedWorkoutId.value;
     }
 
-    await communityPostApi.create({
-      post: postPayload,
-      images: selectedImages.value,
-    });
-
-    router.push('/community');
+    if (isEditMode.value) {
+      if (hasImageChanges()) {
+        const updateImages = await buildUpdateImages();
+        await communityPostApi.update(editPostId.value, {
+          post: postPayload,
+          images: updateImages,
+        });
+      } else {
+        await communityPostApi.updateTextOnly(editPostId.value, postPayload);
+      }
+      router.push(`/community/${editPostId.value}`);
+    } else {
+      await communityPostApi.create({
+        post: postPayload,
+        images: selectedImages.value,
+      });
+      router.push('/community');
+    }
   } catch (error) {
-    errorMessage.value = '게시글 등록에 실패했습니다.';
-    console.error('Create community post failed:', error);
+    errorMessage.value = extractErrorMessage(
+      error,
+      isEditMode.value ? '게시글 수정에 실패했습니다.' : '게시글 등록에 실패했습니다.',
+    );
+    console.error('Submit community post failed:', error);
   } finally {
     isSubmitting.value = false;
   }
 };
 
+const goBackFromWrite = () => {
+  if (isEditMode.value) {
+    router.push(`/community/${editPostId.value}`);
+    return;
+  }
+  router.push('/community');
+};
+
 onMounted(async () => {
   await nextTick();
   renderContentEditor();
+  await populateEditForm();
 });
 
 onBeforeUnmount(() => {

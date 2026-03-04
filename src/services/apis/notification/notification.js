@@ -2,12 +2,16 @@ import apiClient from '@/services/axios';
 import { getAccessToken } from '@/services/token';
 
 export const notificationApi = {
-  list(params) {
-    return apiClient.get('/notifications', { params });
+  listPaged(params) {
+    return apiClient.get('/notifications/paged', { params });
   },
 
   markRead(id) {
     return apiClient.post(`/notifications/${id}/read`);
+  },
+
+  delete(id) {
+    return apiClient.delete(`/notifications/${id}`);
   },
 
   subscribe({ onConnect, onNotification, onError } = {}) {

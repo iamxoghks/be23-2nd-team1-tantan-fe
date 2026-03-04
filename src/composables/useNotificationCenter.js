@@ -44,14 +44,18 @@ const syncUnreadCount = async ({ force = false } = {}) => {
   isUnreadLoading.value = true;
   inflight = (async () => {
     try {
-      const response = await notificationApi.list({ unreadOnly: true });
+      const response = await notificationApi.listPaged({
+        unreadOnly: true,
+        page: 0,
+        size: 1,
+      });
       const payload = extractPayload(response);
       const list = extractList(payload);
 
-      if (typeof payload?.unreadCount === 'number') {
-        setUnreadCount(payload.unreadCount);
+      const totalUnread = Number(payload?.totalElements);
+      if (Number.isFinite(totalUnread)) {
+        setUnreadCount(totalUnread);
       } else {
-        // unreadOnly=true 응답은 모두 미읽음이므로 length를 우선 사용합니다.
         setUnreadCount(list.length || countUnreadFromList(list));
       }
       return unreadCount.value;

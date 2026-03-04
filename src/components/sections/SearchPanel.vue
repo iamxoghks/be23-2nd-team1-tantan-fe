@@ -171,6 +171,12 @@
                 </div>
                 <div class="search-panel-list-open-row">
                   <span :class="getOpenStatusClass(selectedGymOpenStatus)">{{ getOpenStatusLabel(selectedGymOpenStatus) }}</span>
+                  <span
+                    v-if="selectedGymOpenCloseHint"
+                    class="search-panel-open-time-hint"
+                  >
+                    {{ selectedGymOpenCloseHint }}
+                  </span>
                 </div>
 
                 <div class="search-panel-route-btns">
@@ -189,7 +195,7 @@
                   <button class="sx-components-sections-searchpanel-002" @click="onToggleFavoriteGym(selectedGym.id)">
                     <Star
                       :size="24"
-                      :class="isFavorite(selectedGym.id) ? 'ux-components-sections-searchpanel-007' : 'u-text-gray-400'"
+                      :class="isFavorite(selectedGym.id) ? 'search-panel-list-favorite-active' : 'u-text-gray-400'"
                       :fill="isFavorite(selectedGym.id) ? 'currentColor' : 'none'"
                     />
                     <span class="ux-components-sections-searchpanel-008">저장</span>
@@ -462,6 +468,11 @@ import {
   User,
   Star,
   Wifi,
+  ShowerHead,
+  Car,
+  Lock,
+  Scale,
+  Shirt,
   Phone,
   ArrowLeft,
   X,
@@ -513,10 +524,26 @@ const amenityLabelMap = {
   LAUNDRY: '세탁실',
 };
 
+const amenityOrderMap = {
+  FREE_WIFI: 1,
+  SHOWER: 2,
+  PARKING: 3,
+  PERSONAL_TRAINING: 4,
+  PT: 4,
+  LOCKER: 5,
+  INBODY: 6,
+  LAUNDRY: 7,
+};
+
 const amenityIconMap = {
   FREE_WIFI: Wifi,
+  SHOWER: ShowerHead,
+  PARKING: Car,
   PERSONAL_TRAINING: User,
   PT: User,
+  LOCKER: Lock,
+  INBODY: Scale,
+  LAUNDRY: Shirt,
 };
 
 const props = defineProps({
@@ -550,6 +577,48 @@ const selectedGymReviewCount = computed(() => {
 const selectedGymOpenStatus = computed(() =>
   String(selectedGymDetail.value?.openStatus ?? props.selectedGym?.openStatus ?? 'UNKNOWN').toUpperCase(),
 );
+
+const weekDayCodes = ['SUNDAY', 'MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY'];
+
+const normalizeTimeToHHmm = (value) => {
+  const raw = String(value || '').trim();
+  if (!raw) return '';
+  const match = raw.match(/^(\d{1,2}):(\d{2})(?::\d{2})?$/);
+  if (!match) return raw;
+  return `${match[1].padStart(2, '0')}:${match[2]}`;
+};
+
+const resolveTodayCloseTime = (detail, summary) => {
+  const directCandidates = [
+    detail?.todayCloseTime,
+    detail?.closeTime,
+    detail?.closingTime,
+    detail?.endTime,
+    summary?.todayCloseTime,
+    summary?.closeTime,
+    summary?.closingTime,
+    summary?.endTime,
+  ];
+  for (const candidate of directCandidates) {
+    const normalized = normalizeTimeToHHmm(candidate);
+    if (normalized) return normalized;
+  }
+
+  const gymHours = Array.isArray(detail?.gymHours) ? detail.gymHours : [];
+  if (gymHours.length === 0) return '';
+  const todayCode = weekDayCodes[new Date().getDay()];
+  const todayHours = gymHours.find((item) => String(item?.dayOfWeek || '').toUpperCase() === todayCode);
+  if (!todayHours) return '';
+  const isClosed = Boolean(todayHours?.isClosed ?? todayHours?.closed);
+  if (isClosed) return '';
+  return normalizeTimeToHHmm(todayHours?.closeTime);
+};
+
+const selectedGymOpenCloseHint = computed(() => {
+  if (selectedGymOpenStatus.value !== 'OPEN') return '';
+  const closeTime = resolveTodayCloseTime(selectedGymDetail.value, props.selectedGym);
+  return closeTime ? `~${closeTime}` : '';
+});
 const sessionRole = computed(() => normalizeRole(sessionProfile.value?.role));
 const canWriteReview = computed(() => Boolean(getAccessToken()) && sessionRole.value === 'USER');
 
@@ -636,6 +705,8 @@ const displayAmenities = computed(() => {
         const normalizedCode = item.toUpperCase();
         return {
           key: normalizedCode,
+          code: normalizedCode,
+          sortId: null,
           label: formatAmenityLabel(normalizedCode, item),
           icon: amenityIconMap[normalizedCode] || null,
         };
@@ -643,8 +714,12 @@ const displayAmenities = computed(() => {
 
       const code = String(item?.code || item?.amenityCode || item?.name || '').toUpperCase();
       const key = code || String(item?.id || item?.name || Math.random());
+      const rawSortId = Number(item?.id ?? item?.amenityId ?? item?.amenity_id);
+      const sortId = Number.isFinite(rawSortId) ? rawSortId : null;
       return {
         key,
+        code,
+        sortId,
         label: formatAmenityLabel(code, item?.name),
         icon: amenityIconMap[code] || null,
       };
@@ -653,6 +728,18 @@ const displayAmenities = computed(() => {
       if (!item?.label || dedup.has(item.key)) return false;
       dedup.add(item.key);
       return true;
+    })
+    .sort((a, b) => {
+      const aHasId = Number.isFinite(a.sortId);
+      const bHasId = Number.isFinite(b.sortId);
+      if (aHasId && bHasId) return a.sortId - b.sortId;
+      if (aHasId) return -1;
+      if (bHasId) return 1;
+
+      const aOrder = amenityOrderMap[a.code] ?? Number.MAX_SAFE_INTEGER;
+      const bOrder = amenityOrderMap[b.code] ?? Number.MAX_SAFE_INTEGER;
+      if (aOrder !== bOrder) return aOrder - bOrder;
+      return String(a.label).localeCompare(String(b.label), 'ko');
     });
 });
 

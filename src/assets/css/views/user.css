@@ -63,9 +63,9 @@
   background: #f8fafc;
   border: 1px solid #f1f5f9;
   border-radius: 16px;
-  padding: 16px;
+  padding: 12px 14px;
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
 }
 
@@ -142,32 +142,32 @@
 }
 
 .v-profile-exercise-row {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  padding: 16px;
-  border: 1px solid #f1f5f9;
-  border-radius: 12px;
-  background: #f8fafc;
-  width: 100%;
-  min-width: 0;
-}
-
-.v-profile-exercise-inputs {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: minmax(0, 1fr) 96px 76px 76px 44px;
   gap: 8px;
+  align-items: center;
+  padding: 12px;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  background: #ffffff;
   width: 100%;
   min-width: 0;
 }
 
-.v-profile-exercise-name,
-.v-profile-exercise-metric {
+.v-profile-exercise-item {
+  display: grid;
+  gap: 6px;
+}
+
+.v-profile-exercise-name-input {
   min-width: 0;
 }
 
-.v-profile-exercise-name {
-  grid-column: 1 / -1;
+.v-profile-exercise-error {
+  margin: 0;
+  font-size: 12px;
+  color: #ef4444;
+  padding-left: 2px;
 }
 
 .rail-auth-btn-login {
@@ -227,10 +227,10 @@
 .sx-views-user-profile-profileview-016 { @apply flex items-center justify-between mb-6; }
 .sx-views-user-profile-profileview-017 { @apply flex items-center gap-2 text-[16px] md:text-[18px] font-bold text-[#1e293b]; }
 .sx-views-user-profile-profileview-018 { @apply hover:border-blue-200 transition-colors; }
-.sx-views-user-profile-profileview-019 { @apply flex items-center gap-4 md:gap-5 flex-1 min-w-0; }
+.sx-views-user-profile-profileview-019 { @apply flex items-start gap-4 md:gap-5 flex-1 min-w-0; }
 .sx-views-user-profile-profileview-020 { @apply font-bold text-[#1e293b] text-[15px] md:text-[16px] transition-colors truncate; }
-.sx-views-user-profile-profileview-021 { @apply flex gap-2 md:gap-3 mt-3 overflow-x-auto pb-1; }
-.sx-views-user-profile-profileview-022 { @apply flex flex-col items-end gap-2 md:gap-3 ml-4; }
+.sx-views-user-profile-profileview-021 { @apply flex gap-2 mt-2 overflow-x-auto pb-1; }
+.sx-views-user-profile-profileview-022 { @apply flex flex-col items-end gap-1 md:gap-2 ml-3; }
 .sx-views-user-profile-profileview-023 { @apply p-2 text-[#94a3b8] hover:text-red-500 md:opacity-0 transition-all; }
 .sx-views-user-profile-profileview-024 { @apply text-[15px] md:text-[16px] font-bold text-[#1e293b] mb-4; }
 .sx-views-user-profile-profileview-025 { @apply flex gap-3; }
@@ -465,7 +465,7 @@
 .v-profile-log-column { @apply md:col-span-2 space-y-6; }
 .v-profile-view-all-link { @apply text-[#2563eb] text-[13px] md:text-[14px] font-bold hover:underline; }
 .v-profile-log-icon { @apply w-12 h-12 md:w-14 md:h-14 rounded-2xl flex-shrink-0 flex items-center justify-center; }
-.v-profile-log-stat-key { @apply text-[9px] md:text-[10px] text-[#94a3b8] uppercase font-bold tracking-wider; }
+.v-profile-log-stat-key { @apply text-[10px] text-[#94a3b8] font-bold; }
 .v-profile-log-stat-value { @apply text-[12px] md:text-[13px] font-bold text-[#1e293b]; }
 .v-profile-log-time { @apply text-[11px] md:text-[12px] text-[#94a3b8] whitespace-nowrap; }
 .v-profile-membership-title { @apply font-bold text-[#1e293b] text-[13px] md:text-[14px]; }
@@ -1377,6 +1377,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
+  cursor: pointer;
 }
 
 .v-history-delete-btn-align {
@@ -1387,12 +1388,17 @@
   color: #ef4444;
 }
 
-.v-day-history-badge {
+.v-day-history-delete-btn {
   color: #94a3b8;
-  pointer-events: none;
 }
 
-.v-day-history-badge:hover {
+.v-day-history-delete-btn:hover {
+  color: #ef4444;
+}
+
+.v-day-history-delete-btn:disabled {
+  opacity: 0.55;
+  cursor: default;
   color: #94a3b8;
 }
 
@@ -1692,17 +1698,8 @@
   }
 
   .v-profile-exercise-row {
-    flex-direction: row;
-    align-items: center;
-    gap: 12px;
-    padding: 0;
-    border: 0;
-    background: transparent;
-  }
-
-  .v-profile-exercise-inputs {
-    grid-template-columns: minmax(0, 2.2fr) repeat(3, minmax(0, 1fr));
-    flex: 1;
+    grid-template-columns: minmax(0, 1fr) 104px 84px 84px 44px;
+    gap: 10px;
   }
 
   .v-history-back-btn {
@@ -1775,14 +1772,9 @@
     max-width: 460px;
   }
 
-  .v-profile-log-item {
-    padding: 20px;
-  }
+  .v-profile-log-item { padding: 14px 16px; }
 
-  .v-profile-log-stat-chip {
-    border-radius: 10px;
-    padding: 6px 12px;
-  }
+  .v-profile-log-stat-chip { border-radius: 9px; padding: 5px 10px; }
 
   .v-profile-achievement-box {
     width: 60px;

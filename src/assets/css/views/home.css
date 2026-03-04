@@ -1503,6 +1503,12 @@
   gap: 6px;
 }
 
+.search-panel-open-time-hint {
+  font-size: 13px;
+  font-weight: 600;
+  color: #6b7280;
+}
+
 .search-panel-list-footer {
   padding: 24px 20px;
   text-align: center;
@@ -1701,10 +1707,10 @@
 .ux-components-sections-searchpanel-021 { @apply text-[#ffb800]; }
 .ux-components-sections-searchpanel-022 { @apply font-bold text-[#242424]; }
 .ux-components-sections-searchpanel-023 { @apply text-gray-500; }
-.ux-components-sections-searchpanel-024 { @apply text-[13px] font-bold text-[#00c73c]; }
+.ux-components-sections-searchpanel-024 { @apply text-[13px] font-bold text-[#00c73c] leading-[1.2]; }
 .ux-components-sections-searchpanel-025 { @apply text-[13px] text-gray-500; }
 .ux-components-sections-searchpanel-026 { @apply md:right-auto; }
-.ux-components-sections-searchpanel-027 { @apply text-[13px] font-bold text-red-500; }
+.ux-components-sections-searchpanel-027 { @apply text-[13px] font-bold text-red-500 leading-[1.2]; }
 
 @media (max-width: 767px) {
   .map-controls-zoom {
@@ -2169,6 +2175,11 @@
 
   .search-panel-detail-head {
     padding: 16px 16px 10px;
+  }
+
+  .search-panel-detail-head .search-panel-list-open-row {
+    margin-top: -2px;
+    margin-bottom: 10px;
   }
 
   .search-panel-title-row {

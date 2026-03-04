@@ -249,6 +249,23 @@
 }
 
 .v-noti-read-btn:hover {
+  color: #2563eb;
+  background: rgba(37, 99, 235, 0.1);
+}
+
+.v-noti-read-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.v-noti-item-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.v-noti-delete-btn:hover {
   color: #ff4b4b;
   background: rgba(255, 75, 75, 0.1);
 }
@@ -367,10 +384,6 @@
   }
 
   .v-noti-read-btn {
-    opacity: 0;
-  }
-
-  .v-noti-item:hover .v-noti-read-btn {
     opacity: 1;
   }
 }

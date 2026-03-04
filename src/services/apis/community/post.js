@@ -20,8 +20,8 @@ export const communityPostApi = {
     return apiClient.get('/community/post/list', { params });
   },
 
-  detail(id) {
-    return apiClient.get(`/community/post/${id}`);
+  detail(id, params = {}) {
+    return apiClient.get(`/community/post/${id}`, { params });
   },
 
   delete(id) {
@@ -34,5 +34,9 @@ export const communityPostApi = {
       : { post: payload, images: [] };
     const { post, images = [] } = normalized;
     return apiClient.put(`/community/post/${id}`, toPostFormData({ post, images }));
+  },
+
+  updateTextOnly(id, post = {}) {
+    return apiClient.put(`/community/post/${id}`, post);
   },
 };
