@@ -347,10 +347,9 @@
               class="v-footer-link v-footer-link-button"
               @click="openGymOwnerApplyModal"
             >
-              관리자 신청
+              운동업체 등록하기
             </button>
           </div>
-          <div class="v-profile-footer-status"><div class="v-status-dot" /><span>시스템 정상</span></div>
         </footer>
       </div>
     </div>
