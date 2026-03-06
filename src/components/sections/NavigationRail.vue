@@ -76,12 +76,12 @@ import { useAuthModal } from '@/composables/useAuthModal';
 import { useSession } from '@/composables/useSession';
 import { useNotificationCenter } from '@/composables/useNotificationCenter';
 import { userApi } from '@/services/apis';
-import { clearAuthTokens } from '@/services/token';
+import { notifyAuthInvalidated } from '@/services/authLifecycle';
 
 const route = useRoute();
 const router = useRouter();
 const { openAuthModal } = useAuthModal();
-const { sessionProfile, isAuthenticated, syncSessionFromServer, primeSessionFromToken, resetSession } = useSession();
+const { sessionProfile, isAuthenticated, syncSessionFromServer, primeSessionFromToken } = useSession();
 const { hasUnread, clearUnread, syncUnreadCount } = useNotificationCenter();
 
 const logout = async () => {
@@ -90,9 +90,7 @@ const logout = async () => {
   } catch (error) {
     // ignore logout API failure and continue local logout
   } finally {
-    clearAuthTokens();
-    resetSession();
-    clearUnread();
+    notifyAuthInvalidated({ reason: 'logout' });
     router.push('/');
   }
 };

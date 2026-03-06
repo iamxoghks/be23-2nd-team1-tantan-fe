@@ -10,6 +10,18 @@ const hasAccessToken = ref(Boolean(getAccessToken()));
 
 let inflight = null;
 
+const handleAuthInvalidated = () => {
+  sessionProfile.value = null;
+  isSessionHydrated.value = false;
+  isSessionLoading.value = false;
+  hasAccessToken.value = false;
+  inflight = null;
+};
+
+if (typeof window !== 'undefined') {
+  window.addEventListener('auth:invalidated', handleAuthInvalidated);
+}
+
 const refreshAuthState = () => {
   hasAccessToken.value = Boolean(getAccessToken());
 };

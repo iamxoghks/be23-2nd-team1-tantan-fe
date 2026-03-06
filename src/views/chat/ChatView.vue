@@ -208,6 +208,7 @@ import { Search, MessageSquare, MoreHorizontal, Send, Smile, Paperclip, ChevronL
 import { chatApi, userApi } from '@/services/apis';
 import { extractList, extractPayload } from '@/utils/api';
 import { getAccessToken } from '@/services/token';
+import { registerAuthCleanup } from '@/services/authLifecycle';
 import { wsConfig } from '@/services/ws';
 import { useRouter } from 'vue-router';
 
@@ -238,6 +239,7 @@ const chatMessageAreaRef = ref(null);
 const typingStopTimerByRoom = new Map();
 const typingStateByRoom = new Map();
 const presenceTimeoutByRoom = new Map();
+let unregisterAuthCleanup = null;
 const hasRoomSearchTerm = computed(() => String(roomSearchTerm.value || '').trim().length > 0);
 const hasMessageSearchTerm = computed(() => String(messageSearchTerm.value || '').trim().length > 0);
 
@@ -864,6 +866,9 @@ watch(
 );
 
 onMounted(() => {
+  unregisterAuthCleanup = registerAuthCleanup(() => {
+    disconnectStomp();
+  });
   timeTicker = window.setInterval(() => {
     nowTick.value = Date.now();
   }, 15000);
@@ -873,6 +878,10 @@ onMounted(() => {
 });
 
 onBeforeUnmount(() => {
+  if (typeof unregisterAuthCleanup === 'function') {
+    unregisterAuthCleanup();
+    unregisterAuthCleanup = null;
+  }
   if (timeTicker) {
     window.clearInterval(timeTicker);
     timeTicker = null;
