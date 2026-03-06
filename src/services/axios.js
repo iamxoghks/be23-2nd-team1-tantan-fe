@@ -1,10 +1,10 @@
 import axios from 'axios';
 import {
-  clearAuthTokens,
   getAccessToken,
   getRefreshToken,
   setAccessToken,
 } from '@/services/token';
+import { notifyAuthInvalidated } from '@/services/authLifecycle';
 
 const API_BASE_URL =
   import.meta.env.VUE_APP_API_BASE_URL ||
@@ -43,10 +43,29 @@ function resolveRefreshQueue(error, token = null) {
   refreshWaitQueue = [];
 }
 
+function isSuspendedResponse(error) {
+  const status = error?.response?.status;
+  if (status !== 403) return false;
+  const data = error?.response?.data || {};
+  return data?.error_code === 'USER_SUSPENDED';
+}
+
+function forceLogout(detail = {}) {
+  notifyAuthInvalidated(detail);
+  if (typeof window !== 'undefined' && window.location.pathname !== '/login') {
+    window.location.replace('/login');
+  }
+}
+
 apiClient.interceptors.response.use(
   (response) => response,
   async (error) => {
     const originalRequest = error.config;
+
+    if (isSuspendedResponse(error)) {
+      forceLogout({ reason: 'suspended' });
+      return Promise.reject(error);
+    }
 
     if (!error.response || error.response.status !== 401 || originalRequest._retry) {
       return Promise.reject(error);
@@ -54,7 +73,7 @@ apiClient.interceptors.response.use(
 
     const refreshToken = getRefreshToken();
     if (!refreshToken) {
-      clearAuthTokens();
+      forceLogout({ reason: 'missing_refresh_token' });
       return Promise.reject(error);
     }
 
@@ -91,7 +110,7 @@ apiClient.interceptors.response.use(
       originalRequest.headers.Authorization = `Bearer ${newAccessToken}`;
       return apiClient(originalRequest);
     } catch (refreshError) {
-      clearAuthTokens();
+      forceLogout({ reason: 'refresh_failed' });
       resolveRefreshQueue(refreshError, null);
       return Promise.reject(refreshError);
     } finally {

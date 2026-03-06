@@ -151,6 +151,7 @@ import { useRouter } from 'vue-router';
 import NavigationRail from '@/components/sections/NavigationRail.vue';
 import { Bell, Settings, CheckCheck, Check, Heart, MessageSquare, UserPlus, Zap, Trophy, Info, Trash2 } from 'lucide-vue-next';
 import { communityPostApi, notificationApi } from '@/services/apis';
+import { registerAuthCleanup } from '@/services/authLifecycle';
 import { extractList, extractPayload } from '@/utils/api';
 import { useNotificationCenter } from '@/composables/useNotificationCenter';
 
@@ -174,6 +175,7 @@ const errorMessage = ref('');
 const isBlockedTargetModalOpen = ref(false);
 const blockedTargetMessage = ref('삭제되었거나 접근 권한이 없는 게시글입니다.');
 let stopSse = null;
+let unregisterAuthCleanup = null;
 const { setUnreadFromList } = useNotificationCenter();
 
 const iconByType = {
@@ -538,11 +540,21 @@ const startSseSubscription = () => {
 };
 
 onMounted(async () => {
+  unregisterAuthCleanup = registerAuthCleanup(() => {
+    if (typeof stopSse === 'function') {
+      stopSse();
+      stopSse = null;
+    }
+  });
   await loadNotifications();
   startSseSubscription();
 });
 
 onBeforeUnmount(() => {
+  if (typeof unregisterAuthCleanup === 'function') {
+    unregisterAuthCleanup();
+    unregisterAuthCleanup = null;
+  }
   if (typeof stopSse === 'function') {
     stopSse();
   }

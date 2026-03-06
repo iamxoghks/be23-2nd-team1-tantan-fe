@@ -9,6 +9,14 @@ const isUnreadLoading = ref(false);
 
 let inflight = null;
 
+const handleAuthInvalidated = () => {
+  clearUnread();
+};
+
+if (typeof window !== 'undefined') {
+  window.addEventListener('auth:invalidated', handleAuthInvalidated);
+}
+
 const countUnreadFromList = (list = []) => list.reduce((count, item) => (
   count + (item?.isRead || item?.read ? 0 : 1)
 ), 0);

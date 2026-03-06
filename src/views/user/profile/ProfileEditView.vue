@@ -348,13 +348,14 @@ import { useRouter, RouterLink, useRoute } from 'vue-router';
 import NavigationRail from '@/components/sections/NavigationRail.vue';
 import { ArrowLeft, UserRound, Camera } from 'lucide-vue-next';
 import { gymApi, userApi } from '@/services/apis';
-import { clearAuthTokens, normalizeRole } from '@/services/token';
+import { normalizeRole } from '@/services/token';
+import { notifyAuthInvalidated } from '@/services/authLifecycle';
 import { extractPayload } from '@/utils/api';
 import { useSession } from '@/composables/useSession';
 
 const router = useRouter();
 const route = useRoute();
-const { sessionProfile, primeSessionFromToken, syncSessionFromServer, resetSession } = useSession();
+const { sessionProfile, primeSessionFromToken, syncSessionFromServer } = useSession();
 const PROFILE_BIO_MAX_LENGTH = 120;
 const BIO_CIRCLE_RADIUS = 10;
 const BIO_CIRCLE_CIRCUMFERENCE = 2 * Math.PI * BIO_CIRCLE_RADIUS;
@@ -851,8 +852,7 @@ const deleteAccount = async () => {
   isProcessingAccountAction.value = true;
   try {
     await userApi.delete();
-    clearAuthTokens();
-    resetSession();
+    notifyAuthInvalidated({ reason: 'account_deleted' });
     router.push('/');
   } catch (error) {
     isProcessingAccountAction.value = false;
