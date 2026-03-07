@@ -240,6 +240,7 @@ const typingStopTimerByRoom = new Map();
 const typingStateByRoom = new Map();
 const presenceTimeoutByRoom = new Map();
 let unregisterAuthCleanup = null;
+let roomSelectionRequestSeq = 0;
 const hasRoomSearchTerm = computed(() => String(roomSearchTerm.value || '').trim().length > 0);
 const hasMessageSearchTerm = computed(() => String(messageSearchTerm.value || '').trim().length > 0);
 
@@ -722,11 +723,17 @@ const clearRoomSubscriptions = () => {
   roomSubscriptions.value = [];
 };
 
+const resolveRoomKey = (roomId) => {
+  const room = chatRoomsData.value.find((entry) => String(entry.id) === String(roomId));
+  return String(room?.roomKey || roomId || '');
+};
+
 const subscribeRoom = (roomId) => {
   if (!roomId || !stompClient.value?.connected) return;
 
   clearRoomSubscriptions();
-  const roomKey = String(selectedRoom.value?.roomKey || roomId);
+  const roomKey = resolveRoomKey(roomId);
+  if (!roomKey) return;
   const topicCandidates = [wsConfig.roomTopic(roomKey)];
 
   const subscriptions = topicCandidates.map((destination) => (
@@ -809,21 +816,24 @@ const loadRooms = async () => {
   }
 };
 
-const loadMessages = async (roomId) => {
-  if (!roomId) return;
+const loadMessages = async (roomId, { requestSeq = null } = {}) => {
+  if (!roomId) return false;
+  const normalizedRoomId = String(roomId);
   try {
-    const response = await chatApi.messages(roomId, { page: 0, size: 50 });
+    const response = await chatApi.messages(normalizedRoomId, { page: 0, size: 50 });
+    if (requestSeq != null && requestSeq !== roomSelectionRequestSeq) {
+      return false;
+    }
     const payload = extractPayload(response);
     const list = extractList(payload);
-    if (!Array.isArray(list) || list.length === 0) return;
-
-    const mapped = list.map((message, index) => {
+    const safeList = Array.isArray(list) ? list : [];
+    const mapped = safeList.map((message, index) => {
       const senderId = message.senderId ?? message.userId ?? message.fromUserId ?? null;
       const isMine = currentUserId.value != null
         ? Number(senderId) === Number(currentUserId.value)
         : Boolean(message.isMine);
       return {
-        id: message.messageId ?? message.id ?? `msg-${roomId}-${index}`,
+        id: message.messageId ?? message.id ?? `msg-${normalizedRoomId}-${index}`,
         text: message.message || message.content || message.contents || '',
         isMine,
         time: formatMessageTime(message.createdAt || message.sentAt || message.timestamp),
@@ -831,31 +841,42 @@ const loadMessages = async (roomId) => {
         isRead: isReadFlagTrue(message.isRead),
       };
     });
-    messagesByRoom.value[roomId] = sortMessagesByTimeAsc(mapped);
+    messagesByRoom.value[normalizedRoomId] = sortMessagesByTimeAsc(mapped);
 
     try {
-      await chatApi.markRead(roomId);
+      await chatApi.markRead(normalizedRoomId);
     } catch (error) {
       // ignore read fail
     }
+    return true;
   } catch (error) {
-    chatLoadError.value = toFriendlyApiError(error, '메시지 목록을 불러오지 못했습니다.');
+    if (requestSeq == null || requestSeq === roomSelectionRequestSeq) {
+      chatLoadError.value = toFriendlyApiError(error, '메시지 목록을 불러오지 못했습니다.');
+    }
     // keep existing messages when fetch fails
+    return false;
   }
 };
 
-watch(selectedRoomId, (next, prev) => {
+watch(selectedRoomId, async (next, prev) => {
   isRoomMenuOpen.value = false;
   if (prev) {
     const prevRoom = chatRoomsData.value.find((room) => String(room.id) === String(prev));
     stopTypingForRoom(prevRoom?.roomKey || prev);
   }
-  if (!next) return;
-  loadMessages(next);
+  if (!next) {
+    roomSelectionRequestSeq += 1;
+    clearRoomSubscriptions();
+    return;
+  }
+  const requestSeq = ++roomSelectionRequestSeq;
+  chatLoadError.value = '';
+  await loadMessages(next, { requestSeq });
+  if (requestSeq !== roomSelectionRequestSeq || String(selectedRoomId.value) !== String(next)) return;
   if (chatConnectionState.value === 'connected') {
     subscribeRoom(next);
   }
-  scrollMessagesToBottom();
+  await scrollMessagesToBottom();
 });
 
 watch(
