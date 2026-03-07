@@ -131,6 +131,7 @@ const routeSummary = ref(null);
 const isRouting = ref(false);
 const isDirectionModalOpen = ref(false);
 const directionTargetGym = ref(null);
+const pendingFavoriteGymIds = new Set();
 
 const selectedGym = computed(() => gyms.value.find((gym) => gym.id === selectedGymId.value) || null);
 const hasMobileSearchKeyword = computed(() => appliedSearchQuery.value.length > 0);
@@ -425,7 +426,7 @@ const setMobileSheetState = (nextState) => {
   mobileSheetState.value = nextState;
 };
 
-const toggleFavoriteGym = (id) => {
+const toggleFavoriteGym = async (id) => {
   if (!id) return;
   if (!getAccessToken()) {
     openAuthModal();
@@ -433,23 +434,23 @@ const toggleFavoriteGym = (id) => {
   }
 
   const normalizedId = String(id);
+  if (pendingFavoriteGymIds.has(normalizedId)) return;
   const isFavorite = favoriteGymIds.value.includes(normalizedId);
+  pendingFavoriteGymIds.add(normalizedId);
 
-  const request = isFavorite
-    ? gymFavoriteApi.remove(normalizedId)
-    : gymFavoriteApi.add(normalizedId);
-
-  request
-    .then(() => {
-      if (isFavorite) {
-        favoriteGymIds.value = favoriteGymIds.value.filter((gymId) => gymId !== normalizedId);
-      } else {
-        favoriteGymIds.value = [...favoriteGymIds.value, normalizedId];
-      }
-    })
-    .catch((error) => {
-      console.error('Failed to toggle favorite gym:', error);
-    });
+  try {
+    if (isFavorite) {
+      await gymFavoriteApi.remove(normalizedId);
+      favoriteGymIds.value = favoriteGymIds.value.filter((gymId) => gymId !== normalizedId);
+    } else {
+      await gymFavoriteApi.add(normalizedId);
+      favoriteGymIds.value = [...favoriteGymIds.value, normalizedId];
+    }
+  } catch (error) {
+    console.error('Failed to toggle favorite gym:', error);
+  } finally {
+    pendingFavoriteGymIds.delete(normalizedId);
+  }
 };
 
 const toggleFavoritesOnlyOnMap = () => {
