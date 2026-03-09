@@ -10,7 +10,7 @@
         <div class="v-auth-brand-row">
           <span class="v-auth-brand-badge v-auth-brand-badge-blue"><Dumbbell class="u-icon-24" /></span>
           <div>
-            <p class="v-auth-kicker">짐맵</p>
+            <p class="v-auth-kicker">tantan</p>
             <h1 class="v-auth-title">{{ hasToken ? '비밀번호 재설정' : '비밀번호 찾기' }}</h1>
           </div>
         </div>

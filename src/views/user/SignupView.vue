@@ -9,7 +9,7 @@
 
         <div class="v-auth-brand-row">
           <span class="v-auth-brand-badge v-auth-brand-badge-blue"><Dumbbell class="u-icon-24" /></span>
-          <div><p class="v-auth-kicker">짐맵</p><h1 class="v-auth-title">회원가입</h1></div>
+          <div><p class="v-auth-kicker">tantan</p><h1 class="v-auth-title">회원가입</h1></div>
         </div>
 
         <div class="sx-views-user-signupview-001">

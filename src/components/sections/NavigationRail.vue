@@ -1,7 +1,7 @@
 <template>
   <nav class="rail-nav">
     <div class="rail-nav-logo">
-      <RouterLink to="/" class="rail-logo-link" aria-label="짐맵 로고">
+      <RouterLink to="/" class="rail-logo-link" aria-label="tantan 로고">
         <Dumbbell :size="28" :stroke-width="2.5" />
       </RouterLink>
     </div>
