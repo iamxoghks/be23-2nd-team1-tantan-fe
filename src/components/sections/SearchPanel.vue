@@ -206,6 +206,20 @@
                     <span class="ux-components-sections-searchpanel-009">공유</span>
                   </button>
                 </div>
+
+                <button
+                  type="button"
+                  class="search-panel-reservation-shortcut"
+                  @click="handleTabClick('예약')"
+                >
+                  <div class="search-panel-reservation-shortcut-icon">
+                    <CalendarDays :size="18" />
+                  </div>
+                  <div class="search-panel-reservation-shortcut-copy">
+                    <strong>예약</strong>
+                    <span>원하는 날짜와 시간을 바로 선택하세요.</span>
+                  </div>
+                </button>
               </div>
 
               <div class="search-panel-tabs-wrap">
@@ -254,6 +268,163 @@
                     </div>
                     <p class="sx-components-sections-searchpanel-004">{{ selectedGymPhone }}</p>
                     <p class="ux-components-sections-searchpanel-017">{{ selectedGymWebsite }}</p>
+                  </div>
+                </div>
+
+                <div v-else-if="activeTab === '예약'" class="search-panel-tab-content search-panel-reservation-tab">
+                  <section class="search-panel-reservation-hero">
+                    <div>
+                      <span class="search-panel-reservation-chip">실시간 예약</span>
+                      <h3 class="search-panel-reservation-hero-title">날짜와 시간을 고른 뒤 바로 예약할 수 있어요.</h3>
+                      <p class="search-panel-reservation-hero-copy">
+                        {{ selectedGym?.name }}에 등록된 예약 슬롯 기준으로 실시간 가능 시간을 보여드립니다.
+                      </p>
+                    </div>
+                    <div class="search-panel-reservation-hero-summary">
+                      <span>선택 내역</span>
+                      <strong>{{ reservationSelectionSummary }}</strong>
+                    </div>
+                  </section>
+
+                  <div class="search-panel-reservation-card">
+                    <div class="search-panel-reservation-card-head">
+                      <div>
+                        <p class="search-panel-reservation-card-label">예약 날짜</p>
+                        <h3 class="search-panel-reservation-card-title">{{ reservationMonthLabel }}</h3>
+                      </div>
+                      <div class="search-panel-reservation-month-actions">
+                        <button type="button" class="search-panel-reservation-month-btn" @click="moveReservationMonth(-1)">
+                          <ChevronLeft :size="16" />
+                        </button>
+                        <button type="button" class="search-panel-reservation-month-btn" @click="moveReservationMonth(1)">
+                          <ChevronRight :size="16" />
+                        </button>
+                      </div>
+                    </div>
+
+                    <div class="search-panel-reservation-calendar">
+                      <div class="search-panel-reservation-weekday-row">
+                        <span
+                          v-for="weekday in reservationWeekdayLabels"
+                          :key="weekday"
+                          class="search-panel-reservation-weekday"
+                        >
+                          {{ weekday }}
+                        </span>
+                      </div>
+                      <div class="search-panel-reservation-date-grid">
+                        <button
+                          v-for="cell in reservationCalendarCells"
+                          :key="cell.key"
+                          type="button"
+                          class="search-panel-reservation-date-btn"
+                          :class="[
+                            cell.isCurrentMonth ? '' : 'search-panel-reservation-date-btn-outside',
+                            cell.isSelected ? 'search-panel-reservation-date-btn-selected' : '',
+                            cell.isDisabled ? 'search-panel-reservation-date-btn-disabled' : '',
+                          ]"
+                          :disabled="cell.isDisabled"
+                          @click="selectReservationDate(cell.ymd)"
+                        >
+                          <span class="search-panel-reservation-date-number">{{ cell.dayNumber }}</span>
+                          <span v-if="cell.isToday" class="search-panel-reservation-date-badge">오늘</span>
+                          <span
+                            v-else-if="cell.availableCount > 0"
+                            class="search-panel-reservation-date-dot"
+                          />
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div class="search-panel-reservation-card">
+                    <div class="search-panel-reservation-card-head">
+                      <div>
+                        <p class="search-panel-reservation-card-label">예약 시간</p>
+                        <h3 class="search-panel-reservation-card-title">{{ reservationSelectedDateLabel }}</h3>
+                      </div>
+                      <span class="search-panel-reservation-card-caption">
+                        {{ reservationSlots.length > 0 ? `총 ${reservationSlots.length}개 슬롯` : '등록된 슬롯 없음' }}
+                      </span>
+                    </div>
+
+                    <p v-if="!isAuthenticated" class="search-panel-reservation-login-note">
+                      <LogIn :size="14" />
+                      <span>시간 조회는 가능하며, 예약 확정은 로그인 후 진행됩니다.</span>
+                    </p>
+
+                    <div v-if="tabLoading" class="search-panel-empty">
+                      <div class="search-panel-empty-icon">
+                        <CalendarDays :size="32" />
+                      </div>
+                      <p class="ux-components-sections-searchpanel-018">예약 가능한 시간을 불러오는 중입니다...</p>
+                    </div>
+                    <div v-else-if="tabError" class="search-panel-empty">
+                      <div class="search-panel-empty-icon">
+                        <Info :size="32" />
+                      </div>
+                      <p class="ux-components-sections-searchpanel-018">{{ tabError }}</p>
+                    </div>
+                    <div v-else-if="reservationSlotSections.length === 0" class="search-panel-empty search-panel-reservation-empty">
+                      <div class="search-panel-empty-icon">
+                        <CalendarDays :size="32" />
+                      </div>
+                      <p class="ux-components-sections-searchpanel-018">선택한 날짜에는 등록된 예약 시간이 없습니다.</p>
+                    </div>
+                    <div v-else class="search-panel-reservation-slot-sections">
+                      <section
+                        v-for="section in reservationSlotSections"
+                        :key="section.key"
+                        class="search-panel-reservation-slot-section"
+                      >
+                        <h4 class="search-panel-reservation-slot-section-title">{{ section.label }}</h4>
+                        <div class="search-panel-reservation-slot-grid">
+                          <button
+                            v-for="slot in section.slots"
+                            :key="slot.id || slot.slotDateTime"
+                            type="button"
+                            class="search-panel-reservation-slot-btn"
+                            :class="[
+                              slot.slotDateTime === reservationSelectedSlotDateTime ? 'search-panel-reservation-slot-btn-selected' : '',
+                              isReservationSlotUnavailable(slot) ? 'search-panel-reservation-slot-btn-disabled' : '',
+                            ]"
+                            :disabled="isReservationSlotUnavailable(slot)"
+                            @click="selectReservationSlot(slot)"
+                          >
+                            <strong>{{ formatReservationTime(slot.slotDateTime) }}</strong>
+                            <span>{{ getReservationSlotMeta(slot) }}</span>
+                          </button>
+                        </div>
+                      </section>
+                    </div>
+                  </div>
+
+                  <div
+                    v-if="reservationFeedbackMessage"
+                    class="search-panel-reservation-feedback"
+                    :class="reservationFeedbackTone === 'success' ? 'search-panel-reservation-feedback-success' : 'search-panel-reservation-feedback-error'"
+                  >
+                    <CheckCircle2 v-if="reservationFeedbackTone === 'success'" :size="18" />
+                    <Info v-else :size="18" />
+                    <p>{{ reservationFeedbackMessage }}</p>
+                  </div>
+
+                  <div class="search-panel-reservation-actions">
+                    <button
+                      type="button"
+                      class="search-panel-reservation-reset-btn"
+                      @click="resetReservationFilters"
+                    >
+                      초기화
+                    </button>
+                    <button
+                      type="button"
+                      class="search-panel-reservation-submit-btn"
+                      :disabled="reservationActionDisabled"
+                      @click="submitReservation"
+                    >
+                      {{ reservationActionLabel }}
+                    </button>
                   </div>
                 </div>
 
@@ -481,15 +652,93 @@ import {
   Camera,
   MessageSquare,
   Info,
+  CalendarDays,
+  CheckCircle2,
+  LogIn,
 } from 'lucide-vue-next';
 import UiIconButton from '@/components/ui/UiIconButton.vue';
-import { gymApi, reviewApi } from '@/services/apis';
+import { gymApi, reservationApi, reviewApi } from '@/services/apis';
 import { useSession } from '@/composables/useSession';
-import { getAccessToken, normalizeRole } from '@/services/token';
+import { normalizeRole } from '@/services/token';
 import { extractList, extractPayload } from '@/utils/api';
 
 const defaultGymImage = 'https://images.unsplash.com/photo-1534438327276-14e5300c3a48?q=80&w=400&auto=format&fit=crop';
-const tabs = ['홈', '리뷰', '사진'];
+const tabs = ['홈', '예약', '리뷰', '사진'];
+const reservationWeekdayLabels = ['일', '월', '화', '수', '목', '금', '토'];
+const reservationPeriodConfigs = [
+  { key: 'morning', label: '오전', startHour: 0, endHour: 12 },
+  { key: 'afternoon', label: '오후', startHour: 12, endHour: 18 },
+  { key: 'evening', label: '저녁', startHour: 18, endHour: 24 },
+];
+
+const startOfMonth = (date) => new Date(date.getFullYear(), date.getMonth(), 1);
+
+const addMonths = (date, amount) => new Date(date.getFullYear(), date.getMonth() + amount, 1);
+
+const formatDateToYmd = (date) => {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
+const parseDateOnly = (value) => {
+  const match = String(value || '').trim().match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!match) return null;
+  return new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]));
+};
+
+const parseLocalDateTime = (value) => {
+  const match = String(value || '').trim().match(/^(\d{4})-(\d{2})-(\d{2})[T\s](\d{2}):(\d{2})(?::(\d{2}))?$/);
+  if (!match) return null;
+  return new Date(
+    Number(match[1]),
+    Number(match[2]) - 1,
+    Number(match[3]),
+    Number(match[4]),
+    Number(match[5]),
+    Number(match[6] || 0),
+  );
+};
+
+const getTodayStart = () => {
+  const today = new Date();
+  return new Date(today.getFullYear(), today.getMonth(), today.getDate());
+};
+
+const isDateBeforeToday = (value) => {
+  const targetDate = parseDateOnly(value);
+  if (!targetDate) return false;
+  return targetDate.getTime() < getTodayStart().getTime();
+};
+
+const formatReservationMonthLabel = (date) => `${date.getFullYear()}.${String(date.getMonth() + 1).padStart(2, '0')}`;
+
+const formatReservationDateLabel = (value) => {
+  const date = parseDateOnly(value);
+  if (!date) return '날짜를 선택하세요';
+  const dayLabel = reservationWeekdayLabels[date.getDay()];
+  return `${date.getMonth() + 1}월 ${date.getDate()}일 (${dayLabel})`;
+};
+
+const formatReservationTime = (value) => {
+  const date = parseLocalDateTime(value);
+  if (!date) return '--:--';
+  const hour = date.getHours();
+  const minute = String(date.getMinutes()).padStart(2, '0');
+  return `${hour}:${minute}`;
+};
+
+const getReservationSlotHour = (slot) => parseLocalDateTime(slot?.slotDateTime)?.getHours() ?? -1;
+
+const isReservationSlotUnavailable = (slot) => {
+  if (!slot) return true;
+  if (Boolean(slot?.isClosed)) return true;
+  if (Number(slot?.remainingCount || 0) <= 0) return true;
+  const date = parseLocalDateTime(slot?.slotDateTime);
+  return date ? date.getTime() < Date.now() : true;
+};
+
 const activeTab = ref('홈');
 const searchQuery = ref('');
 const appliedSearchQuery = ref('');
@@ -503,6 +752,13 @@ const isReviewModalOpen = ref(false);
 const isReviewSubmitting = ref(false);
 const reviewSubmitError = ref('');
 const reviewImageInputRef = ref(null);
+const reservationMonthCursor = ref(startOfMonth(new Date()));
+const reservationSelectedDate = ref(formatDateToYmd(new Date()));
+const reservationSlotMap = ref({});
+const reservationSelectedSlotDateTime = ref('');
+const reservationSubmitting = ref(false);
+const reservationFeedbackMessage = ref('');
+const reservationFeedbackTone = ref('info');
 const maxReviewImageCount = 10;
 const allowedReviewImageMimeTypes = new Set(['image/jpeg', 'image/jpg', 'image/png']);
 const allowedReviewImageExtensions = new Set(['jpg', 'jpeg', 'png']);
@@ -511,7 +767,7 @@ const reviewForm = ref({
   comment: '',
   images: [],
 });
-const { sessionProfile, primeSessionFromToken, syncSessionFromServer } = useSession();
+const { sessionProfile, isAuthenticated, primeSessionFromToken, syncSessionFromServer } = useSession();
 
 const amenityLabelMap = {
   FREE_WIFI: '무료 Wi-Fi',
@@ -570,6 +826,13 @@ const isFavorite = (id) => props.favoriteGymIds.includes(normalizeId(id));
 const selectedGymId = computed(() => normalizeId(props.selectedGym?.id));
 const selectedGymDetail = computed(() => gymDetailMap.value[selectedGymId.value] || null);
 const reviewItems = computed(() => reviewMap.value[selectedGymId.value] || []);
+const reservationSlotCacheKey = computed(() => {
+  if (!selectedGymId.value || !reservationSelectedDate.value) return '';
+  return `${selectedGymId.value}:${reservationSelectedDate.value}`;
+});
+const reservationSlots = computed(() => reservationSlotMap.value[reservationSlotCacheKey.value] || []);
+const selectedReservationSlot = computed(() =>
+  reservationSlots.value.find((slot) => slot?.slotDateTime === reservationSelectedSlotDateTime.value) || null);
 const selectedGymReviewCount = computed(() => {
   if (reviewItems.value.length > 0) return reviewItems.value.length;
   return formatCount(props.selectedGym?.reviews);
@@ -620,7 +883,62 @@ const selectedGymOpenCloseHint = computed(() => {
   return closeTime ? `~${closeTime}` : '';
 });
 const sessionRole = computed(() => normalizeRole(sessionProfile.value?.role));
-const canWriteReview = computed(() => Boolean(getAccessToken()) && sessionRole.value === 'USER');
+const canWriteReview = computed(() => isAuthenticated.value && sessionRole.value === 'USER');
+const reservationMonthLabel = computed(() => formatReservationMonthLabel(reservationMonthCursor.value));
+const reservationSelectedDateLabel = computed(() => formatReservationDateLabel(reservationSelectedDate.value));
+const reservationCalendarCells = computed(() => {
+  const monthStart = startOfMonth(reservationMonthCursor.value);
+  const calendarStart = new Date(monthStart);
+  calendarStart.setDate(monthStart.getDate() - monthStart.getDay());
+
+  return Array.from({ length: 42 }, (_, index) => {
+    const cellDate = new Date(calendarStart);
+    cellDate.setDate(calendarStart.getDate() + index);
+    const ymd = formatDateToYmd(cellDate);
+    const cachedSlots = selectedGymId.value ? reservationSlotMap.value[`${selectedGymId.value}:${ymd}`] : null;
+    const availableCount = Array.isArray(cachedSlots)
+      ? cachedSlots.filter((slot) => !isReservationSlotUnavailable(slot)).length
+      : null;
+
+    return {
+      key: `${ymd}-${index}`,
+      ymd,
+      dayNumber: cellDate.getDate(),
+      isCurrentMonth: cellDate.getMonth() === monthStart.getMonth(),
+      isToday: ymd === formatDateToYmd(new Date()),
+      isSelected: ymd === reservationSelectedDate.value,
+      isDisabled: isDateBeforeToday(ymd),
+      availableCount,
+    };
+  });
+});
+const reservationSlotSections = computed(() => {
+  const sections = reservationPeriodConfigs
+    .map((section) => ({
+      ...section,
+      slots: reservationSlots.value.filter((slot) => {
+        const hour = getReservationSlotHour(slot);
+        return hour >= section.startHour && hour < section.endHour;
+      }),
+    }))
+    .filter((section) => section.slots.length > 0);
+
+  if (sections.length > 0) return sections;
+  if (reservationSlots.value.length === 0) return [];
+  return [{ key: 'all', label: '전체', slots: reservationSlots.value }];
+});
+const reservationActionLabel = computed(() => {
+  if (reservationSubmitting.value) return '예약 중...';
+  if (!selectedReservationSlot.value) return '시간을 선택하세요';
+  if (!isAuthenticated.value) return '로그인하고 예약';
+  return '예약하기';
+});
+const reservationActionDisabled = computed(() =>
+  reservationSubmitting.value || !selectedReservationSlot.value);
+const reservationSelectionSummary = computed(() => {
+  if (!selectedReservationSlot.value) return '날짜와 시간을 선택해주세요.';
+  return `${reservationSelectedDateLabel.value} ${formatReservationTime(selectedReservationSlot.value.slotDateTime)}`;
+});
 
 const selectedGymType = computed(() =>
   selectedGymDetail.value?.categoryName
@@ -861,6 +1179,35 @@ const ensureGymPhotos = async (gymId, options = {}) => {
   return photos;
 };
 
+const normalizeReservationSlots = (payload) => extractList(payload)
+  .map((item) => ({
+    ...item,
+    remainingCount: Number(item?.remainingCount || 0),
+    reservedCount: Number(item?.reservedCount || 0),
+    maxCapacity: Number(item?.maxCapacity || 0),
+  }))
+  .sort((left, right) => String(left?.slotDateTime || '').localeCompare(String(right?.slotDateTime || '')));
+
+const ensureReservationSlots = async (gymId, date, options = {}) => {
+  const { force = false } = options;
+  if (!gymId || !date) return [];
+
+  const cacheKey = `${gymId}:${date}`;
+  if (!force && reservationSlotMap.value[cacheKey]) {
+    return reservationSlotMap.value[cacheKey] || [];
+  }
+
+  const response = await reservationApi.getSlots(Number(gymId), date);
+  const payload = extractPayload(response, []);
+  const slots = normalizeReservationSlots(payload);
+
+  reservationSlotMap.value = {
+    ...reservationSlotMap.value,
+    [cacheKey]: slots,
+  };
+  return slots;
+};
+
 const toApiErrorMessage = (error, fallback = '리뷰 등록에 실패했습니다.') => {
   const status = Number(error?.response?.status || 0);
   const message = String(
@@ -872,6 +1219,146 @@ const toApiErrorMessage = (error, fallback = '리뷰 등록에 실패했습니�
   if (status === 401) return '로그인이 필요합니다.';
   if (status === 403) return '일반 사용자(USER)만 리뷰를 작성할 수 있습니다.';
   return message || fallback;
+};
+
+const toReservationErrorMessage = (error, fallback = '예약 처리에 실패했습니다.') => {
+  const status = Number(error?.response?.status || 0);
+  const message = String(
+    error?.response?.data?.message
+    || error?.response?.data?.error
+    || error?.response?.data?.result
+    || '',
+  ).trim();
+  if (status === 401) return '로그인이 필요합니다.';
+  if (status === 403) return '예약 권한이 없습니다.';
+  return message || fallback;
+};
+
+const resetReservationFeedback = () => {
+  reservationFeedbackMessage.value = '';
+  reservationFeedbackTone.value = 'info';
+};
+
+const resetReservationFilters = () => {
+  reservationMonthCursor.value = startOfMonth(new Date());
+  reservationSelectedDate.value = formatDateToYmd(new Date());
+  reservationSelectedSlotDateTime.value = '';
+  resetReservationFeedback();
+};
+
+const findFirstSelectableDateInMonth = (monthDate) => {
+  const today = getTodayStart();
+  const candidate = new Date(monthDate.getFullYear(), monthDate.getMonth(), 1);
+  if (candidate.getTime() >= today.getTime()) return candidate;
+  if (today.getFullYear() === monthDate.getFullYear() && today.getMonth() === monthDate.getMonth()) return today;
+  return null;
+};
+
+const syncSelectedReservationSlot = () => {
+  if (!reservationSelectedSlotDateTime.value) return;
+  const isStillSelectable = reservationSlots.value.some((slot) =>
+    slot?.slotDateTime === reservationSelectedSlotDateTime.value && !isReservationSlotUnavailable(slot));
+  if (!isStillSelectable) {
+    reservationSelectedSlotDateTime.value = '';
+  }
+};
+
+const loadReservationSlotsForSelectedDate = async (options = {}) => {
+  const gymId = selectedGymId.value;
+  const date = reservationSelectedDate.value;
+  if (!gymId || !date) return [];
+
+  tabLoading.value = true;
+  tabError.value = '';
+  try {
+    const slots = await ensureReservationSlots(gymId, date, options);
+    syncSelectedReservationSlot();
+    return slots;
+  } catch (error) {
+    console.error('Failed to load reservation slots:', error);
+    tabError.value = '예약 가능한 시간을 불러오지 못했습니다.';
+    throw error;
+  } finally {
+    tabLoading.value = false;
+  }
+};
+
+const moveReservationMonth = async (offset) => {
+  const nextMonth = addMonths(reservationMonthCursor.value, offset);
+  reservationMonthCursor.value = nextMonth;
+
+  const nextDate = findFirstSelectableDateInMonth(nextMonth);
+  if (!nextDate) return;
+
+  const nextDateString = formatDateToYmd(nextDate);
+  reservationSelectedDate.value = nextDateString;
+  reservationSelectedSlotDateTime.value = '';
+  resetReservationFeedback();
+
+  if (activeTab.value === '예약') {
+    await loadReservationSlotsForSelectedDate({ force: true });
+  }
+};
+
+const selectReservationDate = async (dateString) => {
+  if (!dateString || isDateBeforeToday(dateString)) return;
+  const targetDate = parseDateOnly(dateString);
+  if (!targetDate) return;
+
+  reservationMonthCursor.value = startOfMonth(targetDate);
+  if (reservationSelectedDate.value === dateString && activeTab.value !== '예약') return;
+  reservationSelectedDate.value = dateString;
+  reservationSelectedSlotDateTime.value = '';
+  resetReservationFeedback();
+
+  if (activeTab.value === '예약') {
+    await loadReservationSlotsForSelectedDate({ force: true });
+  }
+};
+
+const selectReservationSlot = (slot) => {
+  if (isReservationSlotUnavailable(slot)) return;
+  reservationSelectedSlotDateTime.value = slot?.slotDateTime || '';
+  resetReservationFeedback();
+};
+
+const getReservationSlotMeta = (slot) => {
+  if (Boolean(slot?.isClosed) || Number(slot?.remainingCount || 0) <= 0) return '마감';
+  if (parseLocalDateTime(slot?.slotDateTime)?.getTime() < Date.now()) return '종료';
+  return `잔여 ${Number(slot?.remainingCount || 0)}석`;
+};
+
+const submitReservation = async () => {
+  const gymId = Number(selectedGymId.value || 0);
+  const slot = selectedReservationSlot.value;
+  if (!gymId || !slot) return;
+
+  if (!isAuthenticated.value) {
+    if (typeof props.onRequireAuth === 'function') {
+      props.onRequireAuth();
+      return;
+    }
+    window.alert('로그인이 필요합니다.');
+    return;
+  }
+
+  reservationSubmitting.value = true;
+  resetReservationFeedback();
+  try {
+    await reservationApi.create({
+      gymId,
+      reservationDateTime: slot.slotDateTime,
+    });
+    reservationSelectedSlotDateTime.value = '';
+    reservationFeedbackTone.value = 'success';
+    reservationFeedbackMessage.value = '예약이 접수되었습니다. 마이페이지에서 예약 내역을 확인할 수 있습니다.';
+    await loadReservationSlotsForSelectedDate({ force: true });
+  } catch (error) {
+    reservationFeedbackTone.value = 'error';
+    reservationFeedbackMessage.value = toReservationErrorMessage(error);
+  } finally {
+    reservationSubmitting.value = false;
+  }
 };
 
 const revokeReviewImageUrls = (items = reviewForm.value.images || []) => {
@@ -981,7 +1468,7 @@ const removeReviewFile = (index) => {
 };
 
 const openReviewModal = () => {
-  if (!getAccessToken()) {
+  if (!isAuthenticated.value) {
     if (typeof props.onRequireAuth === 'function') {
       props.onRequireAuth();
       return;
@@ -1127,6 +1614,11 @@ const loadTabData = async (tab) => {
 
   tabLoading.value = true;
   try {
+    if (tab === '예약') {
+      await loadReservationSlotsForSelectedDate();
+      return;
+    }
+
     if (tab === '리뷰') {
       await ensureGymReviews(gymId);
       return;
@@ -1162,6 +1654,7 @@ const filteredGyms = computed(() => {
 watch(selectedGymId, async (nextGymId, prevGymId) => {
   tabError.value = '';
   tabLoading.value = false;
+  resetReservationFilters();
   if (nextGymId !== prevGymId && isReviewModalOpen.value) {
     closeReviewModal();
   }
@@ -1180,7 +1673,7 @@ watch(activeTab, async (tab) => {
 
 onMounted(() => {
   primeSessionFromToken();
-  if (getAccessToken()) {
+  if (isAuthenticated.value) {
     syncSessionFromServer().catch(() => {});
   }
 });

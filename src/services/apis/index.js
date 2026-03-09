@@ -9,3 +9,4 @@ export { notificationApi, notificationSettingsApi } from '@/services/apis/notifi
 export { chatApi } from '@/services/apis/chat';
 export { followApi } from '@/services/apis/follow';
 export { reportApi } from '@/services/apis/report';
+export { reservationApi } from '@/services/apis/reservation';
