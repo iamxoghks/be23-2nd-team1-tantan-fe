@@ -46,25 +46,27 @@
 
           <div class="sx-views-user-profile-profileview-015">
             <div class="v-profile-log-column">
-              <div class="view-card-sm v-owner-panel-card">
-                <h3 class="v-owner-panel-title">영업 시간</h3>
-                <div class="v-owner-read-hours">
-                  <div v-for="item in gymOwnerHours" :key="item.dayOfWeek" class="v-owner-read-hour-row">
-                    <span>{{ dayLabelMap[item.dayOfWeek] }}</span>
-                    <strong>{{ item.isClosed ? '휴무' : `${item.openTime} ~ ${item.closeTime}` }}</strong>
+              <div class="v-owner-info-grid">
+                <div class="view-card-sm v-owner-panel-card">
+                  <h3 class="v-owner-panel-title">영업 시간</h3>
+                  <div class="v-owner-read-hours">
+                    <div v-for="item in gymOwnerHours" :key="item.dayOfWeek" class="v-owner-read-hour-row">
+                      <span>{{ dayLabelMap[item.dayOfWeek] }}</span>
+                      <strong>{{ item.isClosed ? '휴무' : `${item.openTime} ~ ${item.closeTime}` }}</strong>
+                    </div>
                   </div>
                 </div>
-              </div>
 
-              <div class="view-card-sm v-owner-panel-card">
-                <h3 class="v-owner-panel-title">상품</h3>
-                <div v-if="gymOwnerProducts.length" class="v-owner-read-products">
-                  <p v-for="(item, idx) in gymOwnerProducts" :key="idx" class="v-owner-read-product">
-                    <span>{{ item.productName || '-' }}</span>
-                    <strong>{{ Number(item.price || 0).toLocaleString() }}원</strong>
-                  </p>
+                <div class="view-card-sm v-owner-panel-card v-owner-products-card">
+                  <h3 class="v-owner-panel-title">상품</h3>
+                  <div v-if="gymOwnerProducts.length" class="v-owner-read-products">
+                    <p v-for="(item, idx) in gymOwnerProducts" :key="idx" class="v-owner-read-product">
+                      <span>{{ item.productName || '-' }}</span>
+                      <strong>{{ Number(item.price || 0).toLocaleString() }}원</strong>
+                    </p>
+                  </div>
+                  <p v-else class="v-owner-read-text">등록된 상품이 없습니다.</p>
                 </div>
-                <p v-else class="v-owner-read-text">등록된 상품이 없습니다.</p>
               </div>
 
               <div class="view-card-sm v-owner-panel-card">
@@ -1716,6 +1718,19 @@ onBeforeUnmount(() => {
   gap: 16px;
 }
 
+.v-owner-info-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 16px;
+}
+
+@media (min-width: 768px) {
+  .v-owner-info-grid {
+    grid-template-columns: 1fr 1fr;
+    align-items: stretch;
+  }
+}
+
 .v-profile-stat-button {
   border: 0;
   background: transparent;
@@ -2306,26 +2321,42 @@ onBeforeUnmount(() => {
   color: #0f172a;
 }
 
+.v-owner-products-card {
+  display: flex !important;
+  flex-direction: column;
+  height: 100%;
+}
+
 .v-owner-read-products {
-  display: grid;
-  gap: 6px;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  width: 100%;
 }
 
 .v-owner-read-product {
   margin: 0;
   border: 1px solid #e2e8f0;
-  border-radius: 10px;
+  border-radius: 12px;
   background: #ffffff;
-  padding: 10px 12px;
+  padding: 14px 20px; /* 내부 여백도 살짝 키움 */
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 8px;
-  font-size: 13px;
+  gap: 12px;
+  font-size: 14px; /* 글자 크기 살짝 키움 */
+  width: 100%;
+  max-width: 400px; /* 최대 너비 확장 */
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
+  flex-shrink: 0;
 }
 
 .v-owner-read-product strong {
   color: #0f172a;
+  font-weight: 700;
 }
 
 .v-owner-read-text {
