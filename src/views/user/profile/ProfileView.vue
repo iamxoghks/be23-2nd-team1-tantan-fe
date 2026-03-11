@@ -1052,7 +1052,14 @@ const applyGymOwnerData = (payload = {}) => {
   }
 
   const amenities = payload.amenities || payload.amenityCodes || [];
-  gymOwnerAmenitiesInput.value = Array.isArray(amenities) && amenities.length > 0 ? amenities.join(', ') : '';
+  gymOwnerAmenitiesInput.value = Array.isArray(amenities) && amenities.length > 0
+    ? amenities.map((item) => {
+      if (typeof item === 'object' && item !== null) {
+        return item.name || item.amenityName || item.title || JSON.stringify(item);
+      }
+      return String(item);
+    }).join(', ')
+    : '';
 
   const products = payload.products || [];
   gymOwnerProducts.value = Array.isArray(products) && products.length > 0
