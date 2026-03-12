@@ -51,7 +51,10 @@
             </button>
           </form>
         </div>
-        <CategoryPills />
+        <CategoryPills
+          :selected-category-name="selectedCategoryName"
+          @select="handleCategorySelect"
+        />
         <MapCanvasContainer
           :gyms="mapGyms"
           :selected-gym-id="selectedGymId"
@@ -126,12 +129,14 @@ const favoriteGymIds = ref([]);
 const showFavoritesOnlyOnMap = ref(false);
 const mobileSearchInput = ref('');
 const appliedSearchQuery = ref('');
+const selectedCategoryName = ref('');
 const routePath = ref([]);
 const routeSummary = ref(null);
 const isRouting = ref(false);
 const isDirectionModalOpen = ref(false);
 const directionTargetGym = ref(null);
 const pendingFavoriteGymIds = new Set();
+let gymLoadSequence = 0;
 
 const selectedGym = computed(() => gyms.value.find((gym) => gym.id === selectedGymId.value) || null);
 const hasMobileSearchKeyword = computed(() => appliedSearchQuery.value.length > 0);
@@ -426,6 +431,27 @@ const setMobileSheetState = (nextState) => {
   mobileSheetState.value = nextState;
 };
 
+const resetSelectedGymContext = () => {
+  selectedGymId.value = null;
+  routePath.value = [];
+  routeSummary.value = null;
+  isRouting.value = false;
+};
+
+const handleCategorySelect = async (category) => {
+  const clickedCategoryName = String(category?.name || '').trim();
+  const nextCategoryName = selectedCategoryName.value === clickedCategoryName ? '' : clickedCategoryName;
+
+  selectedCategoryName.value = nextCategoryName;
+  resetSelectedGymContext();
+
+  if (mobileSheetState.value === 'hidden') {
+    mobileSheetState.value = 'peek';
+  }
+
+  await loadGyms(nextCategoryName ? { category: nextCategoryName } : {});
+};
+
 const toggleFavoriteGym = async (id) => {
   if (!id) return;
   if (!getAccessToken()) {
@@ -469,7 +495,9 @@ const normalizeGym = (gym) => ({
   color: gym.color || '#1a1a1a',
 });
 
-const syncGymFromDetail = (detail) => {
+const syncGymFromDetail = (detail, requestId = gymLoadSequence) => {
+  if (requestId !== gymLoadSequence) return;
+
   const targetId = String(detail?.id ?? detail?.gymId ?? '').trim();
   if (!targetId) return;
 
@@ -501,7 +529,9 @@ const syncGymFromDetail = (detail) => {
   });
 };
 
-const refreshGymSummariesFromDetails = async () => {
+const refreshGymSummariesFromDetails = async (requestId) => {
+  if (requestId !== gymLoadSequence) return;
+
   const gymIds = gyms.value
     .map((gym) => String(gym.id || '').trim())
     .filter(Boolean)
@@ -513,8 +543,8 @@ const refreshGymSummariesFromDetails = async () => {
     try {
       const response = await gymApi.detail(gymId);
       const payload = response.data?.data || response.data?.result || response.data;
-      if (payload) {
-        syncGymFromDetail(payload);
+      if (payload && requestId === gymLoadSequence) {
+        syncGymFromDetail(payload, requestId);
       }
     } catch (error) {
       // keep list data as-is when one detail request fails
@@ -522,7 +552,9 @@ const refreshGymSummariesFromDetails = async () => {
   }));
 };
 
-const refreshGymReviewStatsFromReviews = async () => {
+const refreshGymReviewStatsFromReviews = async (requestId) => {
+  if (requestId !== gymLoadSequence) return;
+
   const targetGymIds = new Set(
     gyms.value
       .map((gym) => String(gym.id || '').trim())
@@ -537,6 +569,8 @@ const refreshGymReviewStatsFromReviews = async () => {
   let totalPages = null;
 
   while (page < maxPages) {
+    if (requestId !== gymLoadSequence) return;
+
     let list = [];
 
     try {
@@ -571,6 +605,7 @@ const refreshGymReviewStatsFromReviews = async () => {
   }
 
   if (statsByGymId.size === 0) return;
+  if (requestId !== gymLoadSequence) return;
 
   gyms.value = gyms.value.map((gym) => {
     const gymId = String(gym.id || '').trim();
@@ -584,13 +619,24 @@ const refreshGymReviewStatsFromReviews = async () => {
   });
 };
 
-const loadGyms = async () => {
+const loadGyms = async (params = {}) => {
+  const requestId = ++gymLoadSequence;
+
   try {
-    const response = await gymApi.list();
+    const response = await gymApi.list(params);
     const list = response.data?.data || response.data?.result || response.data;
+    if (requestId !== gymLoadSequence) return;
+
     gyms.value = (Array.isArray(list) ? list : []).map((gym) => normalizeGym(gym));
-    await refreshGymSummariesFromDetails();
-    await refreshGymReviewStatsFromReviews();
+
+    if (selectedGymId.value && !gyms.value.some((gym) => gym.id === selectedGymId.value)) {
+      resetSelectedGymContext();
+    }
+
+    await refreshGymSummariesFromDetails(requestId);
+    if (requestId !== gymLoadSequence) return;
+
+    await refreshGymReviewStatsFromReviews(requestId);
   } catch (error) {
     console.error('Failed to load gyms:', error);
   }
