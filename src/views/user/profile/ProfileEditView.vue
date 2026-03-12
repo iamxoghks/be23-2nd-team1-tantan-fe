@@ -71,10 +71,12 @@
 
             <section class="owner-edit-section">
               <h2>편의시설</h2>
-              <label class="owner-edit-field">
-                <span>편의시설 코드 (쉼표 구분)</span>
-                <input v-model="amenitiesInput" type="text" placeholder="PARKING, SHOWER, WIFI" class="v-modal-line-input" />
-              </label>
+              <div class="settings-amenities-grid">
+                <label v-for="amenity in availableAmenities" :key="amenity.code" class="settings-checkbox-field">
+                  <input type="checkbox" :value="amenity.code" v-model="selectedAmenities" />
+                  <span>{{ amenity.label }}</span>
+                </label>
+              </div>
               <button class="v-modal-save-btn owner-edit-action-btn" :disabled="isSavingAmenities" @click="saveAmenities">
                 {{ isSavingAmenities ? '저장 중...' : '편의시설 저장' }}
               </button>
@@ -603,7 +605,16 @@ const gymForm = ref({
   tel: '',
 });
 const gymHours = ref(defaultHours());
-const amenitiesInput = ref('');
+const availableAmenities = [
+  { code: 'FREE_WIFI', label: '무료 Wi-Fi' },
+  { code: 'SHOWER', label: '샤워실' },
+  { code: 'PARKING', label: '주차 가능' },
+  { code: 'PERSONAL_TRAINING', label: 'PT 가능' },
+  { code: 'LOCKER', label: '락커' },
+  { code: 'INBODY', label: '인바디' },
+  { code: 'LAUNDRY', label: '세탁실' },
+];
+const selectedAmenities = ref([]);
 const products = ref([{ productName: '', price: 0 }]);
 const exceptions = ref([]);
 const exceptionForm = ref({
@@ -667,7 +678,9 @@ const applyGymData = (payload = {}) => {
   }
 
   const amenityList = payload.amenities || payload.amenityCodes || [];
-  amenitiesInput.value = Array.isArray(amenityList) && amenityList.length > 0 ? amenityList.join(', ') : '';
+  selectedAmenities.value = Array.isArray(amenityList)
+    ? amenityList.map((a) => (typeof a === 'object' && a !== null ? a.code || a.amenityCode || a.name : a))
+    : [];
 
   const productList = payload.products || [];
   products.value = Array.isArray(productList) && productList.length > 0
@@ -934,11 +947,7 @@ const saveAmenities = async () => {
   ownerMessage.value = '';
   ownerError.value = '';
   try {
-    const payload = amenitiesInput.value
-      .split(',')
-      .map((item) => item.trim())
-      .filter(Boolean);
-    await gymApi.replaceAmenities(payload);
+    await gymApi.replaceAmenities(selectedAmenities.value);
     ownerMessage.value = '편의시설이 저장되었습니다.';
   } catch (error) {
     ownerError.value = '편의시설 저장에 실패했습니다.';
@@ -1288,6 +1297,33 @@ onMounted(async () => {
   margin: 0;
   font-size: 13px;
   color: #dc2626;
+}
+
+.settings-amenities-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  gap: 12px;
+  padding: 16px;
+  background-color: #f1f5f9;
+  border-radius: 12px;
+  margin-bottom: 12px;
+}
+
+.settings-checkbox-field {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  font-size: 14px;
+  color: #1e293b;
+  user-select: none;
+}
+
+.settings-checkbox-field input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  cursor: pointer;
+  accent-color: #2563eb;
 }
 
 .v-profile-edit-account-bottom {
