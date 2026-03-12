@@ -2051,6 +2051,23 @@
   border-color: var(--color-brand-primary);
 }
 
+.category-pill-button-active {
+  border-color: var(--color-brand-primary);
+  background: #eff6ff;
+  box-shadow: 0 4px 10px rgba(37, 99, 235, 0.14);
+}
+
+.category-pill-button-active .category-pill-label {
+  color: var(--color-brand-primary);
+  font-weight: 700;
+}
+
+.category-pill-more-item-active {
+  background: #eff6ff;
+  color: var(--color-brand-primary);
+  font-weight: 700;
+}
+
 .sx-components-sections-searchpanel-001 {}
 .sx-components-sections-searchpanel-002 {}
 .sx-components-sections-searchpanel-003 { @apply text-[16px] font-bold text-gray-900 mb-4; }
