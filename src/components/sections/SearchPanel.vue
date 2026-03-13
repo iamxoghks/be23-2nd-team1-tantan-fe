@@ -207,19 +207,6 @@
                   </button>
                 </div>
 
-                <button
-                  type="button"
-                  class="search-panel-reservation-shortcut"
-                  @click="handleTabClick('예약')"
-                >
-                  <div class="search-panel-reservation-shortcut-icon">
-                    <CalendarDays :size="18" />
-                  </div>
-                  <div class="search-panel-reservation-shortcut-copy">
-                    <strong>예약</strong>
-                    <span>원하는 날짜와 시간을 바로 선택하세요.</span>
-                  </div>
-                </button>
               </div>
 
               <div class="search-panel-tabs-wrap">
@@ -237,16 +224,21 @@
                 </div>
               </div>
 
-              <div class="search-panel-content">
+              <div
+                class="search-panel-content"
+                :class="activeTab === '예약' ? 'search-panel-content-reservation' : ''"
+              >
                 <div v-if="activeTab === '홈'" class="search-panel-content-home">
-                  <div class="u-white-soft-card">
+                  <section class="search-panel-detail-section search-panel-detail-section-info">
                     <h3 class="search-panel-card-title">
                       <Info :size="18" class="ux-components-sections-searchpanel-010" /> 상세 정보
                     </h3>
-                    <p class="ux-components-sections-searchpanel-011">{{ selectedGymAbout }}</p>
-                  </div>
+                    <p class="ux-components-sections-searchpanel-011 search-panel-detail-copy search-panel-detail-copy-offset">
+                      {{ selectedGymAbout }}
+                    </p>
+                  </section>
 
-                  <div class="u-white-soft-card">
+                  <section class="search-panel-detail-section search-panel-detail-section-amenities">
                     <h3 class="sx-components-sections-searchpanel-003">편의 시설</h3>
                     <div class="search-panel-feature-grid">
                       <div
@@ -259,35 +251,28 @@
                       </div>
                     </div>
                     <p v-if="displayAmenities.length === 0" class="search-panel-feature-empty">등록된 편의시설이 없습니다.</p>
-                  </div>
+                  </section>
 
-                  <div class="u-white-soft-card">
+                  <section class="search-panel-detail-section search-panel-detail-section-contact">
                     <div class="search-panel-contact-row">
                       <h3 class="ux-components-sections-searchpanel-016">연락처</h3>
                       <Phone :size="16" class="u-text-gray-400" />
                     </div>
-                    <p class="sx-components-sections-searchpanel-004">{{ selectedGymPhone }}</p>
-                    <p class="ux-components-sections-searchpanel-017">{{ selectedGymWebsite }}</p>
-                  </div>
+                    <div class="search-panel-contact-copy">
+                      <p class="sx-components-sections-searchpanel-004 search-panel-detail-copy">{{ selectedGymPhone }}</p>
+                      <p class="ux-components-sections-searchpanel-017">{{ selectedGymWebsite }}</p>
+                    </div>
+                  </section>
                 </div>
 
                 <div v-else-if="activeTab === '예약'" class="search-panel-tab-content search-panel-reservation-tab">
-                  <section class="search-panel-reservation-hero">
-                    <div>
-                      <span class="search-panel-reservation-chip">실시간 예약</span>
-                      <h3 class="search-panel-reservation-hero-title">날짜와 시간을 고른 뒤 바로 예약할 수 있어요.</h3>
-                      <p class="search-panel-reservation-hero-copy">
-                        {{ selectedGym?.name }}에 등록된 예약 슬롯 기준으로 실시간 가능 시간을 보여드립니다.
-                      </p>
+                  <section class="search-panel-reservation-section search-panel-reservation-section-calendar">
+                    <div class="search-panel-reservation-section-lead">
+                      <CalendarDays :size="18" />
+                      <strong>{{ reservationSelectedDate ? `${reservationSelectedDateLabel} · 시간을 선택해 주세요` : '예약 가능한 날짜를 선택해 주세요' }}</strong>
                     </div>
-                    <div class="search-panel-reservation-hero-summary">
-                      <span>선택 내역</span>
-                      <strong>{{ reservationSelectionSummary }}</strong>
-                    </div>
-                  </section>
 
-                  <div class="search-panel-reservation-card">
-                    <div class="search-panel-reservation-card-head">
+                    <div class="search-panel-reservation-card-head search-panel-reservation-calendar-head">
                       <div>
                         <p class="search-panel-reservation-card-label">예약 날짜</p>
                         <h3 class="search-panel-reservation-card-title">{{ reservationMonthLabel }}</h3>
@@ -313,38 +298,43 @@
                         </span>
                       </div>
                       <div class="search-panel-reservation-date-grid">
-                        <button
-                          v-for="cell in reservationCalendarCells"
-                          :key="cell.key"
-                          type="button"
-                          class="search-panel-reservation-date-btn"
-                          :class="[
-                            cell.isCurrentMonth ? '' : 'search-panel-reservation-date-btn-outside',
-                            cell.isSelected ? 'search-panel-reservation-date-btn-selected' : '',
-                            cell.isDisabled ? 'search-panel-reservation-date-btn-disabled' : '',
-                          ]"
-                          :disabled="cell.isDisabled"
-                          @click="selectReservationDate(cell.ymd)"
-                        >
-                          <span class="search-panel-reservation-date-number">{{ cell.dayNumber }}</span>
-                          <span v-if="cell.isToday" class="search-panel-reservation-date-badge">오늘</span>
-                          <span
-                            v-else-if="cell.availableCount > 0"
-                            class="search-panel-reservation-date-dot"
+                        <template v-for="cell in reservationCalendarCells" :key="cell.key">
+                          <div
+                            v-if="cell.isPlaceholder"
+                            class="search-panel-reservation-date-placeholder"
+                            aria-hidden="true"
                           />
-                        </button>
+                          <button
+                            v-else
+                            type="button"
+                            class="search-panel-reservation-date-btn"
+                            :class="[
+                              cell.isSelected ? 'search-panel-reservation-date-btn-selected' : '',
+                              cell.isDisabled ? 'search-panel-reservation-date-btn-disabled' : '',
+                            ]"
+                            :disabled="cell.isDisabled"
+                            @click="selectReservationDate(cell.ymd)"
+                          >
+                            <span class="search-panel-reservation-date-number">{{ cell.dayNumber }}</span>
+                            <span v-if="cell.isToday" class="search-panel-reservation-date-badge">오늘</span>
+                            <span
+                              v-else-if="cell.availableCount > 0"
+                              class="search-panel-reservation-date-dot"
+                            />
+                          </button>
+                        </template>
                       </div>
                     </div>
-                  </div>
+                  </section>
 
-                  <div class="search-panel-reservation-card">
-                    <div class="search-panel-reservation-card-head">
+                  <section class="search-panel-reservation-section search-panel-reservation-section-slots">
+                    <div class="search-panel-reservation-card-head search-panel-reservation-slot-head">
                       <div>
                         <p class="search-panel-reservation-card-label">예약 시간</p>
                         <h3 class="search-panel-reservation-card-title">{{ reservationSelectedDateLabel }}</h3>
                       </div>
                       <span class="search-panel-reservation-card-caption">
-                        {{ reservationSlots.length > 0 ? `총 ${reservationSlots.length}개 슬롯` : '등록된 슬롯 없음' }}
+                        {{ reservationSelectableSlots.length > 0 ? `예약 가능 ${reservationSelectableSlots.length}개` : '예약 가능한 시간 없음' }}
                       </span>
                     </div>
 
@@ -364,6 +354,12 @@
                         <Info :size="32" />
                       </div>
                       <p class="ux-components-sections-searchpanel-018">{{ tabError }}</p>
+                    </div>
+                    <div v-else-if="!reservationSelectedDate" class="search-panel-empty search-panel-reservation-empty">
+                      <div class="search-panel-empty-icon">
+                        <CalendarDays :size="32" />
+                      </div>
+                      <p class="ux-components-sections-searchpanel-018">선택한 달에는 예약 가능한 날짜가 없습니다.</p>
                     </div>
                     <div v-else-if="reservationSlotSections.length === 0" class="search-panel-empty search-panel-reservation-empty">
                       <div class="search-panel-empty-icon">
@@ -397,7 +393,6 @@
                         </div>
                       </section>
                     </div>
-                  </div>
 
                   <div
                     v-if="reservationFeedbackMessage"
@@ -413,7 +408,7 @@
                     <button
                       type="button"
                       class="search-panel-reservation-reset-btn"
-                      @click="resetReservationFilters"
+                      @click="resetReservationSelection"
                     >
                       초기화
                     </button>
@@ -426,21 +421,19 @@
                       {{ reservationActionLabel }}
                     </button>
                   </div>
+                  </section>
                 </div>
 
                 <div v-else-if="activeTab === '리뷰'" class="search-panel-tab-content">
-                  <div class="search-panel-review-toolbar">
+                  <div v-if="isAuthenticated" class="search-panel-review-toolbar search-panel-review-toolbar-top">
                     <button
-                      v-if="canWriteReview"
                       type="button"
                       class="search-panel-review-write-btn"
                       @click="openReviewModal"
                     >
-                      리뷰 작성
+                      리뷰 쓰기
                     </button>
-                    <p v-else class="search-panel-review-toolbar-hint">리뷰 작성은 일반 사용자 계정만 가능합니다.</p>
                   </div>
-
                   <div v-if="tabLoading" class="search-panel-empty">
                     <div class="search-panel-empty-icon">
                       <MessageSquare :size="32" />
@@ -459,22 +452,73 @@
                     </div>
                     <p class="ux-components-sections-searchpanel-018">등록된 리뷰가 없습니다.</p>
                   </div>
-                  <div v-else class="search-panel-review-list">
-                    <article v-for="review in reviewItems" :key="review.reviewId || review.id" class="search-panel-review-item">
-                      <div class="search-panel-review-head">
-                        <strong>{{ review.nickname || '익명' }}</strong>
-                        <span>★ {{ formatRating(review.rating) }}</span>
+                  <div v-else class="search-panel-review-feed">
+                    <article
+                      v-for="review in reviewDisplayItems"
+                      :key="review.reviewId || review.id"
+                      class="search-panel-review-entry"
+                    >
+                      <div class="search-panel-review-entry-head">
+                        <div class="search-panel-review-author">
+                          <div class="search-panel-review-avatar">{{ review.initial }}</div>
+                          <div class="search-panel-review-author-copy">
+                            <strong>{{ review.nickname || '익명' }}</strong>
+                            <span>리뷰 · 사진 {{ review.imageUrls.length }}</span>
+                          </div>
+                        </div>
+                        <button
+                          v-if="review.canEdit"
+                          type="button"
+                          class="search-panel-review-edit-btn"
+                          :aria-label="`${review.nickname || '내'} 리뷰 수정`"
+                          @click="openEditReviewModal(review)"
+                        >
+                          <Pencil :size="16" />
+                        </button>
                       </div>
-                      <p class="search-panel-review-comment">{{ review.comment || '' }}</p>
-                      <div v-if="toImageUrls(review.images).length > 0" class="search-panel-review-images">
-                        <img
-                          v-for="(imageUrl, imageIndex) in toImageUrls(review.images)"
+
+                      <div class="search-panel-review-score-line">
+                        <div class="search-panel-review-score">
+                          <Star :size="15" :stroke-width="2.4" fill="currentColor" />
+                          <span>{{ formatRating(review.rating) }}</span>
+                        </div>
+                      </div>
+
+                      <div
+                        v-if="review.imageUrls.length > 0"
+                        class="search-panel-review-media"
+                        :class="[
+                          review.imageUrls.length === 1 ? 'search-panel-review-media-single' : '',
+                          review.imageUrls.length >= 3 ? 'search-panel-review-media-many' : '',
+                        ]"
+                      >
+                        <button
+                          v-for="(imageUrl, imageIndex) in review.imageUrls"
                           :key="`${review.reviewId || review.id}-${imageIndex}`"
-                          :src="imageUrl"
-                          alt="리뷰 사진"
-                          class="search-panel-review-image"
-                        />
+                          type="button"
+                          class="search-panel-review-media-button"
+                          :aria-label="`리뷰 사진 ${imageIndex + 1} 크게 보기`"
+                          @click="openPhotoViewerWithItems(review.imageUrls, imageIndex, 'review')"
+                        >
+                          <img
+                            :src="imageUrl"
+                            alt="리뷰 사진"
+                            class="search-panel-review-media-image"
+                          />
+                        </button>
                       </div>
+
+                      <p class="search-panel-review-comment">
+                        {{ review.isExpanded ? review.commentText : review.commentPreview }}
+                      </p>
+                      <button
+                        v-if="review.isExpandable"
+                        type="button"
+                        class="search-panel-review-more-btn"
+                        @click="toggleReviewExpanded(review)"
+                      >
+                        {{ review.isExpanded ? '접기' : '더보기...' }}
+                      </button>
                     </article>
                   </div>
                 </div>
@@ -498,9 +542,19 @@
                     </div>
                     <p class="ux-components-sections-searchpanel-018">등록된 사진이 없습니다.</p>
                   </div>
-                  <div v-else class="search-panel-photo-grid">
-                    <div v-for="(photoUrl, index) in photoItems" :key="`${photoUrl}-${index}`" class="search-panel-photo-item">
-                      <img :src="photoUrl" alt="체육관 사진" class="search-panel-photo-image" />
+                  <div v-else class="search-panel-photo-gallery">
+                    <div class="search-panel-photo-grid">
+                      <button
+                        v-for="photo in photoGalleryItems"
+                        :key="`${photo.url}-${photo.index}`"
+                        type="button"
+                        class="search-panel-photo-item"
+                        :class="`search-panel-photo-item-${photo.layout}`"
+                        :aria-label="`${photoViewerTitle} 사진 ${photo.index + 1} 크게 보기`"
+                        @click="openPhotoViewer(photo.index)"
+                      >
+                        <img :src="photo.url" alt="체육관 사진" class="search-panel-photo-image" />
+                      </button>
                     </div>
                   </div>
                 </div>
@@ -532,7 +586,7 @@
       >
         <div class="search-panel-review-modal">
           <div class="search-panel-review-modal-head">
-            <h3>리뷰 작성</h3>
+            <h3>{{ reviewModalTitle }}</h3>
             <button type="button" class="search-panel-review-modal-close" @click="closeReviewModal">
               <X :size="20" />
             </button>
@@ -558,7 +612,7 @@
           <div class="search-panel-review-modal-upload">
             <div class="search-panel-review-modal-upload-head">
               <span>사진</span>
-              <span class="search-panel-review-modal-upload-count">{{ reviewForm.images.length }}/10</span>
+              <span class="search-panel-review-modal-upload-count">{{ reviewModalImageCount }}/10</span>
             </div>
             <input
               ref="reviewImageInputRef"
@@ -576,15 +630,18 @@
             >
               사진 선택
             </button>
-            <p class="search-panel-review-modal-upload-help">최대 10장, JPG/PNG 형식만 업로드할 수 있습니다.</p>
-            <div v-if="reviewForm.images.length > 0" class="search-panel-review-preview-grid">
+            <p class="search-panel-review-modal-upload-help">
+              {{ isEditingReview ? '새 사진을 선택하면 기존 사진이 교체됩니다. 최대 10장, JPG/PNG 형식만 업로드할 수 있습니다.' : '최대 10장, JPG/PNG 형식만 업로드할 수 있습니다.' }}
+            </p>
+            <div v-if="reviewPreviewItems.length > 0" class="search-panel-review-preview-grid">
               <div
-                v-for="(image, index) in reviewForm.images"
-                :key="`${image.name}-${index}`"
+                v-for="(image, index) in reviewPreviewItems"
+                :key="image.key"
                 class="search-panel-review-preview-item"
               >
                 <img :src="image.previewUrl" alt="리뷰 업로드 이미지" class="search-panel-review-preview-image" />
                 <button
+                  v-if="image.removable"
                   type="button"
                   class="search-panel-review-preview-remove"
                   @click="removeReviewFile(index)"
@@ -619,9 +676,67 @@
               :disabled="isReviewSubmitting || !reviewForm.comment.trim()"
               @click="submitReview"
             >
-              {{ isReviewSubmitting ? '등록 중...' : '등록하기' }}
+              {{ reviewModalSubmitLabel }}
             </button>
           </div>
+        </div>
+      </div>
+    </Teleport>
+
+    <Teleport to="body">
+      <div
+        v-if="isPhotoViewerOpen"
+        class="search-panel-photo-viewer-backdrop"
+        :class="[
+          isPhotoViewerMobile ? 'search-panel-photo-viewer-mobile' : '',
+          isPhotoViewerMobile && !isPhotoViewerControlsVisible ? 'search-panel-photo-viewer-controls-hidden' : '',
+        ]"
+        @click.self="closePhotoViewer"
+      >
+        <div class="search-panel-photo-viewer-stage">
+          <button
+            type="button"
+            class="search-panel-photo-viewer-close"
+            aria-label="큰 사진 닫기"
+            @click.stop="closePhotoViewer"
+          >
+            <X :size="24" />
+          </button>
+
+          <button
+            v-if="photoViewerItems.length > 1"
+            type="button"
+            class="search-panel-photo-viewer-nav search-panel-photo-viewer-nav-prev"
+            aria-label="이전 사진 보기"
+            @click.stop="showPrevPhoto"
+          >
+            <ChevronLeft :size="32" />
+          </button>
+
+          <div class="search-panel-photo-viewer-frame">
+            <button
+              type="button"
+              class="search-panel-photo-viewer-image-toggle"
+              aria-label="사진 뷰어 버튼 표시 또는 숨기기"
+              @click.stop="togglePhotoViewerControls"
+            />
+            <img
+              v-if="selectedPhotoViewerUrl"
+              :src="selectedPhotoViewerUrl"
+              :alt="`${photoViewerTitle} 큰 사진`"
+              class="search-panel-photo-viewer-image"
+            />
+          </div>
+
+          <button
+            v-if="photoViewerItems.length > 1"
+            type="button"
+            class="search-panel-photo-viewer-nav search-panel-photo-viewer-nav-next"
+            aria-label="다음 사진 보기"
+            @click.stop="showNextPhoto"
+          >
+            <ChevronRight :size="32" />
+          </button>
         </div>
       </div>
     </Teleport>
@@ -634,6 +749,7 @@ import {
   Search,
   ChevronRight,
   ChevronLeft,
+  Pencil,
   Speaker,
   Dumbbell,
   User,
@@ -675,6 +791,8 @@ const startOfMonth = (date) => new Date(date.getFullYear(), date.getMonth(), 1);
 
 const addMonths = (date, amount) => new Date(date.getFullYear(), date.getMonth() + amount, 1);
 
+const formatYearMonthKey = (date) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+
 const formatDateToYmd = (date) => {
   const year = date.getFullYear();
   const month = String(date.getMonth() + 1).padStart(2, '0');
@@ -687,6 +805,9 @@ const parseDateOnly = (value) => {
   if (!match) return null;
   return new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]));
 };
+
+const isSameMonth = (left, right) =>
+  left.getFullYear() === right.getFullYear() && left.getMonth() === right.getMonth();
 
 const parseLocalDateTime = (value) => {
   const match = String(value || '').trim().match(/^(\d{4})-(\d{2})-(\d{2})[T\s](\d{2}):(\d{2})(?::(\d{2}))?$/);
@@ -749,11 +870,22 @@ const gymDetailMap = ref({});
 const reviewMap = ref({});
 const photoMap = ref({});
 const isReviewModalOpen = ref(false);
+const isPhotoViewerOpen = ref(false);
+const isPhotoViewerMobile = ref(false);
+const isPhotoViewerControlsVisible = ref(true);
+const photoViewerItems = ref([]);
+const photoViewerSource = ref('gallery');
+const reviewExpandedMap = ref({});
 const isReviewSubmitting = ref(false);
 const reviewSubmitError = ref('');
 const reviewImageInputRef = ref(null);
+const selectedPhotoIndex = ref(-1);
+const reviewModalMode = ref('create');
+const editingReviewId = ref(null);
+const reviewExistingImages = ref([]);
 const reservationMonthCursor = ref(startOfMonth(new Date()));
-const reservationSelectedDate = ref(formatDateToYmd(new Date()));
+const reservationSelectedDate = ref('');
+const reservationCalendarMap = ref({});
 const reservationSlotMap = ref({});
 const reservationSelectedSlotDateTime = ref('');
 const reservationSubmitting = ref(false);
@@ -762,6 +894,7 @@ const reservationFeedbackTone = ref('info');
 const maxReviewImageCount = 10;
 const allowedReviewImageMimeTypes = new Set(['image/jpeg', 'image/jpg', 'image/png']);
 const allowedReviewImageExtensions = new Set(['jpg', 'jpeg', 'png']);
+const reviewPreviewCharacterLimit = 140;
 const reviewForm = ref({
   rating: 5,
   comment: '',
@@ -826,6 +959,11 @@ const isFavorite = (id) => props.favoriteGymIds.includes(normalizeId(id));
 const selectedGymId = computed(() => normalizeId(props.selectedGym?.id));
 const selectedGymDetail = computed(() => gymDetailMap.value[selectedGymId.value] || null);
 const reviewItems = computed(() => reviewMap.value[selectedGymId.value] || []);
+const reservationCalendarCacheKey = computed(() => {
+  if (!selectedGymId.value) return '';
+  return `${selectedGymId.value}:${formatYearMonthKey(reservationMonthCursor.value)}`;
+});
+const reservationMonthAvailability = computed(() => reservationCalendarMap.value[reservationCalendarCacheKey.value] || {});
 const reservationSlotCacheKey = computed(() => {
   if (!selectedGymId.value || !reservationSelectedDate.value) return '';
   return `${selectedGymId.value}:${reservationSelectedDate.value}`;
@@ -883,40 +1021,60 @@ const selectedGymOpenCloseHint = computed(() => {
   return closeTime ? `~${closeTime}` : '';
 });
 const sessionRole = computed(() => normalizeRole(sessionProfile.value?.role));
+const sessionUserId = computed(() => normalizeId(sessionProfile.value?.id));
 const canWriteReview = computed(() => isAuthenticated.value && sessionRole.value === 'USER');
+const isEditingReview = computed(() => reviewModalMode.value === 'edit' && editingReviewId.value != null);
 const reservationMonthLabel = computed(() => formatReservationMonthLabel(reservationMonthCursor.value));
 const reservationSelectedDateLabel = computed(() => formatReservationDateLabel(reservationSelectedDate.value));
 const reservationCalendarCells = computed(() => {
   const monthStart = startOfMonth(reservationMonthCursor.value);
-  const calendarStart = new Date(monthStart);
-  calendarStart.setDate(monthStart.getDate() - monthStart.getDay());
+  const daysInMonth = new Date(monthStart.getFullYear(), monthStart.getMonth() + 1, 0).getDate();
+  const leadingPlaceholderCount = monthStart.getDay();
+  const trailingPlaceholderCount = (7 - ((leadingPlaceholderCount + daysInMonth) % 7)) % 7;
+  const cells = [];
 
-  return Array.from({ length: 42 }, (_, index) => {
-    const cellDate = new Date(calendarStart);
-    cellDate.setDate(calendarStart.getDate() + index);
+  for (let index = 0; index < leadingPlaceholderCount; index += 1) {
+    cells.push({
+      key: `placeholder-start-${index}`,
+      isPlaceholder: true,
+    });
+  }
+
+  for (let dayNumber = 1; dayNumber <= daysInMonth; dayNumber += 1) {
+    const cellDate = new Date(monthStart.getFullYear(), monthStart.getMonth(), dayNumber);
     const ymd = formatDateToYmd(cellDate);
-    const cachedSlots = selectedGymId.value ? reservationSlotMap.value[`${selectedGymId.value}:${ymd}`] : null;
-    const availableCount = Array.isArray(cachedSlots)
-      ? cachedSlots.filter((slot) => !isReservationSlotUnavailable(slot)).length
-      : null;
+    const daySummary = reservationMonthAvailability.value[ymd] || null;
+    const availableCount = Number(daySummary?.availableSlotCount || 0);
+    const isDisabled = isDateBeforeToday(ymd) || availableCount <= 0;
 
-    return {
-      key: `${ymd}-${index}`,
+    cells.push({
+      key: ymd,
+      isPlaceholder: false,
       ymd,
-      dayNumber: cellDate.getDate(),
-      isCurrentMonth: cellDate.getMonth() === monthStart.getMonth(),
+      dayNumber,
       isToday: ymd === formatDateToYmd(new Date()),
       isSelected: ymd === reservationSelectedDate.value,
-      isDisabled: isDateBeforeToday(ymd),
+      isDisabled,
       availableCount,
-    };
-  });
+    });
+  }
+
+  for (let index = 0; index < trailingPlaceholderCount; index += 1) {
+    cells.push({
+      key: `placeholder-end-${index}`,
+      isPlaceholder: true,
+    });
+  }
+
+  return cells;
 });
+const reservationSelectableSlots = computed(() =>
+  reservationSlots.value.filter((slot) => !isReservationSlotUnavailable(slot)));
 const reservationSlotSections = computed(() => {
   const sections = reservationPeriodConfigs
     .map((section) => ({
       ...section,
-      slots: reservationSlots.value.filter((slot) => {
+      slots: reservationSelectableSlots.value.filter((slot) => {
         const hour = getReservationSlotHour(slot);
         return hour >= section.startHour && hour < section.endHour;
       }),
@@ -924,8 +1082,8 @@ const reservationSlotSections = computed(() => {
     .filter((section) => section.slots.length > 0);
 
   if (sections.length > 0) return sections;
-  if (reservationSlots.value.length === 0) return [];
-  return [{ key: 'all', label: '전체', slots: reservationSlots.value }];
+  if (reservationSelectableSlots.value.length === 0) return [];
+  return [{ key: 'all', label: '전체', slots: reservationSelectableSlots.value }];
 });
 const reservationActionLabel = computed(() => {
   if (reservationSubmitting.value) return '예약 중...';
@@ -935,10 +1093,6 @@ const reservationActionLabel = computed(() => {
 });
 const reservationActionDisabled = computed(() =>
   reservationSubmitting.value || !selectedReservationSlot.value);
-const reservationSelectionSummary = computed(() => {
-  if (!selectedReservationSlot.value) return '날짜와 시간을 선택해주세요.';
-  return `${reservationSelectedDateLabel.value} ${formatReservationTime(selectedReservationSlot.value.slotDateTime)}`;
-});
 
 const selectedGymType = computed(() =>
   selectedGymDetail.value?.categoryName
@@ -989,11 +1143,82 @@ const selectedGymDefaultPhotos = computed(() => {
 
 const uniquePhotoUrls = (items = []) => Array.from(new Set(items.filter(Boolean)));
 
+const getReviewNicknameInitial = (nickname) => {
+  const value = String(nickname || '').trim();
+  if (!value) return '익';
+  return value.slice(0, 1).toUpperCase();
+};
+
+const getReviewKey = (review) => String(review?.reviewId ?? review?.id ?? '');
+
+const getReviewPreviewText = (comment) => {
+  const value = String(comment || '');
+  if (value.length <= reviewPreviewCharacterLimit) return value;
+  return `${value.slice(0, reviewPreviewCharacterLimit).trimEnd()}...`;
+};
+
+const canEditReviewItem = (review) =>
+  canWriteReview.value
+  && Boolean(sessionUserId.value)
+  && normalizeId(review?.userId ?? review?.user?.id) === sessionUserId.value;
+
+const reviewDisplayItems = computed(() =>
+  reviewItems.value.map((review) => ({
+    ...review,
+    userId: review?.userId ?? review?.user?.id ?? null,
+    imageUrls: toImageUrls(review?.images),
+    initial: getReviewNicknameInitial(review?.nickname),
+    reviewKey: getReviewKey(review),
+    commentText: String(review?.comment || ''),
+    isExpandable: String(review?.comment || '').length > reviewPreviewCharacterLimit,
+    isExpanded: Boolean(reviewExpandedMap.value[getReviewKey(review)]),
+    commentPreview: getReviewPreviewText(review?.comment),
+    canEdit: canEditReviewItem(review),
+  })));
+
+const reviewModalTitle = computed(() => (isEditingReview.value ? '리뷰 수정' : '리뷰 작성'));
+const reviewModalSubmitLabel = computed(() => {
+  if (isReviewSubmitting.value) return isEditingReview.value ? '수정 중...' : '등록 중...';
+  return isEditingReview.value ? '수정하기' : '등록하기';
+});
+const reviewModalImageCount = computed(() =>
+  reviewForm.value.images.length > 0 ? reviewForm.value.images.length : reviewExistingImages.value.length);
+const reviewPreviewItems = computed(() => {
+  if (reviewForm.value.images.length > 0) {
+    return reviewForm.value.images.map((image, index) => ({
+      key: `new-${image.name}-${index}`,
+      previewUrl: image.previewUrl,
+      removable: true,
+    }));
+  }
+  return reviewExistingImages.value.map((url, index) => ({
+    key: `existing-${index}`,
+    previewUrl: url,
+    removable: false,
+  }));
+});
+
 const photoItems = computed(() => {
   const eventImages = uniquePhotoUrls(photoMap.value[selectedGymId.value] || []);
   if (eventImages.length > 0) return eventImages;
   return selectedGymDefaultPhotos.value;
 });
+
+const resolvePhotoLayout = (index) => {
+  const pattern = ['square', 'square', 'square', 'square', 'square', 'tall', 'tall', 'square', 'square', 'tall'];
+  return pattern[index % pattern.length];
+};
+
+const photoGalleryItems = computed(() =>
+  photoItems.value.map((url, index) => ({
+    url,
+    index,
+    layout: resolvePhotoLayout(index),
+  })));
+
+const selectedPhotoViewerUrl = computed(() => photoViewerItems.value[selectedPhotoIndex.value] || '');
+
+const photoViewerTitle = computed(() => String(props.selectedGym?.name || '체육관'));
 
 const selectedGymHeroImage = computed(() =>
   selectedGymDefaultPhotos.value[0]
@@ -1188,6 +1413,69 @@ const normalizeReservationSlots = (payload) => extractList(payload)
   }))
   .sort((left, right) => String(left?.slotDateTime || '').localeCompare(String(right?.slotDateTime || '')));
 
+const normalizeReservationCalendar = (payload) => extractList(payload)
+  .map((item) => ({
+    date: String(item?.date || '').trim(),
+    totalSlotCount: Number(item?.totalSlotCount || 0),
+    availableSlotCount: Number(item?.availableSlotCount || 0),
+  }))
+  .filter((item) => item.date)
+  .sort((left, right) => left.date.localeCompare(right.date));
+
+const buildReservationCalendarKey = (gymId, monthDate) =>
+  `${gymId}:${formatYearMonthKey(monthDate)}`;
+
+const ensureReservationCalendar = async (gymId, monthDate, options = {}) => {
+  const { force = false } = options;
+  if (!gymId || !(monthDate instanceof Date)) return {};
+
+  const cacheKey = buildReservationCalendarKey(gymId, monthDate);
+  if (!force && reservationCalendarMap.value[cacheKey]) {
+    return reservationCalendarMap.value[cacheKey] || {};
+  }
+
+  const response = await reservationApi.getCalendar(
+    Number(gymId),
+    monthDate.getFullYear(),
+    monthDate.getMonth() + 1,
+  );
+  const payload = extractPayload(response, []);
+  const calendarItems = normalizeReservationCalendar(payload);
+  const calendarByDate = calendarItems.reduce((acc, item) => {
+    acc[item.date] = item;
+    return acc;
+  }, {});
+
+  reservationCalendarMap.value = {
+    ...reservationCalendarMap.value,
+    [cacheKey]: calendarByDate,
+  };
+
+  return calendarByDate;
+};
+
+const syncReservationCalendarDay = (gymId, date, slots = []) => {
+  const targetDate = parseDateOnly(date);
+  if (!gymId || !targetDate) return;
+
+  const monthDate = startOfMonth(targetDate);
+  const cacheKey = buildReservationCalendarKey(gymId, monthDate);
+  const currentMonthCalendar = reservationCalendarMap.value[cacheKey] || {};
+  const availableSlotCount = slots.filter((slot) => !isReservationSlotUnavailable(slot)).length;
+
+  reservationCalendarMap.value = {
+    ...reservationCalendarMap.value,
+    [cacheKey]: {
+      ...currentMonthCalendar,
+      [date]: {
+        date,
+        totalSlotCount: slots.length,
+        availableSlotCount,
+      },
+    },
+  };
+};
+
 const ensureReservationSlots = async (gymId, date, options = {}) => {
   const { force = false } = options;
   if (!gymId || !date) return [];
@@ -1205,6 +1493,7 @@ const ensureReservationSlots = async (gymId, date, options = {}) => {
     ...reservationSlotMap.value,
     [cacheKey]: slots,
   };
+  syncReservationCalendarDay(gymId, date, slots);
   return slots;
 };
 
@@ -1241,17 +1530,31 @@ const resetReservationFeedback = () => {
 
 const resetReservationFilters = () => {
   reservationMonthCursor.value = startOfMonth(new Date());
-  reservationSelectedDate.value = formatDateToYmd(new Date());
+  reservationSelectedDate.value = '';
   reservationSelectedSlotDateTime.value = '';
   resetReservationFeedback();
 };
 
-const findFirstSelectableDateInMonth = (monthDate) => {
-  const today = getTodayStart();
-  const candidate = new Date(monthDate.getFullYear(), monthDate.getMonth(), 1);
-  if (candidate.getTime() >= today.getTime()) return candidate;
-  if (today.getFullYear() === monthDate.getFullYear() && today.getMonth() === monthDate.getMonth()) return today;
-  return null;
+const isReservationDateSelectable = (dateString, availabilityMap = reservationMonthAvailability.value) => {
+  if (!dateString || isDateBeforeToday(dateString)) return false;
+  const daySummary = availabilityMap?.[dateString];
+  return Number(daySummary?.availableSlotCount || 0) > 0;
+};
+
+const findFirstSelectableDateInMonth = (availabilityMap = reservationMonthAvailability.value) => Object.values(availabilityMap)
+  .filter((item) => isReservationDateSelectable(item?.date, availabilityMap))
+  .sort((left, right) => String(left?.date || '').localeCompare(String(right?.date || '')))[0]?.date || '';
+
+const syncSelectedReservationDateForMonth = (monthDate, availabilityMap = reservationMonthAvailability.value) => {
+  const selectedDate = parseDateOnly(reservationSelectedDate.value);
+  if (selectedDate && isSameMonth(selectedDate, monthDate) && isReservationDateSelectable(reservationSelectedDate.value, availabilityMap)) {
+    return reservationSelectedDate.value;
+  }
+
+  const firstSelectableDate = findFirstSelectableDateInMonth(availabilityMap);
+  reservationSelectedDate.value = firstSelectableDate;
+  reservationSelectedSlotDateTime.value = '';
+  return firstSelectableDate;
 };
 
 const syncSelectedReservationSlot = () => {
@@ -1266,12 +1569,22 @@ const syncSelectedReservationSlot = () => {
 const loadReservationSlotsForSelectedDate = async (options = {}) => {
   const gymId = selectedGymId.value;
   const date = reservationSelectedDate.value;
-  if (!gymId || !date) return [];
+  if (!gymId || !date) {
+    reservationSelectedSlotDateTime.value = '';
+    return [];
+  }
 
   tabLoading.value = true;
   tabError.value = '';
   try {
     const slots = await ensureReservationSlots(gymId, date, options);
+    const updatedAvailabilityMap = reservationCalendarMap.value[buildReservationCalendarKey(gymId, reservationMonthCursor.value)] || {};
+    if (!isReservationDateSelectable(date, updatedAvailabilityMap)) {
+      const nextDateString = syncSelectedReservationDateForMonth(reservationMonthCursor.value, updatedAvailabilityMap);
+      if (nextDateString && nextDateString !== date) {
+        return loadReservationSlotsForSelectedDate(options);
+      }
+    }
     syncSelectedReservationSlot();
     return slots;
   } catch (error) {
@@ -1283,25 +1596,44 @@ const loadReservationSlotsForSelectedDate = async (options = {}) => {
   }
 };
 
+const loadReservationCalendarForMonth = async (monthDate, options = {}) => {
+  const gymId = selectedGymId.value;
+  if (!gymId) return {};
+
+  tabLoading.value = true;
+  tabError.value = '';
+  try {
+    return await ensureReservationCalendar(gymId, monthDate, options);
+  } catch (error) {
+    console.error('Failed to load reservation calendar:', error);
+    tabError.value = '예약 가능한 날짜를 불러오지 못했습니다.';
+    throw error;
+  } finally {
+    tabLoading.value = false;
+  }
+};
+
 const moveReservationMonth = async (offset) => {
   const nextMonth = addMonths(reservationMonthCursor.value, offset);
   reservationMonthCursor.value = nextMonth;
-
-  const nextDate = findFirstSelectableDateInMonth(nextMonth);
-  if (!nextDate) return;
-
-  const nextDateString = formatDateToYmd(nextDate);
-  reservationSelectedDate.value = nextDateString;
   reservationSelectedSlotDateTime.value = '';
   resetReservationFeedback();
 
   if (activeTab.value === '예약') {
-    await loadReservationSlotsForSelectedDate({ force: true });
+    const availabilityMap = await loadReservationCalendarForMonth(nextMonth);
+    const nextDateString = syncSelectedReservationDateForMonth(nextMonth, availabilityMap);
+    if (nextDateString) {
+      await loadReservationSlotsForSelectedDate({ force: true });
+    }
+    return;
   }
+
+  const availabilityMap = await ensureReservationCalendar(selectedGymId.value, nextMonth);
+  syncSelectedReservationDateForMonth(nextMonth, availabilityMap);
 };
 
 const selectReservationDate = async (dateString) => {
-  if (!dateString || isDateBeforeToday(dateString)) return;
+  if (!isReservationDateSelectable(dateString)) return;
   const targetDate = parseDateOnly(dateString);
   if (!targetDate) return;
 
@@ -1352,7 +1684,11 @@ const submitReservation = async () => {
     reservationSelectedSlotDateTime.value = '';
     reservationFeedbackTone.value = 'success';
     reservationFeedbackMessage.value = '예약이 접수되었습니다. 마이페이지에서 예약 내역을 확인할 수 있습니다.';
-    await loadReservationSlotsForSelectedDate({ force: true });
+    const availabilityMap = await loadReservationCalendarForMonth(reservationMonthCursor.value, { force: true });
+    const nextDateString = syncSelectedReservationDateForMonth(reservationMonthCursor.value, availabilityMap);
+    if (nextDateString) {
+      await loadReservationSlotsForSelectedDate({ force: true });
+    }
   } catch (error) {
     reservationFeedbackTone.value = 'error';
     reservationFeedbackMessage.value = toReservationErrorMessage(error);
@@ -1371,6 +1707,9 @@ const revokeReviewImageUrls = (items = reviewForm.value.images || []) => {
 
 const resetReviewForm = () => {
   revokeReviewImageUrls();
+  reviewModalMode.value = 'create';
+  editingReviewId.value = null;
+  reviewExistingImages.value = [];
   reviewForm.value = {
     rating: 5,
     comment: '',
@@ -1485,6 +1824,24 @@ const openReviewModal = () => {
   isReviewModalOpen.value = true;
 };
 
+const openEditReviewModal = (review) => {
+  if (!review?.canEdit) return;
+  reviewSubmitError.value = '';
+  resetReviewForm();
+  reviewModalMode.value = 'edit';
+  editingReviewId.value = review.reviewId ?? review.id ?? null;
+  reviewExistingImages.value = [...(review.imageUrls || [])];
+  reviewForm.value = {
+    rating: Number(review.rating || 5),
+    comment: String(review.commentText || review.comment || ''),
+    images: [],
+  };
+  if (reviewImageInputRef.value) {
+    reviewImageInputRef.value.value = '';
+  }
+  isReviewModalOpen.value = true;
+};
+
 const closeReviewModal = () => {
   if (isReviewSubmitting.value) return;
   isReviewModalOpen.value = false;
@@ -1492,22 +1849,106 @@ const closeReviewModal = () => {
   resetReviewForm();
 };
 
+const toggleReviewExpanded = (review) => {
+  const reviewKey = String(review?.reviewKey || getReviewKey(review));
+  if (!reviewKey) return;
+  reviewExpandedMap.value = {
+    ...reviewExpandedMap.value,
+    [reviewKey]: !reviewExpandedMap.value[reviewKey],
+  };
+};
+
+const updatePhotoViewerViewport = () => {
+  const isMobileViewport = window.innerWidth <= 1024 && props.mobileSheetState === 'full';
+  isPhotoViewerMobile.value = isMobileViewport;
+  if (!isMobileViewport) {
+    isPhotoViewerControlsVisible.value = true;
+  }
+};
+
+const openPhotoViewerWithItems = (items, index = 0, source = 'gallery') => {
+  const normalizedItems = uniquePhotoUrls(items);
+  if (!normalizedItems.length) return;
+  updatePhotoViewerViewport();
+  const clampedIndex = Math.min(Math.max(index, 0), normalizedItems.length - 1);
+  photoViewerItems.value = normalizedItems;
+  photoViewerSource.value = source;
+  selectedPhotoIndex.value = clampedIndex;
+  isPhotoViewerControlsVisible.value = true;
+  isPhotoViewerOpen.value = true;
+};
+
+const openPhotoViewer = (index) => {
+  openPhotoViewerWithItems(photoItems.value, index, 'gallery');
+};
+
+const closePhotoViewer = () => {
+  isPhotoViewerOpen.value = false;
+  isPhotoViewerControlsVisible.value = true;
+  selectedPhotoIndex.value = -1;
+  photoViewerItems.value = [];
+  photoViewerSource.value = 'gallery';
+};
+
+const togglePhotoViewerControls = () => {
+  if (!isPhotoViewerMobile.value) return;
+  isPhotoViewerControlsVisible.value = !isPhotoViewerControlsVisible.value;
+};
+
+const showPrevPhoto = () => {
+  if (!photoViewerItems.value.length) return;
+  selectedPhotoIndex.value = (selectedPhotoIndex.value - 1 + photoViewerItems.value.length) % photoViewerItems.value.length;
+};
+
+const showNextPhoto = () => {
+  if (!photoViewerItems.value.length) return;
+  selectedPhotoIndex.value = (selectedPhotoIndex.value + 1) % photoViewerItems.value.length;
+};
+
+const onPhotoViewerKeydown = (event) => {
+  if (!isPhotoViewerOpen.value) return;
+  if (event.key === 'Escape') {
+    closePhotoViewer();
+    return;
+  }
+  if (event.key === 'ArrowLeft') {
+    event.preventDefault();
+    showPrevPhoto();
+    return;
+  }
+  if (event.key === 'ArrowRight') {
+    event.preventDefault();
+    showNextPhoto();
+  }
+};
+
 const submitReview = async () => {
   const gymId = Number(selectedGymId.value || 0);
   const comment = String(reviewForm.value.comment || '').trim();
-  if (!gymId || !comment) return;
+  if ((!gymId && !isEditingReview.value) || !comment) return;
 
   isReviewSubmitting.value = true;
   reviewSubmitError.value = '';
   try {
-    await reviewApi.create({
+    const payload = {
       review: {
-        gymId,
         rating: Number(reviewForm.value.rating || 5),
         comment,
       },
       images: reviewForm.value.images.map((item) => item.file),
-    });
+    };
+
+    if (isEditingReview.value && editingReviewId.value != null) {
+      await reviewApi.edit(editingReviewId.value, payload);
+    } else {
+      await reviewApi.create({
+        ...payload,
+        review: {
+          ...payload.review,
+          gymId,
+        },
+      });
+    }
 
     isReviewModalOpen.value = false;
     resetReviewForm();
@@ -1615,6 +2056,12 @@ const loadTabData = async (tab) => {
   tabLoading.value = true;
   try {
     if (tab === '예약') {
+      const availabilityMap = await ensureReservationCalendar(gymId, reservationMonthCursor.value);
+      const nextDateString = syncSelectedReservationDateForMonth(reservationMonthCursor.value, availabilityMap);
+      if (!nextDateString) {
+        reservationSelectedSlotDateTime.value = '';
+        return;
+      }
       await loadReservationSlotsForSelectedDate();
       return;
     }
@@ -1633,6 +2080,16 @@ const loadTabData = async (tab) => {
   } finally {
     tabLoading.value = false;
   }
+};
+
+const resetReservationSelection = async () => {
+  resetReservationFilters();
+  if (activeTab.value !== '예약') return;
+
+  const availabilityMap = await loadReservationCalendarForMonth(reservationMonthCursor.value, { force: true });
+  const nextDateString = syncSelectedReservationDateForMonth(reservationMonthCursor.value, availabilityMap);
+  if (!nextDateString) return;
+  await loadReservationSlotsForSelectedDate({ force: true });
 };
 
 const onRequestArriveDirection = () => {
@@ -1655,8 +2112,12 @@ watch(selectedGymId, async (nextGymId, prevGymId) => {
   tabError.value = '';
   tabLoading.value = false;
   resetReservationFilters();
+  reviewExpandedMap.value = {};
   if (nextGymId !== prevGymId && isReviewModalOpen.value) {
     closeReviewModal();
+  }
+  if (nextGymId !== prevGymId && isPhotoViewerOpen.value) {
+    closePhotoViewer();
   }
 
   if (!nextGymId) return;
@@ -1671,14 +2132,36 @@ watch(activeTab, async (tab) => {
   await loadTabData(tab);
 });
 
+watch(photoItems, (nextItems) => {
+  if (!isPhotoViewerOpen.value || photoViewerSource.value !== 'gallery') return;
+  const normalizedItems = uniquePhotoUrls(nextItems);
+  if (!normalizedItems.length) {
+    closePhotoViewer();
+    return;
+  }
+  photoViewerItems.value = normalizedItems;
+  if (selectedPhotoIndex.value >= normalizedItems.length) {
+    selectedPhotoIndex.value = normalizedItems.length - 1;
+  }
+});
+
+watch(() => props.mobileSheetState, () => {
+  updatePhotoViewerViewport();
+});
+
 onMounted(() => {
   primeSessionFromToken();
   if (isAuthenticated.value) {
     syncSessionFromServer().catch(() => {});
   }
+  updatePhotoViewerViewport();
+  window.addEventListener('keydown', onPhotoViewerKeydown);
+  window.addEventListener('resize', updatePhotoViewerViewport);
 });
 
 onBeforeUnmount(() => {
   revokeReviewImageUrls();
+  window.removeEventListener('keydown', onPhotoViewerKeydown);
+  window.removeEventListener('resize', updatePhotoViewerViewport);
 });
 </script>
