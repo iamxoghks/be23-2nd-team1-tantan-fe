@@ -38,7 +38,7 @@ jobs:
         run: npm run build
 
       - name: deploy to s3
-        run: aws s3 sync ./dist s3://server.nahcb572.shop/ --delete
+        run: aws s3 sync ./dist s3://www.nahcb572.shop/ --delete
         # cp 대신 sync --delete를 쓰면 S3의 옛날 파일들을 정리해줘서 더 깔끔합니다.
 
       - name: invalidate cloudfront
