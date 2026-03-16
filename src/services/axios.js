@@ -9,7 +9,7 @@ import { notifyAuthInvalidated } from '@/services/authLifecycle';
 const API_BASE_URL =
   import.meta.env.VUE_APP_API_BASE_URL ||
   import.meta.env.VITE_API_BASE_URL ||
-  'http://localhost:8080';
+  'http://server.nahcb572.shop';
 
 const normalizedApiBaseUrl = String(API_BASE_URL).replace(/\/+$/, '');
 
