@@ -3,7 +3,7 @@ const WS_BASE_URL =
   import.meta.env.VITE_WS_BASE_URL ||
   import.meta.env.VUE_APP_API_BASE_URL ||
   import.meta.env.VITE_API_BASE_URL ||
-  'http://localhost:8080';
+  'http://server.nahcb572.shop';
 
 function toWsUrl(httpOrWsUrl) {
   if (httpOrWsUrl.startsWith('ws://') || httpOrWsUrl.startsWith('wss://')) {
