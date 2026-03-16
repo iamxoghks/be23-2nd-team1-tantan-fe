@@ -275,7 +275,8 @@ const postActionMenuRef = ref(null);
 const isDeleteModalOpen = ref(false);
 const isDeletingPost = ref(false);
 const myProfileImage = computed(() => (
-  sessionProfile.value?.raw?.profileImageUrl
+  sessionProfile.value?.raw?.profileThumbnailUrl
+  || sessionProfile.value?.raw?.profileImageUrl
   || sessionProfile.value?.raw?.profileImage
   || fallbackAvatar(sessionProfile.value?.displayName || sessionProfile.value?.userName || 'me')
 ));
@@ -821,6 +822,7 @@ onBeforeUnmount(() => {
 
 .v-community-detail-main {
   overflow-x: hidden;
+  background: #ffffff;
 }
 
 .v-community-detail-content {
@@ -830,6 +832,7 @@ onBeforeUnmount(() => {
   padding-left: 24px;
   padding-right: 24px;
   padding-bottom: 112px;
+  background: #ffffff;
 }
 
 .v-community-detail-body .sx-views-community-communityview-021 > div:first-child {
@@ -972,6 +975,17 @@ onBeforeUnmount(() => {
   display: grid;
   gap: 10px;
   min-width: 0;
+  background: #ffffff;
+}
+
+.v-community-detail-page {
+  background: #ffffff;
+}
+
+.v-community-detail-body .sx-views-community-communityview-020,
+.v-community-detail-body .sx-views-community-communityview-022,
+.v-community-detail-body .sx-views-community-communityview-033 {
+  background: #ffffff;
 }
 
 .v-community-detail-image-wrap {

@@ -43,7 +43,7 @@ const props = defineProps({
   mapInstance: { type: Object, default: null },
   showFavoritesOnly: { type: Boolean, default: false },
 });
-const emit = defineEmits(['toggle-favorites-only']);
+const emit = defineEmits(['toggle-favorites-only', 'current-location-selected']);
 
 const zoomLevel = ref(14);
 const minZoom = ref(8);
@@ -262,6 +262,10 @@ const moveToCurrentLocation = () => {
       animateCameraToTarget(map, position);
 
       updateCurrentLocation(coords.latitude, coords.longitude);
+      emit('current-location-selected', {
+        latitude: Number(coords.latitude),
+        longitude: Number(coords.longitude),
+      });
       if (!locationMarker.value) {
         locationMarker.value = new window.naver.maps.Marker({
           map,

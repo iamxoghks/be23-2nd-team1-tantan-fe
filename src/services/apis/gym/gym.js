@@ -113,6 +113,10 @@ export const gymApi = {
     return apiClient.get(`/gym/${gymId}/gymImagesCombinedReview`);
   },
 
+  gymImagesCombinedReviewDetail(gymId) {
+    return apiClient.get(`/gym/${gymId}/gymImagesCombinedReview/detail`);
+  },
+
   // Backward-compatible alias
   update(payload) {
     return apiClient.put('/gym/my-gym/all', toGymAllUpdateFormData(payload));

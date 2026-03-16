@@ -82,10 +82,6 @@
             <div class="search-panel-list-row">
               <div class="search-panel-list-image-wrap">
                 <img :src="gym.image || defaultGymImage" :alt="gym.name" class="ux-components-sections-searchpanel-020" />
-                <div class="search-panel-list-image-badge">
-                  <Camera :size="10" />
-                  <span>{{ toImageUrls(gym.images).length || 1 }}</span>
-                </div>
               </div>
 
               <div class="search-panel-list-body">
@@ -102,8 +98,6 @@
                     <span class="ux-components-sections-searchpanel-021">★</span>
                     <span class="ux-components-sections-searchpanel-022">{{ formatRating(gym.rating) }}</span>
                     <span class="ux-components-sections-searchpanel-023">(리뷰 {{ formatCount(gym.reviews) }}개)</span>
-                    <span class="u-text-gray-300">·</span>
-                    <span class="search-panel-list-location">{{ gym.location || '-' }}</span>
                   </div>
                   <p class="search-panel-list-desc">"{{ truncateText(gym.about, 40) }}"</p>
                   <div class="search-panel-list-open-row">
@@ -121,7 +115,7 @@
         </div>
 
         <div class="search-panel-detail-pane">
-          <div v-if="selectedGym" ref="detailScrollRef" class="search-panel-detail">
+          <div v-if="selectedGym" ref="detailScrollRef" class="search-panel-detail" @scroll.passive="handleDetailScroll">
             <div class="sx-components-sections-searchpanel-001">
               <img :src="selectedGymHeroImage" :alt="selectedGym.name" class="ux-components-sections-searchpanel-001" />
               <UiIconButton
@@ -201,7 +195,7 @@
                     <span class="ux-components-sections-searchpanel-008">저장</span>
                   </button>
                   <div class="search-panel-action-divider" />
-                  <button class="sx-components-sections-searchpanel-002">
+                  <button class="sx-components-sections-searchpanel-002" @click="handleShareGym">
                     <Share2 :size="24" class="u-text-gray-400" />
                     <span class="ux-components-sections-searchpanel-009">공유</span>
                   </button>
@@ -238,8 +232,20 @@
                     </p>
                   </section>
 
+                  <section class="search-panel-detail-section search-panel-detail-section-location">
+                    <div class="search-panel-contact-row">
+                      <MapPin :size="16" class="ux-components-sections-searchpanel-010" />
+                      <h3 class="ux-components-sections-searchpanel-016">위치</h3>
+                    </div>
+                    <div class="search-panel-contact-copy">
+                      <p class="search-panel-detail-copy">{{ selectedGymAddress }}</p>
+                    </div>
+                  </section>
+
                   <section class="search-panel-detail-section search-panel-detail-section-amenities">
-                    <h3 class="sx-components-sections-searchpanel-003">편의 시설</h3>
+                    <h3 class="search-panel-card-title">
+                      <Sparkles :size="18" class="ux-components-sections-searchpanel-010" /> 편의 시설
+                    </h3>
                     <div class="search-panel-feature-grid">
                       <div
                         v-for="amenity in displayAmenities"
@@ -255,8 +261,8 @@
 
                   <section class="search-panel-detail-section search-panel-detail-section-contact">
                     <div class="search-panel-contact-row">
+                      <Phone :size="16" class="ux-components-sections-searchpanel-010" />
                       <h3 class="ux-components-sections-searchpanel-016">연락처</h3>
-                      <Phone :size="16" class="u-text-gray-400" />
                     </div>
                     <div class="search-panel-contact-copy">
                       <p class="sx-components-sections-searchpanel-004 search-panel-detail-copy">{{ selectedGymPhone }}</p>
@@ -459,49 +465,55 @@
                       class="search-panel-review-entry"
                     >
                       <div class="search-panel-review-entry-head">
-                        <div class="search-panel-review-author">
-                          <div class="search-panel-review-avatar">{{ review.initial }}</div>
+                        <button
+                          type="button"
+                          class="search-panel-review-author search-panel-review-author-link"
+                          :disabled="!review.userId"
+                          @click="openReviewAuthorProfile(review)"
+                        >
+                          <div v-if="review.profileImageUrl" class="search-panel-review-avatar search-panel-review-avatar-image-wrap">
+                            <img :src="review.profileImageUrl" :alt="`${review.nickname || '익명'} 프로필 이미지`" class="search-panel-review-avatar-image" />
+                          </div>
+                          <div v-else class="search-panel-review-avatar">{{ review.initial }}</div>
                           <div class="search-panel-review-author-copy">
                             <strong>{{ review.nickname || '익명' }}</strong>
-                            <span>리뷰 · 사진 {{ review.imageUrls.length }}</span>
                           </div>
-                        </div>
-                        <button
-                          v-if="review.canEdit"
-                          type="button"
-                          class="search-panel-review-edit-btn"
-                          :aria-label="`${review.nickname || '내'} 리뷰 수정`"
-                          @click="openEditReviewModal(review)"
-                        >
-                          <Pencil :size="16" />
                         </button>
-                      </div>
-
-                      <div class="search-panel-review-score-line">
-                        <div class="search-panel-review-score">
-                          <Star :size="15" :stroke-width="2.4" fill="currentColor" />
-                          <span>{{ formatRating(review.rating) }}</span>
+                        <div class="search-panel-review-head-actions">
+                          <div class="search-panel-review-score">
+                            <Star :size="15" :stroke-width="2.4" fill="currentColor" />
+                            <span>{{ formatRating(review.rating) }}</span>
+                          </div>
+                          <button
+                            v-if="review.canEdit"
+                            type="button"
+                            class="search-panel-review-edit-btn"
+                            :aria-label="`${review.nickname || '내'} 리뷰 수정`"
+                            @click="openEditReviewModal(review)"
+                          >
+                            <Pencil :size="16" />
+                          </button>
                         </div>
                       </div>
 
                       <div
-                        v-if="review.imageUrls.length > 0"
+                        v-if="review.imageItems.length > 0"
                         class="search-panel-review-media"
                         :class="[
-                          review.imageUrls.length === 1 ? 'search-panel-review-media-single' : '',
-                          review.imageUrls.length >= 3 ? 'search-panel-review-media-many' : '',
+                          review.imageItems.length === 1 ? 'search-panel-review-media-single' : '',
+                          review.imageItems.length >= 3 ? 'search-panel-review-media-many' : '',
                         ]"
                       >
                         <button
-                          v-for="(imageUrl, imageIndex) in review.imageUrls"
+                          v-for="(imageItem, imageIndex) in review.imageItems"
                           :key="`${review.reviewId || review.id}-${imageIndex}`"
                           type="button"
                           class="search-panel-review-media-button"
                           :aria-label="`리뷰 사진 ${imageIndex + 1} 크게 보기`"
-                          @click="openPhotoViewerWithItems(review.imageUrls, imageIndex, 'review')"
+                          @click="openReviewPhotoViewer(review, imageIndex)"
                         >
                           <img
-                            :src="imageUrl"
+                            :src="imageItem.thumbnailUrl || imageItem.originalUrl"
                             alt="리뷰 사진"
                             class="search-panel-review-media-image"
                           />
@@ -520,6 +532,9 @@
                         {{ review.isExpanded ? '접기' : '더보기...' }}
                       </button>
                     </article>
+                    <div v-if="reviewIsLoadingMore" class="search-panel-review-load-more" aria-live="polite">
+                      <span class="search-panel-review-load-spinner" aria-hidden="true" />
+                    </div>
                   </div>
                 </div>
 
@@ -546,14 +561,14 @@
                     <div class="search-panel-photo-grid">
                       <button
                         v-for="photo in photoGalleryItems"
-                        :key="`${photo.url}-${photo.index}`"
+                        :key="`${photo.originalUrl}-${photo.index}`"
                         type="button"
                         class="search-panel-photo-item"
                         :class="`search-panel-photo-item-${photo.layout}`"
                         :aria-label="`${photoViewerTitle} 사진 ${photo.index + 1} 크게 보기`"
                         @click="openPhotoViewer(photo.index)"
                       >
-                        <img :src="photo.url" alt="체육관 사진" class="search-panel-photo-image" />
+                        <img :src="photo.thumbnailUrl" alt="체육관 사진" class="search-panel-photo-image" />
                       </button>
                     </div>
                   </div>
@@ -740,11 +755,26 @@
         </div>
       </div>
     </Teleport>
+
+    <Teleport to="body">
+      <transition name="search-panel-share-toast-fade">
+        <div
+          v-if="shareToastMessage"
+          class="search-panel-share-toast"
+          :class="shareToastTone === 'error' ? 'search-panel-share-toast-error' : 'search-panel-share-toast-success'"
+          role="status"
+          aria-live="polite"
+        >
+          {{ shareToastMessage }}
+        </div>
+      </transition>
+    </Teleport>
   </div>
 </template>
 
 <script setup>
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
+import { useRoute, useRouter } from 'vue-router';
 import {
   Search,
   ChevronRight,
@@ -761,6 +791,8 @@ import {
   Scale,
   Shirt,
   Phone,
+  MapPin,
+  Sparkles,
   ArrowLeft,
   X,
   Share2,
@@ -777,6 +809,11 @@ import { gymApi, reservationApi, reviewApi } from '@/services/apis';
 import { useSession } from '@/composables/useSession';
 import { normalizeRole } from '@/services/token';
 import { extractList, extractPayload } from '@/utils/api';
+import {
+  getPrimaryOriginalImageUrl,
+  toImageVariantItems,
+  toOriginalImageUrls,
+} from '@/utils/imageVariants';
 
 const defaultGymImage = 'https://images.unsplash.com/photo-1534438327276-14e5300c3a48?q=80&w=400&auto=format&fit=crop';
 const tabs = ['홈', '예약', '리뷰', '사진'];
@@ -862,13 +899,15 @@ const isReservationSlotUnavailable = (slot) => {
 
 const activeTab = ref('홈');
 const searchQuery = ref('');
-const appliedSearchQuery = ref('');
 const detailScrollRef = ref(null);
 const tabLoading = ref(false);
 const tabError = ref('');
 const gymDetailMap = ref({});
 const reviewMap = ref({});
+const reviewDetailMap = ref({});
+const reviewPaginationMap = ref({});
 const photoMap = ref({});
+const photoDetailMap = ref({});
 const isReviewModalOpen = ref(false);
 const isPhotoViewerOpen = ref(false);
 const isPhotoViewerMobile = ref(false);
@@ -892,6 +931,8 @@ const reservationSubmitting = ref(false);
 const reservationFeedbackMessage = ref('');
 const reservationFeedbackTone = ref('info');
 const maxReviewImageCount = 10;
+const reviewPageSize = 5;
+const reviewLoadMoreThreshold = 160;
 const allowedReviewImageMimeTypes = new Set(['image/jpeg', 'image/jpg', 'image/png']);
 const allowedReviewImageExtensions = new Set(['jpg', 'jpeg', 'png']);
 const reviewPreviewCharacterLimit = 140;
@@ -901,6 +942,29 @@ const reviewForm = ref({
   images: [],
 });
 const { sessionProfile, isAuthenticated, primeSessionFromToken, syncSessionFromServer } = useSession();
+const route = useRoute();
+const router = useRouter();
+const shareToastMessage = ref('');
+const shareToastTone = ref('success');
+let shareToastTimer = null;
+
+const tabQueryValueMap = {
+  홈: 'home',
+  예약: 'reservation',
+  리뷰: 'review',
+  사진: 'photo',
+};
+
+const tabQueryLabelMap = {
+  home: '홈',
+  reservation: '예약',
+  review: '리뷰',
+  photo: '사진',
+  홈: '홈',
+  예약: '예약',
+  리뷰: '리뷰',
+  사진: '사진',
+};
 
 const amenityLabelMap = {
   FREE_WIFI: '무료 Wi-Fi',
@@ -949,16 +1013,41 @@ const props = defineProps({
   onArriveDirection: { type: Function, default: null },
   onRequireAuth: { type: Function, default: null },
   onSyncGym: { type: Function, default: null },
+  searchKeyword: { type: String, default: '' },
+  onSearchGyms: { type: Function, default: null },
 });
 
 const handleTouchStartY = ref(null);
 
 const normalizeId = (value) => String(value ?? '').trim();
 const isFavorite = (id) => props.favoriteGymIds.includes(normalizeId(id));
+const createEmptyReviewPagination = () => ({
+  page: -1,
+  size: reviewPageSize,
+  totalElements: 0,
+  totalPages: 0,
+  hasNext: false,
+  loadingMore: false,
+});
+const getReviewPaginationState = (gymId) =>
+  reviewPaginationMap.value[gymId] || createEmptyReviewPagination();
+const setReviewPaginationState = (gymId, patch = {}) => {
+  reviewPaginationMap.value = {
+    ...reviewPaginationMap.value,
+    [gymId]: {
+      ...getReviewPaginationState(gymId),
+      ...patch,
+    },
+  };
+  return reviewPaginationMap.value[gymId];
+};
 
 const selectedGymId = computed(() => normalizeId(props.selectedGym?.id));
 const selectedGymDetail = computed(() => gymDetailMap.value[selectedGymId.value] || null);
 const reviewItems = computed(() => reviewMap.value[selectedGymId.value] || []);
+const selectedGymReviewMeta = computed(() => getReviewPaginationState(selectedGymId.value));
+const reviewIsLoadingMore = computed(() => Boolean(selectedGymReviewMeta.value.loadingMore));
+const reviewHasNextPage = computed(() => Boolean(selectedGymReviewMeta.value.hasNext));
 const reservationCalendarCacheKey = computed(() => {
   if (!selectedGymId.value) return '';
   return `${selectedGymId.value}:${formatYearMonthKey(reservationMonthCursor.value)}`;
@@ -972,8 +1061,14 @@ const reservationSlots = computed(() => reservationSlotMap.value[reservationSlot
 const selectedReservationSlot = computed(() =>
   reservationSlots.value.find((slot) => slot?.slotDateTime === reservationSelectedSlotDateTime.value) || null);
 const selectedGymReviewCount = computed(() => {
-  if (reviewItems.value.length > 0) return reviewItems.value.length;
-  return formatCount(props.selectedGym?.reviews);
+  const totalElements = Number(selectedGymReviewMeta.value.totalElements || 0);
+  if (Number.isFinite(totalElements) && totalElements > 0) return totalElements;
+  return formatCount(
+    selectedGymDetail.value?.reviewCount
+      ?? selectedGymDetail.value?.reviews
+      ?? props.selectedGym?.reviewCount
+      ?? props.selectedGym?.reviews,
+  );
 });
 const selectedGymOpenStatus = computed(() =>
   String(selectedGymDetail.value?.openStatus ?? props.selectedGym?.openStatus ?? 'UNKNOWN').toUpperCase(),
@@ -1100,17 +1195,12 @@ const selectedGymType = computed(() =>
     || props.selectedGym?.categoryName
     || '-');
 
-const selectedGymRating = computed(() => {
-  if (reviewItems.value.length > 0) {
-    const sum = reviewItems.value.reduce((acc, item) => acc + Number(item?.rating || 0), 0);
-    return sum / reviewItems.value.length;
-  }
-  return Number(
+const selectedGymRating = computed(() =>
+  Number(
     selectedGymDetail.value?.rating
       ?? props.selectedGym?.rating
       ?? 0,
-  );
-});
+  ));
 const selectedGymAbout = computed(() =>
   selectedGymDetail.value?.description
     || props.selectedGym?.about
@@ -1119,29 +1209,20 @@ const selectedGymPhone = computed(() =>
   selectedGymDetail.value?.tel
     || props.selectedGym?.phone
     || '-');
+const selectedGymAddress = computed(() =>
+  selectedGymDetail.value?.address
+    || props.selectedGym?.address
+    || props.selectedGym?.location
+    || '-');
 const selectedGymWebsite = computed(() => props.selectedGym?.website || '');
 
-const toImageUrls = (rawImages) => {
-  if (!rawImages) return [];
-  if (typeof rawImages === 'string') return rawImages ? [rawImages] : [];
-  if (!Array.isArray(rawImages)) return [];
-  return rawImages
-    .map((item) => {
-      if (typeof item === 'string') return item;
-      return item?.imageUrl || item?.url || item?.path || item?.src || '';
-    })
-    .filter(Boolean);
-};
-
-const selectedGymDefaultPhotos = computed(() => {
-  const detailImages = toImageUrls(selectedGymDetail.value?.images);
+const selectedGymDefaultPhotoItems = computed(() => {
+  const detailImages = toImageVariantItems(selectedGymDetail.value?.images);
   if (detailImages.length > 0) return detailImages;
-  const listImages = toImageUrls(props.selectedGym?.images);
+  const listImages = toImageVariantItems(props.selectedGym?.images);
   if (listImages.length > 0) return listImages;
-  return toImageUrls(props.selectedGym?.image);
+  return toImageVariantItems(props.selectedGym?.image);
 });
-
-const uniquePhotoUrls = (items = []) => Array.from(new Set(items.filter(Boolean)));
 
 const getReviewNicknameInitial = (nickname) => {
   const value = String(nickname || '').trim();
@@ -1162,11 +1243,25 @@ const canEditReviewItem = (review) =>
   && Boolean(sessionUserId.value)
   && normalizeId(review?.userId ?? review?.user?.id) === sessionUserId.value;
 
+const openReviewAuthorProfile = (review) => {
+  const userId = Number(review?.userId ?? review?.user?.id ?? 0);
+  if (!Number.isFinite(userId) || userId <= 0) return;
+  if (normalizeId(userId) === sessionUserId.value) {
+    router.push({ path: '/profile' });
+    return;
+  }
+  router.push({ path: '/profile', query: { userId: String(userId) } });
+};
+
 const reviewDisplayItems = computed(() =>
   reviewItems.value.map((review) => ({
     ...review,
     userId: review?.userId ?? review?.user?.id ?? null,
-    imageUrls: toImageUrls(review?.images),
+    profileImageUrl: review?.profileImageUrl
+      ?? review?.user?.profileThumbnailUrl
+      ?? review?.user?.profileImageUrl
+      ?? '',
+    imageItems: toImageVariantItems(review?.images),
     initial: getReviewNicknameInitial(review?.nickname),
     reviewKey: getReviewKey(review),
     commentText: String(review?.comment || ''),
@@ -1199,9 +1294,9 @@ const reviewPreviewItems = computed(() => {
 });
 
 const photoItems = computed(() => {
-  const eventImages = uniquePhotoUrls(photoMap.value[selectedGymId.value] || []);
+  const eventImages = toImageVariantItems(photoMap.value[selectedGymId.value] || []);
   if (eventImages.length > 0) return eventImages;
-  return selectedGymDefaultPhotos.value;
+  return selectedGymDefaultPhotoItems.value;
 });
 
 const resolvePhotoLayout = (index) => {
@@ -1210,8 +1305,9 @@ const resolvePhotoLayout = (index) => {
 };
 
 const photoGalleryItems = computed(() =>
-  photoItems.value.map((url, index) => ({
-    url,
+  photoItems.value.map((item, index) => ({
+    originalUrl: item.originalUrl,
+    thumbnailUrl: item.thumbnailUrl || item.originalUrl,
     index,
     layout: resolvePhotoLayout(index),
   })));
@@ -1221,7 +1317,8 @@ const selectedPhotoViewerUrl = computed(() => photoViewerItems.value[selectedPho
 const photoViewerTitle = computed(() => String(props.selectedGym?.name || '체육관'));
 
 const selectedGymHeroImage = computed(() =>
-  selectedGymDefaultPhotos.value[0]
+  getPrimaryOriginalImageUrl(selectedGymDetail.value?.images)
+    || getPrimaryOriginalImageUrl(props.selectedGym?.images)
     || props.selectedGym?.image
     || defaultGymImage);
 
@@ -1341,32 +1438,60 @@ const ensureGymDetail = async (gymId, options = {}) => {
   return gymDetailMap.value[gymId];
 };
 
-const syncGymReviewStats = (gymId, reviews = []) => {
+const normalizeReviewPageMeta = (payload, itemCount = 0) => {
+  const page = Number(payload?.number ?? payload?.page ?? payload?.pageable?.pageNumber ?? 0);
+  const size = Number(payload?.size ?? payload?.pageable?.pageSize ?? reviewPageSize);
+  const totalElements = Number(payload?.totalElements ?? payload?.total ?? itemCount);
+  const totalPages = Number(
+    payload?.totalPages
+      ?? (Number.isFinite(totalElements) && size > 0 ? Math.ceil(totalElements / size) : 0),
+  );
+  const hasNext = Boolean(
+    payload?.hasNext
+      ?? (payload?.last != null
+        ? !payload.last
+        : (Number.isFinite(totalPages) ? page + 1 < totalPages : itemCount >= size)),
+  );
+
+  return {
+    page: Number.isFinite(page) ? page : 0,
+    size: Number.isFinite(size) && size > 0 ? size : reviewPageSize,
+    totalElements: Number.isFinite(totalElements) ? totalElements : itemCount,
+    totalPages: Number.isFinite(totalPages) ? totalPages : 0,
+    hasNext,
+  };
+};
+
+const mergeReviewPages = (currentItems = [], nextItems = []) => {
+  const merged = [];
+  const seen = new Set();
+
+  [...currentItems, ...nextItems].forEach((item, index) => {
+    const key = getReviewKey(item) || `${item?.createdTime || ''}:${item?.nickname || ''}:${index}`;
+    if (seen.has(key)) return;
+    seen.add(key);
+    merged.push(item);
+  });
+
+  return merged;
+};
+
+const syncGymReviewStats = (gymId, reviews = [], pageMeta = null) => {
   if (typeof props.onSyncGym !== 'function') return;
   const list = Array.isArray(reviews) ? reviews : [];
-  const reviewCount = list.length;
-  const rating = reviewCount > 0
-    ? list.reduce((acc, item) => acc + Number(item?.rating || 0), 0) / reviewCount
-    : 0;
+  const reviewCount = Number(pageMeta?.totalElements);
+  const normalizedReviewCount = Number.isFinite(reviewCount) && reviewCount >= 0 ? reviewCount : list.length;
 
   props.onSyncGym({
     id: gymId,
-    rating,
-    reviewCount,
-    reviews: reviewCount,
+    reviewCount: normalizedReviewCount,
+    reviews: normalizedReviewCount,
   });
 };
 
-const ensureGymReviews = async (gymId, options = {}) => {
-  const { force = false } = options;
-  if (!gymId) return [];
-  if (!force && reviewMap.value[gymId]) {
-    const cached = reviewMap.value[gymId] || [];
-    syncGymReviewStats(gymId, cached);
-    return cached;
-  }
-
-  const response = await reviewApi.listPage({ gymId, page: 0, size: 50 });
+const loadGymReviewPage = async (gymId, page = 0, options = {}) => {
+  const { append = false } = options;
+  const response = await reviewApi.listPage({ gymId, page, size: reviewPageSize });
   const payload = extractPayload(response, {});
   const list = extractList(payload);
   const hasGymIdField = list.some((item) =>
@@ -1377,13 +1502,69 @@ const ensureGymReviews = async (gymId, options = {}) => {
       return normalizeId(candidateGymId) === gymId;
     })
     : list;
+  const pageMeta = normalizeReviewPageMeta(payload, filtered.length);
+  const currentItems = append ? reviewMap.value[gymId] || [] : [];
+  const nextItems = append ? mergeReviewPages(currentItems, filtered) : filtered;
 
   reviewMap.value = {
     ...reviewMap.value,
-    [gymId]: filtered,
+    [gymId]: nextItems,
   };
-  syncGymReviewStats(gymId, filtered);
-  return filtered;
+  setReviewPaginationState(gymId, {
+    ...pageMeta,
+    loadingMore: false,
+  });
+  syncGymReviewStats(gymId, nextItems, pageMeta);
+  return nextItems;
+};
+
+const ensureGymReviews = async (gymId, options = {}) => {
+  const { force = false } = options;
+  if (!gymId) return [];
+  if (!force && reviewMap.value[gymId]) {
+    const cached = reviewMap.value[gymId] || [];
+    syncGymReviewStats(gymId, cached, getReviewPaginationState(gymId));
+    return cached;
+  }
+
+  setReviewPaginationState(gymId, {
+    ...createEmptyReviewPagination(),
+    loadingMore: false,
+  });
+  return loadGymReviewPage(gymId, 0);
+};
+
+const ensureReviewDetail = async (reviewId, options = {}) => {
+  const { force = false } = options;
+  const normalizedReviewId = normalizeId(reviewId);
+  if (!normalizedReviewId) return null;
+  if (!force && reviewDetailMap.value[normalizedReviewId]) {
+    return reviewDetailMap.value[normalizedReviewId];
+  }
+
+  const response = await reviewApi.detail(normalizedReviewId);
+  const payload = extractPayload(response, {});
+  reviewDetailMap.value = {
+    ...reviewDetailMap.value,
+    [normalizedReviewId]: payload,
+  };
+  return payload;
+};
+
+const loadMoreGymReviews = async (gymId) => {
+  if (!gymId) return [];
+  const currentState = getReviewPaginationState(gymId);
+  if (currentState.loadingMore || !currentState.hasNext) {
+    return reviewMap.value[gymId] || [];
+  }
+
+  setReviewPaginationState(gymId, { loadingMore: true });
+  try {
+    return await loadGymReviewPage(gymId, currentState.page + 1, { append: true });
+  } catch (error) {
+    setReviewPaginationState(gymId, { loadingMore: false });
+    throw error;
+  }
 };
 
 const ensureGymPhotos = async (gymId, options = {}) => {
@@ -1395,10 +1576,28 @@ const ensureGymPhotos = async (gymId, options = {}) => {
 
   const response = await gymApi.gymImagesCombinedReview(gymId);
   const payload = extractPayload(response, {});
-  const photos = uniquePhotoUrls(toImageUrls(payload?.images));
+  const photos = toImageVariantItems(payload?.images);
 
   photoMap.value = {
     ...photoMap.value,
+    [gymId]: photos,
+  };
+  return photos;
+};
+
+const ensureGymPhotoDetails = async (gymId, options = {}) => {
+  const { force = false } = options;
+  if (!gymId) return [];
+  if (!force && photoDetailMap.value[gymId]) {
+    return photoDetailMap.value[gymId] || [];
+  }
+
+  const response = await gymApi.gymImagesCombinedReviewDetail(gymId);
+  const payload = extractPayload(response, {});
+  const photos = toImageVariantItems(payload?.images);
+
+  photoDetailMap.value = {
+    ...photoDetailMap.value,
     [gymId]: photos,
   };
   return photos;
@@ -1824,22 +2023,34 @@ const openReviewModal = () => {
   isReviewModalOpen.value = true;
 };
 
-const openEditReviewModal = (review) => {
+const openEditReviewModal = async (review) => {
   if (!review?.canEdit) return;
+  const reviewId = review.reviewId ?? review.id ?? null;
+  if (!reviewId) return;
+
   reviewSubmitError.value = '';
   resetReviewForm();
   reviewModalMode.value = 'edit';
-  editingReviewId.value = review.reviewId ?? review.id ?? null;
-  reviewExistingImages.value = [...(review.imageUrls || [])];
-  reviewForm.value = {
-    rating: Number(review.rating || 5),
-    comment: String(review.commentText || review.comment || ''),
-    images: [],
-  };
-  if (reviewImageInputRef.value) {
-    reviewImageInputRef.value.value = '';
+  editingReviewId.value = reviewId;
+
+  try {
+    const detail = await ensureReviewDetail(reviewId);
+    const reviewSource = detail || review;
+    reviewExistingImages.value = toOriginalImageUrls(reviewSource?.images);
+    reviewForm.value = {
+      rating: Number(reviewSource?.rating || 5),
+      comment: String(reviewSource?.comment || review.commentText || review.comment || ''),
+      images: [],
+    };
+    if (reviewImageInputRef.value) {
+      reviewImageInputRef.value.value = '';
+    }
+    isReviewModalOpen.value = true;
+  } catch (error) {
+    reviewSubmitError.value = toApiErrorMessage(error);
+    reviewModalMode.value = 'create';
+    editingReviewId.value = null;
   }
-  isReviewModalOpen.value = true;
 };
 
 const closeReviewModal = () => {
@@ -1867,7 +2078,7 @@ const updatePhotoViewerViewport = () => {
 };
 
 const openPhotoViewerWithItems = (items, index = 0, source = 'gallery') => {
-  const normalizedItems = uniquePhotoUrls(items);
+  const normalizedItems = toOriginalImageUrls(items);
   if (!normalizedItems.length) return;
   updatePhotoViewerViewport();
   const clampedIndex = Math.min(Math.max(index, 0), normalizedItems.length - 1);
@@ -1879,7 +2090,38 @@ const openPhotoViewerWithItems = (items, index = 0, source = 'gallery') => {
 };
 
 const openPhotoViewer = (index) => {
-  openPhotoViewerWithItems(photoItems.value, index, 'gallery');
+  openGymPhotoViewer(index);
+};
+
+const openReviewPhotoViewer = async (review, index = 0) => {
+  const reviewId = review?.reviewId ?? review?.id ?? null;
+  if (!reviewId) {
+    openPhotoViewerWithItems(review?.imageItems || [], index, 'review');
+    return;
+  }
+
+  try {
+    const detail = await ensureReviewDetail(reviewId);
+    const originalItems = toImageVariantItems(detail?.images);
+    openPhotoViewerWithItems(originalItems.length ? originalItems : review?.imageItems || [], index, 'review-detail');
+  } catch (error) {
+    openPhotoViewerWithItems(review?.imageItems || [], index, 'review');
+  }
+};
+
+const openGymPhotoViewer = async (index = 0) => {
+  const gymId = selectedGymId.value;
+  if (!gymId) {
+    openPhotoViewerWithItems(photoItems.value, index, 'gallery');
+    return;
+  }
+
+  try {
+    const originalItems = await ensureGymPhotoDetails(gymId);
+    openPhotoViewerWithItems(originalItems.length ? originalItems : photoItems.value, index, 'photo-detail');
+  } catch (error) {
+    openPhotoViewerWithItems(photoItems.value, index, 'gallery');
+  }
 };
 
 const closePhotoViewer = () => {
@@ -1951,10 +2193,24 @@ const submitReview = async () => {
     }
 
     isReviewModalOpen.value = false;
+    if (editingReviewId.value != null) {
+      const nextReviewDetailMap = { ...reviewDetailMap.value };
+      delete nextReviewDetailMap[editingReviewId.value];
+      reviewDetailMap.value = nextReviewDetailMap;
+    }
+    if (gymId) {
+      const nextPhotoDetailMap = { ...photoDetailMap.value };
+      delete nextPhotoDetailMap[gymId];
+      photoDetailMap.value = nextPhotoDetailMap;
+    }
     resetReviewForm();
     await ensureGymDetail(String(gymId), { force: true });
     await ensureGymReviews(String(gymId), { force: true });
     await ensureGymPhotos(String(gymId), { force: true });
+    if (activeTab.value === '리뷰') {
+      await nextTick();
+      await ensureReviewFeedScrollable();
+    }
   } catch (error) {
     reviewSubmitError.value = toApiErrorMessage(error);
   } finally {
@@ -1963,12 +2219,16 @@ const submitReview = async () => {
 };
 
 const submitSearch = () => {
-  appliedSearchQuery.value = searchQuery.value.trim();
+  if (typeof props.onSearchGyms === 'function') {
+    props.onSearchGyms(searchQuery.value.trim());
+  }
 };
 
 const clearSearch = () => {
   searchQuery.value = '';
-  appliedSearchQuery.value = '';
+  if (typeof props.onSearchGyms === 'function') {
+    props.onSearchGyms('');
+  }
 };
 
 const hideMobileSheet = () => {
@@ -2036,6 +2296,44 @@ const handleTabClick = async (tab) => {
   }
 };
 
+const ensureReviewFeedScrollable = async () => {
+  if (activeTab.value !== '리뷰' || !selectedGymId.value) return;
+  const container = detailScrollRef.value;
+  if (!container) return;
+
+  let guard = 0;
+  while (reviewHasNextPage.value
+    && !reviewIsLoadingMore.value
+    && container.scrollHeight <= container.clientHeight + reviewLoadMoreThreshold
+    && guard < 6) {
+    guard += 1;
+    await loadMoreGymReviews(selectedGymId.value);
+    await nextTick();
+  }
+};
+
+const maybeLoadMoreReviews = async () => {
+  if (activeTab.value !== '리뷰' || !selectedGymId.value) return;
+  if (tabLoading.value || reviewIsLoadingMore.value || !reviewHasNextPage.value) return;
+
+  const container = detailScrollRef.value;
+  if (!container) return;
+
+  const remainingDistance = container.scrollHeight - (container.scrollTop + container.clientHeight);
+  if (remainingDistance > reviewLoadMoreThreshold) return;
+
+  await loadMoreGymReviews(selectedGymId.value);
+  await nextTick();
+  await ensureReviewFeedScrollable();
+};
+
+const handleDetailScroll = () => {
+  if (activeTab.value !== '리뷰') return;
+  maybeLoadMoreReviews().catch((error) => {
+    console.error('Failed to load more reviews:', error);
+  });
+};
+
 const loadTabData = async (tab) => {
   const gymId = selectedGymId.value;
   if (!gymId) return;
@@ -2068,6 +2366,8 @@ const loadTabData = async (tab) => {
 
     if (tab === '리뷰') {
       await ensureGymReviews(gymId);
+      await nextTick();
+      await ensureReviewFeedScrollable();
       return;
     }
 
@@ -2099,14 +2399,101 @@ const onRequestArriveDirection = () => {
   }
 };
 
-const filteredGyms = computed(() => {
-  const keyword = appliedSearchQuery.value.toLowerCase();
-  if (!keyword) return props.gyms;
-  return props.gyms.filter((gym) => {
-    const fields = [gym.name, gym.type, gym.location, gym.about];
-    return fields.some((field) => String(field || '').toLowerCase().includes(keyword));
+const filteredGyms = computed(() => props.gyms);
+
+const clearShareToast = () => {
+  if (shareToastTimer) {
+    clearTimeout(shareToastTimer);
+    shareToastTimer = null;
+  }
+  shareToastMessage.value = '';
+};
+
+const showShareToast = (message, tone = 'success') => {
+  clearShareToast();
+  shareToastTone.value = tone;
+  shareToastMessage.value = message;
+  shareToastTimer = setTimeout(() => {
+    shareToastMessage.value = '';
+    shareToastTimer = null;
+  }, 2200);
+};
+
+const getActiveTabFromRoute = () => {
+  const routeTab = String(route.query.t ?? route.query.tab ?? '').trim();
+  return tabQueryLabelMap[routeTab] || '홈';
+};
+
+const syncDetailTabQuery = (tab) => {
+  if (!selectedGymId.value) return;
+
+  const nextQuery = {
+    ...route.query,
+    g: selectedGymId.value,
+    t: tabQueryValueMap[tab] || tabQueryValueMap['홈'],
+  };
+  delete nextQuery.gymId;
+  delete nextQuery.tab;
+
+  const currentGymId = String(route.query.g ?? route.query.gymId ?? '');
+  const currentTab = String(route.query.t ?? route.query.tab ?? '');
+  if (currentGymId === String(nextQuery.g) && currentTab === String(nextQuery.t)) return;
+
+  router.replace({ path: route.path, query: nextQuery }).catch(() => {});
+};
+
+const buildGymShareUrl = (tab) => {
+  const nextQuery = {
+    ...route.query,
+    g: selectedGymId.value,
+    t: tabQueryValueMap[tab] || tabQueryValueMap['홈'],
+  };
+  delete nextQuery.gymId;
+  delete nextQuery.tab;
+
+  const resolved = router.resolve({
+    path: route.path,
+    query: nextQuery,
   });
-});
+
+  return new URL(resolved.fullPath, window.location.origin).toString();
+};
+
+const copyTextToClipboard = async (text) => {
+  if (navigator?.clipboard?.writeText) {
+    await navigator.clipboard.writeText(text);
+    return;
+  }
+
+  const textarea = document.createElement('textarea');
+  textarea.value = text;
+  textarea.setAttribute('readonly', '');
+  textarea.style.position = 'fixed';
+  textarea.style.opacity = '0';
+  textarea.style.pointerEvents = 'none';
+  document.body.appendChild(textarea);
+  textarea.focus();
+  textarea.select();
+
+  const copied = document.execCommand('copy');
+  document.body.removeChild(textarea);
+  if (!copied) {
+    throw new Error('Clipboard copy failed');
+  }
+};
+
+const handleShareGym = async () => {
+  if (!selectedGymId.value) return;
+
+  try {
+    const shareUrl = buildGymShareUrl(activeTab.value);
+    await copyTextToClipboard(shareUrl);
+    showShareToast('링크가 복사되었습니다.');
+  } catch (error) {
+    console.error('Failed to copy share link:', error);
+    showShareToast('링크 복사에 실패했습니다.', 'error');
+  }
+};
 
 watch(selectedGymId, async (nextGymId, prevGymId) => {
   tabError.value = '';
@@ -2121,20 +2508,34 @@ watch(selectedGymId, async (nextGymId, prevGymId) => {
   }
 
   if (!nextGymId) return;
+  const nextTab = getActiveTabFromRoute();
   if (nextGymId !== prevGymId) {
-    activeTab.value = '홈';
+    if (activeTab.value !== nextTab) {
+      activeTab.value = nextTab;
+      return;
+    }
   }
 
-  await loadTabData('홈');
+  await loadTabData(nextTab);
 }, { immediate: true });
 
 watch(activeTab, async (tab) => {
+  if (selectedGymId.value) {
+    syncDetailTabQuery(tab);
+  }
   await loadTabData(tab);
+});
+
+watch(() => [route.query.t, route.query.tab], ([nextShortTab, nextLongTab]) => {
+  if (!selectedGymId.value) return;
+  const nextTab = tabQueryLabelMap[String(nextShortTab ?? nextLongTab ?? '').trim()] || '홈';
+  if (nextTab === activeTab.value) return;
+  activeTab.value = nextTab;
 });
 
 watch(photoItems, (nextItems) => {
   if (!isPhotoViewerOpen.value || photoViewerSource.value !== 'gallery') return;
-  const normalizedItems = uniquePhotoUrls(nextItems);
+  const normalizedItems = toOriginalImageUrls(nextItems);
   if (!normalizedItems.length) {
     closePhotoViewer();
     return;
@@ -2144,6 +2545,10 @@ watch(photoItems, (nextItems) => {
     selectedPhotoIndex.value = normalizedItems.length - 1;
   }
 });
+
+watch(() => props.searchKeyword, (nextKeyword) => {
+  searchQuery.value = String(nextKeyword || '');
+}, { immediate: true });
 
 watch(() => props.mobileSheetState, () => {
   updatePhotoViewerViewport();
@@ -2161,6 +2566,7 @@ onMounted(() => {
 
 onBeforeUnmount(() => {
   revokeReviewImageUrls();
+  clearShareToast();
   window.removeEventListener('keydown', onPhotoViewerKeydown);
   window.removeEventListener('resize', updatePhotoViewerViewport);
 });
