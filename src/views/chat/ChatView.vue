@@ -188,7 +188,10 @@
           </div>
 
           <div v-else class="chat-empty-panel">
-            <div class="v-chat-empty-state"><div class="v-chat-empty-icon"><MessageSquare :size="40" class="v-text-white" /></div><p class="v-chat-empty-title">대화내역이 없습니다.</p></div>
+            <div class="v-chat-empty-state">
+              <div class="v-chat-empty-icon"><MessageSquare :size="40" class="v-text-white" /></div>
+              <p class="v-chat-empty-title">{{ chatEmptyStateTitle }}</p>
+            </div>
           </div>
         </div>
       </div>
@@ -217,6 +220,12 @@ const messageSearchTerm = ref('');
 const isMessageSearchOpen = ref(false);
 const messageSearchInputRef = ref(null);
 const selectedRoom = computed(() => chatRoomsData.value.find((r) => r.id === selectedRoomId.value));
+const hasChatRooms = computed(() => chatRoomsData.value.length > 0);
+const chatEmptyStateTitle = computed(() => (
+  hasChatRooms.value
+    ? '채팅방을 선택해주세요.'
+    : '대화내역이 없습니다.'
+));
 const currentUserId = ref(null);
 const isLoadingRooms = ref(false);
 const chatLoadError = ref('');
@@ -678,7 +687,7 @@ const leaveSelectedRoom = async () => {
     const nextMessagesByRoom = { ...messagesByRoom.value };
     delete nextMessagesByRoom[room.roomKey || room.id];
     messagesByRoom.value = nextMessagesByRoom;
-    selectedRoomId.value = chatRoomsData.value[0]?.id || null;
+    selectedRoomId.value = null;
   } catch (error) {
     window.alert(toFriendlyApiError(error, '채팅방 나가기에 실패했습니다.'));
   }
@@ -801,10 +810,6 @@ const loadRooms = async () => {
       chatRoomsData.value = sortRoomsByLastMessageDesc(roomList.map(mapRoom));
     } else {
       chatRoomsData.value = [];
-    }
-
-    if (!selectedRoomId.value && chatRoomsData.value.length > 0) {
-      selectedRoomId.value = chatRoomsData.value[0].id;
     }
   } catch (error) {
     chatLoadError.value = toFriendlyApiError(error, '채팅방 목록을 불러오지 못했습니다.');

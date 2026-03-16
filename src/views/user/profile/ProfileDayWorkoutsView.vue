@@ -80,7 +80,16 @@
                       <span class="v-profile-history-duration">{{ workout.duration || 'Daily' }}</span>
                     </div>
                     <h4 class="sx-views-user-profile-profilehistoryview-008">{{ workout.title }}</h4>
-                    <!-- <p class="u-text-meta-truncate">{{ workout.tags }}</p> -->
+                    <div v-if="workout.exercises && workout.exercises.length > 0" class="v-history-exercise-list">
+                      <div
+                        v-for="(exercise, exerciseIndex) in workout.exercises"
+                        :key="`${workout.id}-${exerciseIndex}-${exercise.name}`"
+                        class="v-history-exercise-item"
+                      >
+                        <span class="v-history-exercise-name">{{ exercise.name }}</span>
+                        <span class="v-history-exercise-stats">{{ exercise.stats }}</span>
+                      </div>
+                    </div>
 
                     <div class="v-history-stat-row">
                       <div
@@ -146,6 +155,7 @@ import { RouterLink, useRoute } from 'vue-router';
 import { ArrowLeft, CalendarDays, Search, Calendar, Trash2 } from 'lucide-vue-next';
 import NavigationRail from '@/components/sections/NavigationRail.vue';
 import { workoutApi } from '@/services/apis';
+import { buildWorkoutTags, buildWorkoutTitle, extractWorkoutExercises } from '@/utils/workoutDisplay';
 
 const PAGE_SIZE = 20;
 
@@ -247,25 +257,26 @@ const extractListPayload = (raw = {}) => {
 };
 
 const normalizeWorkout = (item, index) => {
-  const details = Array.isArray(item?.workoutDetails)
-    ? item.workoutDetails
-    : Array.isArray(item?.workoutDetailList)
-      ? item.workoutDetailList
-      : Array.isArray(item?.workoutDetailCreateDtoList)
-        ? item.workoutDetailCreateDtoList
-        : [];
+  const exercises = extractWorkoutExercises(item);
+  const hasExerciseValues = exercises.some((exercise) => exercise.hasWeight || exercise.hasSets || exercise.hasReps);
+  const totalWeight = exercises.reduce((sum, exercise) => sum + Number(exercise?.weight ?? 0), 0);
+  const totalSets = exercises.reduce((sum, exercise) => sum + Number(exercise?.sets ?? 0), 0);
+  const fallbackWeight = Number(item?.totalVolume ?? item?.totalWeight ?? item?.weight ?? 0);
+  const fallbackSets = Number(item?.totalSets ?? item?.setCount ?? item?.sets ?? 0);
+  const fallbackTitle = item?.workoutCondition || item?.title || item?.name || `운동 기록 ${index + 1}`;
 
   return {
     id: item?.workoutId ?? item?.id ?? `workout-${index + 1}`,
-    title: item?.workoutCondition || `운동 기록 ${index + 1}`,
+    title: buildWorkoutTitle(exercises, fallbackTitle),
     time: formatTime(item?.workoutDate || item?.createdAt || item?.createdTime),
     date: formatDate(item?.workoutDate || item?.createdAt || item?.createdTime),
     duration: 'Daily',
-    tags: details.map((detail) => detail?.workoutName).filter(Boolean).join(', ') || '운동',
+    tags: buildWorkoutTags(exercises),
+    exercises,
     stats: {
-      볼륨: `${details.reduce((sum, detail) => sum + Number(detail?.weight || 0), 0).toLocaleString()}kg`,
-      세트: details.reduce((sum, detail) => sum + Number(detail?.setCount || 0), 0),
-      종목: details.length,
+      볼륨: `${Number(hasExerciseValues ? totalWeight : fallbackWeight || 0).toLocaleString()}kg`,
+      세트: Number(hasExerciseValues ? totalSets : fallbackSets || 0),
+      종목: exercises.length,
     },
     bgColor: '#dbeafe',
     fgColor: '#2563eb',

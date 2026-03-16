@@ -2356,10 +2356,6 @@
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.08);
 }
 
-.category-pill-more-btn:hover {
-  border-color: var(--color-brand-primary);
-}
-
 .category-pill-more-dot {
   width: 4px;
   height: 4px;
@@ -2400,10 +2396,6 @@
   border-right: 0;
 }
 
-.category-pill-more-item:hover {
-  background: var(--color-surface-panel);
-}
-
 .category-pill-measure {
   position: absolute;
   left: -9999px;
@@ -2428,25 +2420,35 @@
   flex-shrink: 0;
 }
 
-.sx-components-sections-categorypills-002:hover {
-  border-color: var(--color-brand-primary);
-}
-
 .category-pill-button-active {
-  border-color: var(--color-brand-primary);
-  background: #eff6ff;
-  box-shadow: 0 4px 10px rgba(37, 99, 235, 0.14);
+  border-color: var(--category-pill-accent, var(--color-brand-primary));
+  background: var(--category-pill-accent-soft, #eff6ff);
+  box-shadow: 0 4px 10px var(--category-pill-accent-shadow, rgba(37, 99, 235, 0.14));
 }
 
 .category-pill-button-active .category-pill-label {
-  color: var(--color-brand-primary);
+  color: var(--category-pill-accent, var(--color-brand-primary));
   font-weight: 700;
 }
 
 .category-pill-more-item-active {
-  background: #eff6ff;
-  color: var(--color-brand-primary);
+  background: var(--category-pill-accent-soft, #eff6ff);
+  color: var(--category-pill-accent, var(--color-brand-primary));
   font-weight: 700;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .category-pill-more-btn:hover {
+    border-color: var(--color-brand-primary);
+  }
+
+  .category-pill-more-item:hover {
+    background: var(--color-surface-panel);
+  }
+
+  .sx-components-sections-categorypills-002:hover {
+    border-color: var(--color-brand-primary);
+  }
 }
 
 .sx-components-sections-searchpanel-001 {}
