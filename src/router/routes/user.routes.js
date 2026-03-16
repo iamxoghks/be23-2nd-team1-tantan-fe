@@ -6,6 +6,7 @@ import PasswordResetView from '@/views/user/PasswordResetView.vue';
 import ProfileView from '@/views/user/profile/ProfileView.vue';
 import ProfileEditView from '@/views/user/profile/ProfileEditView.vue';
 import ProfileDayWorkoutsView from '@/views/user/profile/ProfileDayWorkoutsView.vue';
+import ProfileReservationHistoryView from '@/views/user/profile/ProfileReservationHistoryView.vue';
 
 export const userRoutes = [
   { path: '/login', component: LoginView },
@@ -15,7 +16,9 @@ export const userRoutes = [
   { path: '/reset-password', component: PasswordResetView },
   { path: '/profile', component: ProfileView },
   { path: '/workoutHistory', component: ProfileDayWorkoutsView, meta: { requiresAuth: true } },
+  { path: '/reservationHistory', component: ProfileReservationHistoryView, meta: { requiresAuth: true } },
   { path: '/profile/history', redirect: { path: '/workoutHistory' } },
+  { path: '/profile/reservations', redirect: { path: '/reservationHistory' } },
   {
     path: '/profile/activity/:date',
     redirect: (to) => {

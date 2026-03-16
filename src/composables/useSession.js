@@ -1,6 +1,13 @@
 import { computed, ref } from 'vue';
 import { userApi } from '@/services/apis';
-import { clearAuthTokens, getAccessToken, getTokenRole, normalizeRole } from '@/services/token';
+import {
+  clearAuthTokens,
+  getAccessToken,
+  getRefreshToken,
+  getTokenRole,
+  normalizeRole,
+  setAccessToken,
+} from '@/services/token';
 import { extractPayload } from '@/utils/api';
 
 const sessionProfile = ref(null);
@@ -69,6 +76,29 @@ const primeSessionFromToken = () => {
 
 primeSessionFromToken();
 
+const syncAccessTokenRole = async (serverRole) => {
+  const normalizedServerRole = normalizeRole(serverRole);
+  const refreshToken = getRefreshToken();
+  const tokenRole = getTokenRole();
+
+  if (!normalizedServerRole || !refreshToken || tokenRole === normalizedServerRole) {
+    return;
+  }
+
+  try {
+    const response = await userApi.refreshAt({ refreshToken });
+    const payload = extractPayload(response, {});
+    const newAccessToken = payload?.accessToken;
+
+    if (!newAccessToken) return;
+
+    setAccessToken(newAccessToken);
+    refreshAuthState();
+  } catch (error) {
+    // Keep the current session alive even if proactive token refresh fails.
+  }
+};
+
 const syncSessionFromServer = async ({ force = false } = {}) => {
   refreshAuthState();
   const token = getAccessToken();
@@ -89,6 +119,7 @@ const syncSessionFromServer = async ({ force = false } = {}) => {
     try {
       const response = await userApi.profile();
       const payload = extractPayload(response);
+      await syncAccessTokenRole(payload?.role);
       sessionProfile.value = normalizeProfile(payload);
       isSessionHydrated.value = true;
       return sessionProfile.value;
