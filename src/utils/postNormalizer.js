@@ -131,26 +131,18 @@ const extractPostImageUrls = (post = {}) => {
 };
 
 const toExerciseStats = (detail = {}) => {
+  const weight = toNumber(detail.weight ?? detail.totalWeight ?? detail.volume ?? detail.kg, NaN);
+  const setCount = toNumber(detail.setCount ?? detail.sets ?? detail.set, NaN);
+  const rep = toNumber(detail.rep ?? detail.reps ?? detail.repCount ?? detail.count, NaN);
+
+  const parts = [];
+  if (Number.isFinite(weight)) parts.push(`${weight}kg`);
+  if (Number.isFinite(setCount)) parts.push(`${setCount}세트`);
+  if (Number.isFinite(rep)) parts.push(`${rep}회`);
+  if (parts.length > 0) return parts.join(', ');
+
   const statsText = asTrimmedString(detail.stats || detail.summary || detail.record);
-  if (statsText) return statsText;
-
-  const weight = toNumber(detail.weight, NaN);
-  const setCount = toNumber(detail.setCount, NaN);
-  const rep = toNumber(detail.rep, NaN);
-
-  if (Number.isFinite(weight) && Number.isFinite(setCount)) {
-    return `${weight}kg x ${setCount} sets`;
-  }
-  if (Number.isFinite(weight) && Number.isFinite(rep)) {
-    return `${weight}kg x ${rep} reps`;
-  }
-  if (Number.isFinite(setCount) && Number.isFinite(rep)) {
-    return `${setCount} sets x ${rep} reps`;
-  }
-  if (Number.isFinite(weight)) return `${weight}kg`;
-  if (Number.isFinite(setCount)) return `${setCount} sets`;
-  if (Number.isFinite(rep)) return `${rep} reps`;
-  return '-';
+  return statsText || '-';
 };
 
 const normalizeExercises = (rawDetails = []) => rawDetails

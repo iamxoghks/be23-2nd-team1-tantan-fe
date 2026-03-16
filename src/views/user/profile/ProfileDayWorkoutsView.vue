@@ -6,7 +6,7 @@
       <div class="v-profile-history-wrap">
         <div class="sx-views-user-profile-profilehistoryview-002">
           <div class="sx-views-community-communityview-016">
-            <RouterLink to="/profile" class="v-history-back-btn"><ArrowLeft class="v-icon-18-md20" /></RouterLink>
+            <RouterLink :to="profileRouteLink" class="v-history-back-btn"><ArrowLeft class="v-icon-18-md20" /></RouterLink>
             <div>
               <h1 class="v-history-title">
                 <CalendarDays class="v-history-title-icon" />
@@ -104,6 +104,7 @@
                   </div>
                 </div>
                 <button
+                  v-if="isOwnWorkoutHistory"
                   type="button"
                   class="v-history-delete-btn v-history-delete-btn-align v-day-history-delete-btn"
                   :disabled="isDeletingWorkout(workout.id)"
@@ -155,11 +156,13 @@ import { RouterLink, useRoute } from 'vue-router';
 import { ArrowLeft, CalendarDays, Search, Calendar, Trash2 } from 'lucide-vue-next';
 import NavigationRail from '@/components/sections/NavigationRail.vue';
 import { workoutApi } from '@/services/apis';
+import { useSession } from '@/composables/useSession';
 import { buildWorkoutTags, buildWorkoutTitle, extractWorkoutExercises } from '@/utils/workoutDisplay';
 
 const PAGE_SIZE = 20;
 
 const route = useRoute();
+const { sessionProfile, primeSessionFromToken } = useSession();
 
 const isLoading = ref(false);
 const isLoadingMore = ref(false);
@@ -181,6 +184,24 @@ const parseDateParam = (value) => {
 };
 
 const selectedDate = ref(parseDateParam(route.query?.date));
+const routeTargetUserId = computed(() => {
+  const raw = String(route.query?.userId || '').trim();
+  const parsed = Number(raw);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
+});
+const currentUserId = computed(() => {
+  const raw = Number(sessionProfile.value?.id ?? 0);
+  return Number.isFinite(raw) && raw > 0 ? raw : null;
+});
+const isOwnWorkoutHistory = computed(() => {
+  if (!routeTargetUserId.value) return true;
+  if (!currentUserId.value) return false;
+  return Number(routeTargetUserId.value) === Number(currentUserId.value);
+});
+const profileRouteLink = computed(() => ({
+  path: '/profile',
+  query: routeTargetUserId.value ? { userId: String(routeTargetUserId.value) } : undefined,
+}));
 
 const isAllMode = computed(() => !selectedDate.value);
 const normalizedDate = computed(() => parseDateParam(selectedDate.value));
@@ -367,6 +388,7 @@ const loadWorkouts = async ({ reset } = { reset: false }) => {
   }
 
   const targetPage = shouldReset ? 0 : currentPage.value + 1;
+  const requestedUserId = routeTargetUserId.value ? Number(routeTargetUserId.value) : null;
 
   try {
     const response = isAllMode.value
@@ -374,11 +396,13 @@ const loadWorkouts = async ({ reset } = { reset: false }) => {
         page: targetPage,
         size: PAGE_SIZE,
         sort: 'workoutDate,desc',
+        ...(requestedUserId ? { userId: requestedUserId } : {}),
       })
       : await workoutApi.day(normalizedDate.value, {
         page: targetPage,
         size: PAGE_SIZE,
         sort: 'workoutDate,desc',
+        ...(requestedUserId ? { userId: requestedUserId } : {}),
       });
 
     const {
@@ -440,7 +464,16 @@ watch(
   },
 );
 
+watch(
+  () => route.query?.userId,
+  () => {
+    loadWorkouts({ reset: true });
+  },
+);
+
 onBeforeUnmount(() => {
   disconnectInfiniteObserver();
 });
+
+primeSessionFromToken();
 </script>

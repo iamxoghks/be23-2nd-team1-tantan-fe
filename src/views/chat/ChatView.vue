@@ -43,7 +43,7 @@
               :key="room.id"
               class="chat-room-item"
               :class="selectedRoomId === room.id ? 'chat-room-item-active' : 'chat-room-item-hover'"
-              @click="selectedRoomId = room.id"
+              @click="selectRoom(room.id)"
             >
               <div class="v-chat-room-avatar" :style="roomAvatarStyle(room)">
                 <img
@@ -310,6 +310,22 @@ const toggleMessageSearch = async () => {
 
 const toggleRoomMenu = () => {
   isRoomMenuOpen.value = !isRoomMenuOpen.value;
+};
+
+const clearRoomUnread = (roomId) => {
+  const normalizedRoomId = String(roomId || '');
+  if (!normalizedRoomId) return;
+
+  chatRoomsData.value = chatRoomsData.value.map((room) => (
+    String(room.id) === normalizedRoomId
+      ? { ...room, unread: 0 }
+      : room
+  ));
+};
+
+const selectRoom = (roomId) => {
+  clearRoomUnread(roomId);
+  selectedRoomId.value = roomId;
 };
 
 const scrollMessagesToBottom = async () => {
@@ -873,6 +889,7 @@ watch(selectedRoomId, async (next, prev) => {
   }
   const requestSeq = ++roomSelectionRequestSeq;
   chatLoadError.value = '';
+  clearRoomUnread(next);
   await loadMessages(next, { requestSeq });
   if (requestSeq !== roomSelectionRequestSeq || String(selectedRoomId.value) !== String(next)) return;
   if (chatConnectionState.value === 'connected') {

@@ -115,6 +115,28 @@
   flex-shrink: 0;
 }
 
+.v-profile-log-exercise-card {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: flex-start;
+  gap: 10px;
+  padding: 12px 14px;
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+  background: #ffffff;
+}
+
+.v-profile-log-exercise-metrics {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.v-profile-log-exercise-metric {
+  min-width: 72px;
+}
+
 .v-profile-achievement-box {
   width: 52px;
   height: 52px;

@@ -310,7 +310,7 @@
                   <History :size="20" class="v-text-brand" />
                   최근 운동 기록
                 </div>
-                <RouterLink to="/workoutHistory" class="v-profile-view-all-link">전체 보기</RouterLink>
+                <RouterLink :to="profileWorkoutHistoryLink" class="v-profile-view-all-link">전체 보기</RouterLink>
               </div>
 
               <div class="u-col-gap-4">
@@ -326,16 +326,35 @@
                         <div
                           v-for="(exercise, exerciseIndex) in log.exercises"
                           :key="`${log.id}-${exerciseIndex}-${exercise.name}`"
-                          class="v-profile-log-exercise-item"
+                          class="v-profile-log-exercise-item v-profile-log-exercise-card"
                         >
                           <span class="v-profile-log-exercise-name">{{ exercise.name }}</span>
-                          <span class="v-profile-log-exercise-stats">{{ exercise.stats }}</span>
-                        </div>
-                      </div>
-                      <div class="sx-views-user-profile-profileview-021">
-                        <div v-for="([key, val]) in Object.entries(log.stats || {})" :key="key" class="v-profile-log-stat-chip">
-                          <span class="v-profile-log-stat-key">{{ key }}</span>
-                          <span class="v-profile-log-stat-value">{{ val }}</span>
+                          <div
+                            v-if="exercise.hasWeight || exercise.hasSets || exercise.hasReps"
+                            class="v-profile-log-exercise-metrics"
+                          >
+                            <div
+                              v-if="exercise.hasWeight && exercise.weight !== null"
+                              class="v-profile-log-stat-chip v-profile-log-exercise-metric"
+                            >
+                              <span class="v-profile-log-stat-key">중량</span>
+                              <span class="v-profile-log-stat-value">{{ formatWorkoutMetricValue(exercise.weight, 'kg') }}</span>
+                            </div>
+                            <div
+                              v-if="exercise.hasSets && exercise.sets !== null"
+                              class="v-profile-log-stat-chip v-profile-log-exercise-metric"
+                            >
+                              <span class="v-profile-log-stat-key">세트</span>
+                              <span class="v-profile-log-stat-value">{{ formatWorkoutMetricValue(exercise.sets) }}</span>
+                            </div>
+                            <div
+                              v-if="exercise.hasReps && exercise.reps !== null"
+                              class="v-profile-log-stat-chip v-profile-log-exercise-metric"
+                            >
+                              <span class="v-profile-log-stat-key">횟수</span>
+                              <span class="v-profile-log-stat-value">{{ formatWorkoutMetricValue(exercise.reps) }}</span>
+                            </div>
+                          </div>
                         </div>
                       </div>
                     </div>
@@ -720,6 +739,10 @@ const routeTargetGymId = computed(() => {
   const parsed = Number(raw);
   return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
 });
+const profileWorkoutHistoryLink = computed(() => ({
+  path: '/workoutHistory',
+  query: routeTargetUserId.value ? { userId: String(routeTargetUserId.value) } : undefined,
+}));
 const viewedRole = computed(() => (
   normalizeRole(profile.value?.role)
   || previewRole.value
@@ -918,6 +941,12 @@ const formatFollowCount = (value) => {
     return `${compact}천`;
   }
   return count.toLocaleString();
+};
+
+const formatWorkoutMetricValue = (value, unit = '') => {
+  const normalized = Number(value);
+  if (!Number.isFinite(normalized)) return '-';
+  return `${normalized.toLocaleString()}${unit}`;
 };
 
 const toFollowUserList = (payload) => {
@@ -1392,7 +1421,13 @@ const loadProfileData = async () => {
 
     if (!isGymOwner.value && !shouldMaskPrivateProfile.value) {
       try {
-        const workoutResponse = await workoutApi.list({ page: 0, size: 5, sort: 'workoutDate,desc' });
+        const requestedUserId = Number(normalizedProfileUserId.value || 0) || null;
+        const workoutResponse = await workoutApi.list({
+          page: 0,
+          size: 5,
+          sort: 'workoutDate,desc',
+          ...(requestedUserId ? { userId: requestedUserId } : {}),
+        });
         const payload = workoutResponse?.data?.data || workoutResponse?.data?.result || workoutResponse?.data;
         const list = Array.isArray(payload)
           ? payload
@@ -1710,7 +1745,13 @@ const openWorkoutByDate = (weekIndex, dayIndex, value) => {
   if (!isHeatmapCellClickable(weekIndex, dayIndex, value)) return;
   const date = getHeatmapCellDate(weekIndex, dayIndex);
   if (!date) return;
-  router.push({ path: '/workoutHistory', query: { date } });
+  router.push({
+    path: '/workoutHistory',
+    query: {
+      date,
+      ...(routeTargetUserId.value ? { userId: String(routeTargetUserId.value) } : {}),
+    },
+  });
 };
 
 const loadHeatmapData = async () => {

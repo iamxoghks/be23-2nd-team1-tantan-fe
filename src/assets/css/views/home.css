@@ -2422,8 +2422,8 @@
 
 .category-pill-button-active {
   border-color: var(--category-pill-accent, var(--color-brand-primary));
-  background: var(--category-pill-accent-soft, #eff6ff);
-  box-shadow: 0 4px 10px var(--category-pill-accent-shadow, rgba(37, 99, 235, 0.14));
+  background: #ffffff;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.08);
 }
 
 .category-pill-button-active .category-pill-label {
@@ -2447,7 +2447,7 @@
   }
 
   .sx-components-sections-categorypills-002:hover {
-    border-color: var(--color-brand-primary);
+    border-color: var(--color-border-base);
   }
 }
 

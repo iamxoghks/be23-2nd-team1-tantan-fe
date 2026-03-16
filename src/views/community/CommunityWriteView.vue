@@ -76,7 +76,7 @@
           <p v-if="errorMessage" class="u-text-error-xs">{{ errorMessage }}</p>
           <p v-if="selectedImageTotalCount > 0" class="v-write-selected-count">{{ selectedImageTotalCount }}개 이미지 선택됨</p>
           <div v-if="existingImagePreviews.length > 0" class="sx-views-community-communitywriteview-005">
-            <div v-for="(preview, index) in existingImagePreviews" :key="preview.id" class="sx-views-community-communitywriteview-006">
+            <div v-for="(preview, index) in existingImagePreviews" :key="preview.key" class="sx-views-community-communitywriteview-006">
               <img :src="preview.url" alt="기존 이미지 미리보기" class="v-cover-image" />
               <button class="ui-thumb-delete v-thumb-delete-hover" @click="removeExistingImage(index)">
                 <X class="v-icon-14" />
@@ -164,7 +164,7 @@ const isContentComposing = ref(false);
 const selectedImages = ref([]);
 const imagePreviews = ref([]);
 const existingImagePreviews = ref([]);
-const originalExistingImageUrls = ref([]);
+const originalExistingImagePreviews = ref([]);
 const isSubmitting = ref(false);
 const isInitializingEdit = ref(false);
 const errorMessage = ref('');
@@ -584,52 +584,51 @@ const removeExistingImage = (index) => {
   existingImagePreviews.value = existingImagePreviews.value.filter((_, idx) => idx !== index);
 };
 
-const resolveImageUrls = (source) => {
+const normalizeImagePreview = (item, index = 0) => {
+  if (typeof item === 'string') {
+    const url = String(item).trim();
+    return url ? { id: null, url, key: `existing-${index}-${url}` } : null;
+  }
+
+  const url = String(item?.imageUrl || item?.url || item?.path || item?.src || '').trim();
+  if (!url) return null;
+
+  const rawId = item?.imageId ?? item?.id ?? null;
+  const numericId = Number(rawId);
+  const normalizedId = Number.isFinite(numericId) ? numericId : null;
+
+  return {
+    id: normalizedId,
+    url,
+    key: `existing-${normalizedId ?? index}-${url}`,
+  };
+};
+
+const resolveEditableImages = (source) => {
   const candidates = Array.isArray(source?.images) ? source.images : [];
-  const fromList = candidates
-    .map((item) => {
-      if (typeof item === 'string') return item;
-      return item?.imageUrl || item?.url || item?.path || item?.src || '';
-    })
+  const normalizedList = candidates
+    .map((item, index) => normalizeImagePreview(item, index))
     .filter(Boolean);
-  if (fromList.length > 0) return fromList;
-  const single = source?.image || source?.imageUrl || '';
+
+  if (normalizedList.length > 0) return normalizedList;
+
+  const single = normalizeImagePreview(source?.image || source?.imageUrl || '', 0);
   return single ? [single] : [];
 };
 
-const urlToFile = async (url, index) => {
-  const response = await fetch(url);
-  if (!response.ok) throw new Error(`Failed to fetch image: ${url}`);
-  const blob = await response.blob();
-  const mimeType = blob.type || 'image/jpeg';
-  const ext = mimeType.includes('/') ? mimeType.split('/')[1] : 'jpg';
-  return new File([blob], `existing-${index}.${ext}`, { type: mimeType });
-};
-
 const buildUpdateImages = async () => {
-  const remainingExistingUrls = existingImagePreviews.value.map((item) => item.url);
-  const originalUrls = originalExistingImageUrls.value;
-  const unchangedExisting =
-    remainingExistingUrls.length === originalUrls.length
-    && remainingExistingUrls.every((url, index) => url === originalUrls[index]);
-  const hasNewUploads = selectedImages.value.length > 0;
-
-  if (unchangedExisting && !hasNewUploads) {
-    return [];
-  }
-
-  const existingFiles = await Promise.all(
-    remainingExistingUrls.map((url, index) => urlToFile(url, index)),
-  );
-  return [...existingFiles, ...selectedImages.value];
+  return selectedImages.value.slice();
 };
 
 const hasImageChanges = () => {
-  const remainingExistingUrls = existingImagePreviews.value.map((item) => item.url);
-  const originalUrls = originalExistingImageUrls.value;
+  const remainingExistingImages = existingImagePreviews.value;
+  const originalImages = originalExistingImagePreviews.value;
   const unchangedExisting =
-    remainingExistingUrls.length === originalUrls.length
-    && remainingExistingUrls.every((url, index) => url === originalUrls[index]);
+    remainingExistingImages.length === originalImages.length
+    && remainingExistingImages.every((image, index) => (
+      image.id === originalImages[index]?.id
+      && image.url === originalImages[index]?.url
+    ));
   return !unchangedExisting || selectedImages.value.length > 0;
 };
 
@@ -666,12 +665,9 @@ const populateEditForm = async () => {
       selectedCategory.value = targetCategory;
     }
 
-    const imageUrls = resolveImageUrls(detailSource || normalizedPost || {});
-    existingImagePreviews.value = imageUrls.map((url, index) => ({
-      id: `existing-${index}-${url}`,
-      url,
-    }));
-    originalExistingImageUrls.value = imageUrls.slice();
+    const editableImages = resolveEditableImages(detailSource || normalizedPost || {});
+    existingImagePreviews.value = editableImages.map((image) => ({ ...image }));
+    originalExistingImagePreviews.value = editableImages.map((image) => ({ ...image }));
 
     renderContentEditor({ preserveSelection: false });
   } catch (error) {
@@ -711,6 +707,9 @@ const handleSubmitPost = async () => {
     if (isEditMode.value) {
       if (hasImageChanges()) {
         postPayload.replaceImages = true;
+        postPayload.keepImageIds = existingImagePreviews.value
+          .map((image) => image.id)
+          .filter((id) => Number.isFinite(id));
         const updateImages = await buildUpdateImages();
         await communityPostApi.update(editPostId.value, {
           post: postPayload,
