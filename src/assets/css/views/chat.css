@@ -619,14 +619,6 @@
   background: #ffffff;
 }
 
-.chat-input-tools {
-  margin-bottom: 8px;
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  color: #8f8f8f;
-}
-
 .chat-input-shell {
   position: relative;
 }
@@ -704,10 +696,6 @@
   .chat-input-section {
     padding: 16px;
     padding-bottom: 16px;
-  }
-
-  .chat-input-tools {
-    margin-bottom: 12px;
   }
 }
 

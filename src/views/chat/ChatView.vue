@@ -173,7 +173,6 @@
             </div>
 
             <div class="chat-input-section">
-              <div class="chat-input-tools"><Smile :size="20" class="v-chat-action-icon" /><Paperclip :size="20" class="v-chat-action-icon" /></div>
               <div class="chat-input-shell">
                 <textarea
                   v-model="messageInput"
@@ -201,7 +200,7 @@
 import { ref, computed, onMounted, onBeforeUnmount, watch, nextTick } from 'vue';
 import { Client } from '@stomp/stompjs';
 import NavigationRail from '@/components/sections/NavigationRail.vue';
-import { Search, MessageSquare, MoreHorizontal, Send, Smile, Paperclip, ChevronLeft, X, Flag } from 'lucide-vue-next';
+import { Search, MessageSquare, MoreHorizontal, Send, ChevronLeft, X, Flag } from 'lucide-vue-next';
 import { chatApi, userApi } from '@/services/apis';
 import { extractList, extractPayload } from '@/utils/api';
 import { getAccessToken } from '@/services/token';

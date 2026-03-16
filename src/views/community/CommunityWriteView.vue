@@ -100,14 +100,7 @@
             <ImageIcon class="u-icon-20" /><span class="u-hidden-md-inline-14">사진</span>
             <input class="ux-views-community-communitywriteview-001" type="file" multiple accept="image/*" @change="handleImageChange" />
           </label>
-          <button class="ui-icon-text-action u-hover-blue v-shrink-0"><Film class="u-icon-20" /><span class="u-hidden-md-inline-14">동영상</span></button>
-          <button class="ui-icon-text-action u-hover-blue v-shrink-0"><LinkIcon class="u-icon-20" /><span class="u-hidden-md-inline-14">링크</span></button>
           <button class="v-write-attach-btn" @click="toggleWorkoutSelector"><Grid class="u-icon-20" /><span class="v-text-12-md14">기록 첨부</span></button>
-        </div>
-
-        <div class="sx-views-community-communitywriteview-008">
-          <span class="v-text-12-md14-dark">익명</span>
-          <button class="v-toggle-switch" :class="isAnonymous ? 'v-toggle-on' : 'v-toggle-off'" @click="isAnonymous = !isAnonymous"><div class="v-toggle-knob" :class="isAnonymous ? 'v-toggle-knob-on' : 'v-toggle-knob-off'" /></button>
         </div>
 
         <div v-if="showWorkoutSelector" class="v-popover-panel">
@@ -148,7 +141,7 @@
 <script setup>
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
-import { X, Image as ImageIcon, Film, Link as LinkIcon, Grid, ChevronRight, Calendar } from 'lucide-vue-next';
+import { X, Image as ImageIcon, Grid, ChevronRight, Calendar } from 'lucide-vue-next';
 import { communityPostApi, workoutApi } from '@/services/apis';
 import { extractPayload } from '@/utils/api';
 import { normalizeCommunityPost } from '@/utils/postNormalizer';
@@ -164,7 +157,6 @@ const categoryPills = [
 const selectedCategory = ref(categoryPills[0]);
 const showWorkoutSelector = ref(false);
 const attachedWorkout = ref(null);
-const isAnonymous = ref(false);
 const title = ref('');
 const content = ref('');
 const contentEditorRef = ref(null);
