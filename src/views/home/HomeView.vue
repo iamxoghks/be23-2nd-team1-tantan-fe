@@ -18,6 +18,8 @@
           :selected-gym="selectedGym"
           :on-close-gym="closeGym"
           :gyms="searchedGyms"
+          :search-keyword="appliedSearchQuery"
+          :on-search-gyms="handleDesktopSearch"
           :on-select-gym="handleSelectGym"
           :favorite-gym-ids="favoriteGymIds"
           :on-toggle-favorite-gym="toggleFavoriteGym"
@@ -51,7 +53,10 @@
             </button>
           </form>
         </div>
-        <CategoryPills />
+        <CategoryPills
+          :selected-category-name="selectedCategoryName"
+          @select="handleCategorySelect"
+        />
         <MapCanvasContainer
           :gyms="mapGyms"
           :selected-gym-id="selectedGymId"
@@ -70,6 +75,7 @@
           :map-instance="mapInstance"
           :show-favorites-only="showFavoritesOnlyOnMap"
           @toggle-favorites-only="toggleFavoritesOnlyOnMap"
+          @current-location-selected="handleCurrentLocationSelected"
         />
       </div>
     </main>
@@ -104,19 +110,22 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue';
+import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue';
+import { useRoute, useRouter } from 'vue-router';
 import NavigationRail from '@/components/sections/NavigationRail.vue';
 import SearchPanel from '@/components/sections/SearchPanel.vue';
 import MapCanvasContainer from '@/components/sections/MapCanvasContainer.vue';
 import MapControlsOverlay from '@/components/sections/MapControlsOverlay.vue';
 import CategoryPills from '@/components/sections/CategoryPills.vue';
 import { Search, X } from 'lucide-vue-next';
-import { gymApi, gymFavoriteApi, mapApi, reviewApi } from '@/services/apis';
+import { gymApi, gymFavoriteApi, mapApi } from '@/services/apis';
 import { getAccessToken } from '@/services/token';
 import { useAuthModal } from '@/composables/useAuthModal';
-import { extractList, extractPayload } from '@/utils/api';
+import { getPrimaryThumbnailImageUrl, toImageVariantItems } from '@/utils/imageVariants';
 
 const { openAuthModal } = useAuthModal();
+const route = useRoute();
+const router = useRouter();
 const isSearchPanelCollapsed = ref(false);
 const selectedGymId = ref(null);
 const mobileSheetState = ref('peek');
@@ -126,12 +135,20 @@ const favoriteGymIds = ref([]);
 const showFavoritesOnlyOnMap = ref(false);
 const mobileSearchInput = ref('');
 const appliedSearchQuery = ref('');
+const selectedCategoryName = ref('');
+const nearbyModeEnabled = ref(false);
 const routePath = ref([]);
 const routeSummary = ref(null);
 const isRouting = ref(false);
 const isDirectionModalOpen = ref(false);
 const directionTargetGym = ref(null);
 const pendingFavoriteGymIds = new Set();
+const mapIdleDebounceMs = 250;
+const gymListPageSize = 1000;
+let gymLoadSequence = 0;
+let mapIdleListener = null;
+let viewportSearchTimer = null;
+let lastGymListRequestKey = '';
 
 const selectedGym = computed(() => gyms.value.find((gym) => gym.id === selectedGymId.value) || null);
 const hasMobileSearchKeyword = computed(() => appliedSearchQuery.value.length > 0);
@@ -140,19 +157,6 @@ const mobileSheetStateClass = computed(() => {
   if (mobileSheetState.value === 'hidden') return 'home-panel-vertical-hidden';
   return 'home-panel-vertical-peek';
 });
-
-const filterGymsByKeyword = (sourceGyms, keyword) => {
-  const normalizedKeyword = keyword.trim().toLowerCase();
-  if (!normalizedKeyword) return sourceGyms;
-
-  return sourceGyms.filter((gym) => {
-    const haystack = [gym.name, gym.address, gym.location, gym.category]
-      .filter(Boolean)
-      .join(' ')
-      .toLowerCase();
-    return haystack.includes(normalizedKeyword);
-  });
-};
 
 const toGymLatLng = (gym) => {
   const lat = Number(gym?.latitude ?? gym?.lat ?? gym?.y);
@@ -244,6 +248,120 @@ const formatDuration = (duration) => {
   if (hours > 0) return `${hours}시간 ${minutes}분`;
   return `${minutes}분`;
 };
+
+const normalizeCoordinate = (value) => {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) return null;
+  return Number(numeric.toFixed(6));
+};
+
+const getMapLatLng = (latLng) => {
+  if (!latLng) return null;
+  if (typeof latLng.lat === 'function' && typeof latLng.lng === 'function') {
+    return {
+      lat: normalizeCoordinate(latLng.lat()),
+      lng: normalizeCoordinate(latLng.lng()),
+    };
+  }
+  if (Number.isFinite(latLng.y) && Number.isFinite(latLng.x)) {
+    return {
+      lat: normalizeCoordinate(latLng.y),
+      lng: normalizeCoordinate(latLng.x),
+    };
+  }
+  return null;
+};
+
+const toRadians = (value) => (Number(value) * Math.PI) / 180;
+
+const calculateDistanceMeters = (start, end) => {
+  if (!start || !end) return null;
+
+  const earthRadiusMeters = 6371000;
+  const deltaLat = toRadians(end.lat - start.lat);
+  const deltaLng = toRadians(end.lng - start.lng);
+  const startLat = toRadians(start.lat);
+  const endLat = toRadians(end.lat);
+
+  const a = Math.sin(deltaLat / 2) ** 2
+    + Math.cos(startLat) * Math.cos(endLat) * Math.sin(deltaLng / 2) ** 2;
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return earthRadiusMeters * c;
+};
+
+const computeMapViewportSearch = () => {
+  if (!mapInstance.value || !nearbyModeEnabled.value) return null;
+
+  const center = getMapLatLng(mapInstance.value.getCenter?.());
+  const bounds = mapInstance.value.getBounds?.();
+  const northEast = getMapLatLng(bounds?.getNE?.());
+  const southWest = getMapLatLng(bounds?.getSW?.());
+
+  if (!center || !northEast || !southWest) {
+    return null;
+  }
+
+  const corners = [
+    northEast,
+    southWest,
+    { lat: northEast.lat, lng: southWest.lng },
+    { lat: southWest.lat, lng: northEast.lng },
+  ];
+
+  const maxDistance = corners.reduce((acc, corner) => {
+    const distance = calculateDistanceMeters(center, corner);
+    if (!Number.isFinite(distance)) return acc;
+    return Math.max(acc, distance);
+  }, 0);
+
+  if (!Number.isFinite(maxDistance) || maxDistance <= 0) {
+    return {
+      userLatitude: center.lat,
+      userLongitude: center.lng,
+      radiusMeters: 3000,
+    };
+  }
+
+  return {
+    userLatitude: center.lat,
+    userLongitude: center.lng,
+    radiusMeters: Math.max(300, Math.round(maxDistance)),
+  };
+};
+
+const buildGymListParams = () => {
+  const params = {
+    page: 0,
+    size: gymListPageSize,
+  };
+
+  const keyword = appliedSearchQuery.value.trim();
+  if (keyword) {
+    params.name = keyword;
+  }
+
+  const category = selectedCategoryName.value.trim();
+  if (category) {
+    params.category = category;
+  }
+
+  if (nearbyModeEnabled.value) {
+    const geoParams = computeMapViewportSearch();
+    if (geoParams) {
+      params.userLatitude = geoParams.userLatitude;
+      params.userLongitude = geoParams.userLongitude;
+      params.radiusMeters = geoParams.radiusMeters;
+    }
+  }
+
+  return params;
+};
+
+const serializeGymListParams = (params = {}) => JSON.stringify(
+  Object.entries(params)
+    .filter(([, value]) => value != null && value !== '')
+    .sort(([left], [right]) => left.localeCompare(right)),
+);
 
 const closeDirectionModal = () => {
   isDirectionModalOpen.value = false;
@@ -364,9 +482,7 @@ const openArriveDirection = (gym) => {
   isDirectionModalOpen.value = true;
 };
 
-const searchedGyms = computed(() => {
-  return filterGymsByKeyword(gyms.value, appliedSearchQuery.value);
-});
+const searchedGyms = computed(() => gyms.value);
 
 const mapGyms = computed(() => {
   if (!showFavoritesOnlyOnMap.value) return searchedGyms.value;
@@ -383,6 +499,7 @@ const closeGym = () => {
   routePath.value = [];
   routeSummary.value = null;
   isRouting.value = false;
+  syncHomeDetailQuery(null);
 };
 
 const handleSelectGym = (id) => {
@@ -394,36 +511,140 @@ const handleSelectGym = (id) => {
   if (id && isSearchPanelCollapsed.value) {
     isSearchPanelCollapsed.value = false;
   }
+  syncHomeDetailQuery(id, { resetTab: true });
 };
 
 const handleMapReady = (map) => {
+  if (mapIdleListener && window.naver?.maps?.Event) {
+    window.naver.maps.Event.removeListener(mapIdleListener);
+    mapIdleListener = null;
+  }
   mapInstance.value = map;
+  if (!map || !window.naver?.maps?.Event) return;
+  mapIdleListener = window.naver.maps.Event.addListener(map, 'idle', () => {
+    if (!nearbyModeEnabled.value) return;
+    scheduleViewportSearchReload();
+  });
 };
 
-const applyMobileSearch = () => {
+const applyMobileSearch = async () => {
   appliedSearchQuery.value = mobileSearchInput.value.trim();
-  const nextGyms = filterGymsByKeyword(gyms.value, appliedSearchQuery.value);
   selectedGymId.value = null;
   isSearchPanelCollapsed.value = false;
+  syncHomeDetailQuery(null);
+  await loadGymsForCurrentContext();
   if (appliedSearchQuery.value.length > 0) {
     mobileSheetState.value = 'full';
     return;
   }
-  if (nextGyms.length > 0) {
-    mobileSheetState.value = 'peek';
-  }
+  mobileSheetState.value = 'peek';
 };
 
-const clearMobileSearch = () => {
+const clearMobileSearch = async () => {
   mobileSearchInput.value = '';
   appliedSearchQuery.value = '';
   selectedGymId.value = null;
+  syncHomeDetailQuery(null);
+  await loadGymsForCurrentContext();
   mobileSheetState.value = 'peek';
 };
 
 const setMobileSheetState = (nextState) => {
   if (!['full', 'peek', 'hidden'].includes(nextState)) return;
   mobileSheetState.value = nextState;
+};
+
+const resetSelectedGymContext = () => {
+  selectedGymId.value = null;
+  routePath.value = [];
+  routeSummary.value = null;
+  isRouting.value = false;
+  syncHomeDetailQuery(null);
+};
+
+const syncHomeDetailQuery = (gymId, options = {}) => {
+  const nextQuery = { ...route.query };
+  if (gymId) {
+    nextQuery.g = String(gymId);
+    delete nextQuery.gymId;
+  } else {
+    delete nextQuery.g;
+    delete nextQuery.gymId;
+  }
+
+  if (options.resetTab || !gymId) {
+    delete nextQuery.t;
+    delete nextQuery.tab;
+  }
+
+  const currentGymId = String(route.query.g ?? route.query.gymId ?? '');
+  const currentTab = String(route.query.t ?? route.query.tab ?? '');
+  const nextGymId = String(nextQuery.g ?? nextQuery.gymId ?? '');
+  const nextTab = String(nextQuery.t ?? nextQuery.tab ?? '');
+  if (currentGymId === nextGymId && currentTab === nextTab) return;
+
+  router.replace({ path: route.path, query: nextQuery }).catch(() => {});
+};
+
+const syncSelectedGymFromRoute = () => {
+  const queryGymId = String(route.query.g ?? route.query.gymId ?? '').trim();
+  if (!queryGymId) {
+    if (selectedGymId.value != null) {
+      closeGym();
+    }
+    return;
+  }
+
+  if (selectedGymId.value === queryGymId) {
+    if (mobileSheetState.value !== 'full') {
+      mobileSheetState.value = 'full';
+    }
+    return;
+  }
+
+  const targetGym = gyms.value.find((gym) => String(gym.id) === queryGymId);
+  if (!targetGym) return;
+
+  selectedGymId.value = queryGymId;
+  mobileSheetState.value = 'full';
+  routePath.value = [];
+  routeSummary.value = null;
+  isRouting.value = false;
+
+  if (isSearchPanelCollapsed.value) {
+    isSearchPanelCollapsed.value = false;
+  }
+};
+
+const handleCategorySelect = async (category) => {
+  const clickedCategoryName = String(category?.name || '').trim();
+  const nextCategoryName = selectedCategoryName.value === clickedCategoryName ? '' : clickedCategoryName;
+
+  selectedCategoryName.value = nextCategoryName;
+  resetSelectedGymContext();
+
+  if (mobileSheetState.value === 'hidden') {
+    mobileSheetState.value = 'peek';
+  }
+
+  await loadGymsForCurrentContext();
+};
+
+const handleDesktopSearch = async (keyword) => {
+  appliedSearchQuery.value = String(keyword || '').trim();
+  mobileSearchInput.value = appliedSearchQuery.value;
+  resetSelectedGymContext();
+
+  if (mobileSheetState.value === 'hidden') {
+    mobileSheetState.value = 'peek';
+  }
+
+  await loadGymsForCurrentContext();
+};
+
+const handleCurrentLocationSelected = () => {
+  nearbyModeEnabled.value = true;
+  scheduleViewportSearchReload(true);
 };
 
 const toggleFavoriteGym = async (id) => {
@@ -469,18 +690,14 @@ const normalizeGym = (gym) => ({
   color: gym.color || '#1a1a1a',
 });
 
-const syncGymFromDetail = (detail) => {
+const syncGymFromDetail = (detail, requestId = gymLoadSequence) => {
+  if (requestId !== gymLoadSequence) return;
+
   const targetId = String(detail?.id ?? detail?.gymId ?? '').trim();
   if (!targetId) return;
 
-  const imageList = Array.isArray(detail?.images) ? detail.images : [];
-  const firstImage = imageList.find((item) => {
-    if (typeof item === 'string') return Boolean(item);
-    return Boolean(item?.imageUrl || item?.url || item?.path || item?.src);
-  });
-  const imageUrl = typeof firstImage === 'string'
-    ? firstImage
-    : firstImage?.imageUrl || firstImage?.url || firstImage?.path || firstImage?.src || '';
+  const imageList = toImageVariantItems(detail?.images);
+  const imageUrl = getPrimaryThumbnailImageUrl(imageList);
 
   gyms.value = gyms.value.map((gym) => {
     if (String(gym.id) !== targetId) return gym;
@@ -501,99 +718,48 @@ const syncGymFromDetail = (detail) => {
   });
 };
 
-const refreshGymSummariesFromDetails = async () => {
-  const gymIds = gyms.value
-    .map((gym) => String(gym.id || '').trim())
-    .filter(Boolean)
-    .slice(0, 30);
+const loadGyms = async (params = {}, options = {}) => {
+  const { force = false } = options;
+  const requestId = ++gymLoadSequence;
+  const requestKey = serializeGymListParams(params);
 
-  if (gymIds.length === 0) return;
-
-  await Promise.allSettled(gymIds.map(async (gymId) => {
-    try {
-      const response = await gymApi.detail(gymId);
-      const payload = response.data?.data || response.data?.result || response.data;
-      if (payload) {
-        syncGymFromDetail(payload);
-      }
-    } catch (error) {
-      // keep list data as-is when one detail request fails
-    }
-  }));
-};
-
-const refreshGymReviewStatsFromReviews = async () => {
-  const targetGymIds = new Set(
-    gyms.value
-      .map((gym) => String(gym.id || '').trim())
-      .filter(Boolean),
-  );
-  if (targetGymIds.size === 0) return;
-
-  const statsByGymId = new Map();
-  const pageSize = 100;
-  const maxPages = 50;
-  let page = 0;
-  let totalPages = null;
-
-  while (page < maxPages) {
-    let list = [];
-
-    try {
-      const response = await reviewApi.listPage({ page, size: pageSize });
-      const payload = extractPayload(response, {});
-      list = extractList(payload);
-      const parsedTotalPages = Number(payload?.totalPages);
-      if (Number.isFinite(parsedTotalPages) && parsedTotalPages > 0) {
-        totalPages = parsedTotalPages;
-      }
-    } catch (error) {
-      break;
-    }
-
-    if (list.length === 0) break;
-
-    list.forEach((item) => {
-      const gymId = String(item?.gymId ?? item?.gym?.id ?? '').trim();
-      if (!gymId || !targetGymIds.has(gymId)) return;
-
-      const current = statsByGymId.get(gymId) || { sum: 0, count: 0 };
-      const rating = Number(item?.rating || 0);
-      statsByGymId.set(gymId, {
-        sum: current.sum + (Number.isFinite(rating) ? rating : 0),
-        count: current.count + 1,
-      });
-    });
-
-    if (totalPages != null && page >= totalPages - 1) break;
-    if (list.length < pageSize) break;
-    page += 1;
+  if (!force && requestKey === lastGymListRequestKey) {
+    return;
   }
 
-  if (statsByGymId.size === 0) return;
+  lastGymListRequestKey = requestKey;
 
-  gyms.value = gyms.value.map((gym) => {
-    const gymId = String(gym.id || '').trim();
-    const stat = statsByGymId.get(gymId);
-    if (!stat || stat.count <= 0) return gym;
-    return {
-      ...gym,
-      rating: stat.sum / stat.count,
-      reviews: stat.count,
-    };
-  });
-};
-
-const loadGyms = async () => {
   try {
-    const response = await gymApi.list();
+    const response = await gymApi.list(params);
     const list = response.data?.data || response.data?.result || response.data;
+    if (requestId !== gymLoadSequence) return;
+
     gyms.value = (Array.isArray(list) ? list : []).map((gym) => normalizeGym(gym));
-    await refreshGymSummariesFromDetails();
-    await refreshGymReviewStatsFromReviews();
+
+    if (selectedGymId.value && !gyms.value.some((gym) => gym.id === selectedGymId.value)) {
+      resetSelectedGymContext();
+    }
   } catch (error) {
+    if (lastGymListRequestKey === requestKey) {
+      lastGymListRequestKey = '';
+    }
     console.error('Failed to load gyms:', error);
   }
+};
+
+const loadGymsForCurrentContext = async (options = {}) => {
+  await loadGyms(buildGymListParams(), options);
+};
+
+const scheduleViewportSearchReload = (force = false) => {
+  if (viewportSearchTimer) {
+    clearTimeout(viewportSearchTimer);
+  }
+  viewportSearchTimer = setTimeout(() => {
+    loadGymsForCurrentContext({ force }).catch((error) => {
+      console.error('Failed to reload nearby gyms:', error);
+    });
+  }, mapIdleDebounceMs);
 };
 
 const loadFavoriteGyms = async () => {
@@ -612,7 +778,23 @@ const loadFavoriteGyms = async () => {
 };
 
 onMounted(async () => {
-  await loadGyms();
+  await loadGymsForCurrentContext();
   await loadFavoriteGyms();
+  syncSelectedGymFromRoute();
+});
+
+onBeforeUnmount(() => {
+  if (viewportSearchTimer) {
+    clearTimeout(viewportSearchTimer);
+    viewportSearchTimer = null;
+  }
+  if (mapIdleListener && window.naver?.maps?.Event) {
+    window.naver.maps.Event.removeListener(mapIdleListener);
+    mapIdleListener = null;
+  }
+});
+
+watch(() => [route.query.g, route.query.gymId, gyms.value.length], () => {
+  syncSelectedGymFromRoute();
 });
 </script>

@@ -60,10 +60,12 @@
 
           <section class="settings-section">
             <h2>편의시설</h2>
-            <label class="settings-field">
-              <span>편의시설 코드 (쉼표 구분)</span>
-              <input v-model="amenitiesInput" type="text" placeholder="PARKING, SHOWER, WIFI" />
-            </label>
+            <div class="settings-amenities-grid">
+              <label v-for="amenity in availableAmenities" :key="amenity.code" class="settings-checkbox-field">
+                <input type="checkbox" :value="amenity.code" v-model="selectedAmenities" />
+                <span>{{ amenity.label }}</span>
+              </label>
+            </div>
             <button class="v-modal-save-btn settings-action-btn" :disabled="isSavingAmenities" @click="saveAmenities">
               {{ isSavingAmenities ? '저장 중...' : '편의시설 저장' }}
             </button>
@@ -131,6 +133,33 @@
           </section>
 
           <section class="settings-section">
+            <h2>예약 슬롯 관리 (자동 생성)</h2>
+            <div class="settings-grid-2">
+              <label class="settings-field">
+                <span>날짜</span>
+                <input v-model="reservationForm.date" type="date" />
+              </label>
+              <label class="settings-field">
+                <span>예약명</span>
+                <input v-model="reservationForm.slotName" type="text" placeholder="예: 1:1 PT 수업" />
+              </label>
+            </div>
+            <div class="settings-grid-2">
+              <label class="settings-field">
+                <span>가격 (원)</span>
+                <input v-model.number="reservationForm.price" type="number" min="0" step="1000" />
+              </label>
+              <label class="settings-field">
+                <span>정원 (명)</span>
+                <input v-model.number="reservationForm.maxCapacity" type="number" min="1" />
+              </label>
+            </div>
+            <button class="v-modal-save-btn settings-action-btn" :disabled="isCreatingReservation" @click="createDailySlots">
+              {{ isCreatingReservation ? '생성 중...' : '예약 슬롯 일괄 생성' }}
+            </button>
+          </section>
+
+          <section class="settings-section">
             <h2>계정 보안</h2>
             <div class="settings-grid-3">
               <label class="settings-field">
@@ -162,7 +191,7 @@
 <script setup>
 import { onMounted, ref } from 'vue';
 import NavigationRail from '@/components/sections/NavigationRail.vue';
-import { gymApi, userApi } from '@/services/apis';
+import { gymApi, userApi, reservationApi } from '@/services/apis';
 import { extractPayload } from '@/utils/api';
 
 const DAY_ORDER = ['MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY', 'SUNDAY'];
@@ -192,7 +221,16 @@ const gymProfile = ref({
 });
 
 const hours = ref(defaultHours());
-const amenitiesInput = ref('');
+const availableAmenities = [
+  { code: 'FREE_WIFI', label: '무료 Wi-Fi' },
+  { code: 'SHOWER', label: '샤워실' },
+  { code: 'PARKING', label: '주차 가능' },
+  { code: 'PERSONAL_TRAINING', label: 'PT 가능' },
+  { code: 'LOCKER', label: '락커' },
+  { code: 'INBODY', label: '인바디' },
+  { code: 'LAUNDRY', label: '세탁실' },
+];
+const selectedAmenities = ref([]);
 const products = ref([{ productName: '', price: 0 }]);
 const exceptions = ref([]);
 const exceptionForm = ref({
@@ -209,12 +247,21 @@ const passwordForm = ref({
   newPasswordConfirm: '',
 });
 
+const gymId = ref(null);
+const reservationForm = ref({
+  date: '',
+  slotName: '1:1 PT 수업',
+  price: 50000,
+  maxCapacity: 1,
+});
+
 const isSavingProfile = ref(false);
 const isSavingHours = ref(false);
 const isSavingAmenities = ref(false);
 const isSavingProducts = ref(false);
 const isCreatingException = ref(false);
 const isSavingPassword = ref(false);
+const isCreatingReservation = ref(false);
 const message = ref('');
 const errorMessage = ref('');
 
@@ -254,6 +301,8 @@ const loadMyGym = async () => {
   const response = await gymApi.myGym();
   const payload = extractPayload(response);
 
+  gymId.value = payload.id || payload.gymId || null;
+
   let draft = null;
   try {
     const draftRaw = localStorage.getItem('gymOwnerOnboardingDraft');
@@ -285,9 +334,9 @@ const loadMyGym = async () => {
   }
 
   const amenityList = payload.amenities || payload.amenityCodes || [];
-  if (Array.isArray(amenityList) && amenityList.length > 0) {
-    amenitiesInput.value = amenityList.join(', ');
-  }
+  selectedAmenities.value = Array.isArray(amenityList)
+    ? amenityList.map((a) => (typeof a === 'object' && a !== null ? a.code || a.amenityCode || a.name : a))
+    : [];
 
   const productList = payload.products || [];
   if (Array.isArray(productList) && productList.length > 0) {
@@ -295,6 +344,49 @@ const loadMyGym = async () => {
       productName: item.productName || item.name || '',
       price: Number(item.price || 0),
     }));
+  }
+};
+
+const createDailySlots = async () => {
+  if (!gymId.value) {
+    errorMessage.value = '짐 정보를 불러오지 못했습니다. 새로고침 후 다시 시도해주세요.';
+    return;
+  }
+  if (!reservationForm.value.date) {
+    errorMessage.value = '예약 슬롯을 생성할 날짜를 선택해주세요.';
+    return;
+  }
+  if (reservationForm.value.price < 0) {
+    errorMessage.value = '가격은 0원 이상이어야 합니다.';
+    return;
+  }
+  if (reservationForm.value.maxCapacity < 1) {
+    errorMessage.value = '정원은 1명 이상이어야 합니다.';
+    return;
+  }
+
+  isCreatingReservation.value = true;
+  message.value = '';
+  errorMessage.value = '';
+
+  try {
+    await reservationApi.createDailySlots(gymId.value, {
+      date: reservationForm.value.date,
+      slotName: reservationForm.value.slotName,
+      price: reservationForm.value.price,
+      maxCapacity: reservationForm.value.maxCapacity,
+    });
+    
+    message.value = `${reservationForm.value.date} 예약 슬롯이 성공적으로 생성되었습니다.`;
+    
+    reservationForm.value.date = '';
+    reservationForm.value.slotName = '1:1 PT 수업';
+    reservationForm.value.price = 50000;
+    reservationForm.value.maxCapacity = 1;
+  } catch (error) {
+    errorMessage.value = error?.response?.data?.message || '예약 슬롯 생성에 실패했습니다. 영업시간이 설정되어 있는지 확인해주세요.';
+  } finally {
+    isCreatingReservation.value = false;
   }
 };
 
@@ -342,11 +434,7 @@ const saveAmenities = async () => {
   message.value = '';
   errorMessage.value = '';
   try {
-    const payload = amenitiesInput.value
-      .split(',')
-      .map((item) => item.trim())
-      .filter(Boolean);
-    await gymApi.replaceAmenities(payload);
+    await gymApi.replaceAmenities(selectedAmenities.value);
     message.value = '편의시설이 저장되었습니다.';
   } catch (error) {
     errorMessage.value = '편의시설 저장에 실패했습니다.';
@@ -624,6 +712,33 @@ onMounted(async () => {
   margin: 0;
   font-size: 13px;
   color: #dc2626;
+}
+
+.settings-amenities-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  gap: 12px;
+  padding: 16px;
+  background-color: #f1f5f9;
+  border-radius: 12px;
+  margin-bottom: 12px;
+}
+
+.settings-checkbox-field {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  font-size: 14px;
+  color: #1e293b;
+  user-select: none;
+}
+
+.settings-checkbox-field input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  cursor: pointer;
+  accent-color: #2563eb;
 }
 
 @media (min-width: 900px) {
