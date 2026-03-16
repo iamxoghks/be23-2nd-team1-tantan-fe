@@ -346,7 +346,9 @@
             </div>
             <div class="v-profile-edit-actions">
               <RouterLink :to="profileLink" class="v-modal-cancel-btn v-profile-edit-action-btn">취소</RouterLink>
-              <button class="v-modal-save-btn v-profile-edit-action-btn" type="button" :disabled="isBioOverLimit" @click="saveProfile">수정하기</button>
+              <button class="v-modal-save-btn v-profile-edit-action-btn" type="button" :disabled="isBioOverLimit || isSavingProfile" @click="saveProfile">
+                {{ isSavingProfile ? '저장 중...' : '수정하기' }}
+              </button>
             </div>
           </div>
           <div class="v-profile-edit-account-bottom">
@@ -354,12 +356,72 @@
               type="button"
               class="v-profile-delete-link"
               :disabled="isProcessingAccountAction"
-              @click="deleteAccount"
+              @click="openDeleteAccountModal"
             >
               회원탈퇴
             </button>
           </div>
         </template>
+      </div>
+    </div>
+
+    <div
+      v-if="profileSaveModal.open"
+      class="view-modal-backdrop v-profile-save-modal-backdrop"
+      role="button"
+      tabindex="0"
+      aria-label="프로필 수정 결과 모달 닫기"
+      @click.self="handleProfileSaveModalConfirm"
+      @keyup.enter="handleProfileSaveModalConfirm"
+    >
+      <div class="view-modal-panel v-profile-save-modal" role="dialog" aria-modal="true" aria-labelledby="profile-save-modal-title" @click.stop>
+        <div class="v-profile-save-modal-body">
+          <h2 id="profile-save-modal-title" class="v-modal-title">{{ profileSaveModal.title }}</h2>
+          <p class="v-profile-save-modal-copy">{{ profileSaveModal.message }}</p>
+          <p
+            v-if="profileSaveModal.detail"
+            class="v-profile-save-modal-detail"
+            :class="profileSaveModal.tone === 'error' ? 'v-profile-save-modal-detail-error' : ''"
+          >
+            {{ profileSaveModal.detail }}
+          </p>
+        </div>
+        <div class="v-profile-save-modal-actions">
+          <button type="button" class="v-modal-save-btn v-profile-save-modal-confirm" @click="handleProfileSaveModalConfirm">
+            확인
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <div
+      v-if="isDeleteAccountModalOpen"
+      class="view-modal-backdrop v-profile-delete-modal-backdrop"
+      role="button"
+      tabindex="0"
+      aria-label="회원탈퇴 확인 모달 닫기"
+      @click.self="closeDeleteAccountModal"
+      @keyup.enter="closeDeleteAccountModal"
+    >
+      <div class="view-modal-panel v-profile-delete-modal" role="dialog" aria-modal="true" aria-labelledby="delete-account-modal-title" @click.stop>
+        <div class="v-profile-delete-modal-body">
+          <h2 id="delete-account-modal-title" class="v-modal-title">회원탈퇴</h2>
+          <p class="v-profile-delete-modal-copy">
+            정말 회원탈퇴를 진행하시겠습니까?
+          </p>
+          <p class="v-profile-delete-modal-copy v-profile-delete-modal-copy-muted">
+            탈퇴 후에는 계정을 다시 복구할 수 없습니다.
+          </p>
+          <p v-if="deleteAccountError" class="v-profile-delete-modal-error">{{ deleteAccountError }}</p>
+        </div>
+        <div class="v-profile-delete-modal-actions">
+          <button type="button" class="v-modal-cancel-btn" :disabled="isProcessingAccountAction" @click="closeDeleteAccountModal">
+            취소
+          </button>
+          <button type="button" class="v-modal-save-btn v-profile-delete-modal-confirm" :disabled="isProcessingAccountAction" @click="deleteAccount">
+            {{ isProcessingAccountAction ? '처리 중...' : '탈퇴하기' }}
+          </button>
+        </div>
       </div>
     </div>
   </div>
@@ -377,7 +439,7 @@ import { useRouter, RouterLink, useRoute } from 'vue-router';
 import NavigationRail from '@/components/sections/NavigationRail.vue';
 import { ArrowLeft, UserRound, Camera } from 'lucide-vue-next';
 import { gymApi, userApi, reservationApi } from '@/services/apis';
-import { normalizeRole } from '@/services/token';
+import { normalizeRole, setAuthTokens } from '@/services/token';
 import { notifyAuthInvalidated } from '@/services/authLifecycle';
 import { extractPayload } from '@/utils/api';
 import { useSession } from '@/composables/useSession';
@@ -391,11 +453,13 @@ const BIO_CIRCLE_RADIUS = 10;
 const BIO_CIRCLE_CIRCUMFERENCE = 2 * Math.PI * BIO_CIRCLE_RADIUS;
 
 const previewRole = computed(() => normalizeRole(route.query.previewRole));
-const effectiveRole = computed(() => previewRole.value || normalizeRole(sessionProfile.value?.role) || 'USER');
+const loadedProfileRole = ref(null);
+const effectiveRole = computed(() => previewRole.value || loadedProfileRole.value || normalizeRole(sessionProfile.value?.role) || 'USER');
 const isGymOwner = computed(() => effectiveRole.value === 'GYM_OWNER');
+const profileNavigationRole = computed(() => previewRole.value || loadedProfileRole.value || (isGymOwner.value ? 'GYM_OWNER' : null));
 const profileLink = computed(() => (
-  previewRole.value
-    ? { path: '/profile', query: { previewRole: previewRole.value } }
+  profileNavigationRole.value
+    ? { path: '/profile', query: { previewRole: profileNavigationRole.value } }
     : { path: '/profile' }
 ));
 
@@ -419,6 +483,17 @@ const emailVerifyError = ref('');
 const profileImageInputRef = ref(null);
 const profileImageFile = ref(null);
 const profileImagePreviewUrl = ref(null);
+const isSavingProfile = ref(false);
+const profileSaveModal = ref({
+  open: false,
+  tone: 'success',
+  title: '',
+  message: '',
+  detail: '',
+  redirectToProfile: false,
+});
+const isDeleteAccountModalOpen = ref(false);
+const deleteAccountError = ref('');
 
 const bioEditorRef = ref(null);
 const isBioComposing = ref(false);
@@ -814,10 +889,56 @@ const verifyEmailCode = async () => {
   }
 };
 
+const extractProfileSaveErrorMessage = (error) => {
+  const serverMessage = String(
+    error?.response?.data?.error_message
+      || error?.response?.data?.message
+      || error?.response?.data?.error
+      || '',
+  ).trim();
+
+  if (serverMessage) return serverMessage;
+  if (!error?.response) return '백엔드 연결에 실패했습니다. API 주소/CORS 설정을 확인해주세요.';
+  return '프로필 수정 중 오류가 발생했습니다.';
+};
+
+const normalizeBearerToken = (value) => {
+  const raw = String(value || '').trim();
+  if (!raw) return '';
+  return raw.replace(/^Bearer\s+/i, '').trim();
+};
+
+const openProfileSaveModal = ({ tone = 'success', title = '', message = '', detail = '', redirectToProfile = false } = {}) => {
+  profileSaveModal.value = {
+    open: true,
+    tone,
+    title,
+    message,
+    detail,
+    redirectToProfile,
+  };
+};
+
+const handleProfileSaveModalConfirm = () => {
+  const shouldRedirect = Boolean(profileSaveModal.value.redirectToProfile);
+  profileSaveModal.value = {
+    open: false,
+    tone: 'success',
+    title: '',
+    message: '',
+    detail: '',
+    redirectToProfile: false,
+  };
+  if (shouldRedirect) {
+    router.push(profileLink.value);
+  }
+};
+
 const loadProfile = async () => {
   try {
     const response = await userApi.myInfo();
     const data = extractPayload(response);
+    loadedProfileRole.value = normalizeRole(data.role);
     form.value.userName = data.userName || data.name || data.displayName || '';
     form.value.nickName = data.nickName || data.nickname || '';
     form.value.email = data.email || '';
@@ -832,6 +953,25 @@ const loadProfile = async () => {
   }
   await nextTick();
   renderBioEditor();
+};
+
+const initializeProfileEditView = async () => {
+  primeSessionFromToken();
+  try {
+    await syncSessionFromServer();
+  } catch (error) {
+    // preview mode fallback
+  }
+
+  if (previewRole.value === 'GYM_OWNER' || normalizeRole(sessionProfile.value?.role) === 'GYM_OWNER') {
+    await loadGym();
+    return;
+  }
+
+  await loadProfile();
+  if (isGymOwner.value) {
+    await loadGym();
+  }
 };
 
 const openProfileImagePicker = () => {
@@ -870,15 +1010,16 @@ watch(
 
 const saveProfile = async () => {
   syncBioFromEditor({ preserveSelection: false });
-  if (isBioOverLimit.value) return;
+  if (isBioOverLimit.value || isSavingProfile.value) return;
   if (isEmailChangeRequested.value && !isEmailChangeVerifiedForCurrent.value) {
     emailVerifyError.value = '이메일 변경 시 인증을 완료해주세요.';
     emailVerifyMessage.value = '';
     return;
   }
 
+  isSavingProfile.value = true;
   try {
-    await userApi.update({
+    const response = await userApi.update({
       userName: form.value.userName,
       nickName: form.value.nickName,
       email: form.value.email,
@@ -887,25 +1028,58 @@ const saveProfile = async () => {
       showStats: form.value.showStats,
       profileImage: profileImageFile.value || undefined,
     });
-    router.push(profileLink.value);
+
+    const accessToken = normalizeBearerToken(response?.headers?.authorization);
+    const refreshToken = String(response?.headers?.['x-refresh-token'] || '').trim();
+    if (accessToken || refreshToken) {
+      setAuthTokens({ accessToken, refreshToken });
+    }
+
+    openProfileSaveModal({
+      tone: 'success',
+      title: '프로필 수정 완료',
+      message: '수정되었습니다.',
+      redirectToProfile: true,
+    });
   } catch (error) {
     console.error('Failed to update profile:', error);
-    router.push(profileLink.value);
+    openProfileSaveModal({
+      tone: 'error',
+      title: '프로필 수정 실패',
+      message: '프로필을 수정하지 못했습니다.',
+      detail: extractProfileSaveErrorMessage(error),
+      redirectToProfile: false,
+    });
+  } finally {
+    isSavingProfile.value = false;
   }
+};
+
+const openDeleteAccountModal = () => {
+  if (isProcessingAccountAction.value) return;
+  deleteAccountError.value = '';
+  isDeleteAccountModalOpen.value = true;
+};
+
+const closeDeleteAccountModal = () => {
+  if (isProcessingAccountAction.value) return;
+  deleteAccountError.value = '';
+  isDeleteAccountModalOpen.value = false;
 };
 
 const deleteAccount = async () => {
   if (isProcessingAccountAction.value) return;
-  if (!window.confirm('정말 회원탈퇴를 진행하시겠습니까?')) return;
 
   isProcessingAccountAction.value = true;
+  deleteAccountError.value = '';
   try {
     await userApi.delete();
+    isDeleteAccountModalOpen.value = false;
     notifyAuthInvalidated({ reason: 'account_deleted' });
     router.push('/');
   } catch (error) {
+    deleteAccountError.value = '회원탈퇴에 실패했습니다.';
     isProcessingAccountAction.value = false;
-    window.alert('회원탈퇴에 실패했습니다.');
   }
 };
 
@@ -1148,18 +1322,7 @@ const deleteImage = async (image) => {
 };
 
 onMounted(async () => {
-  primeSessionFromToken();
-  try {
-    await syncSessionFromServer();
-  } catch (error) {
-    // preview mode fallback
-  }
-
-  if (isGymOwner.value) {
-    await loadGym();
-    return;
-  }
-  await loadProfile();
+  await initializeProfileEditView();
 });
 </script>
 
@@ -1434,6 +1597,94 @@ onMounted(async () => {
   text-decoration: none;
 }
 
+.v-profile-save-modal-backdrop {
+  padding: 20px;
+}
+
+.v-profile-save-modal {
+  width: min(420px, 100%);
+  border-radius: 24px;
+}
+
+.v-profile-save-modal-body {
+  padding: 24px 24px 16px;
+}
+
+.v-profile-save-modal-copy {
+  margin: 12px 0 0;
+  font-size: 14px;
+  line-height: 1.6;
+  color: #334155;
+}
+
+.v-profile-save-modal-detail {
+  margin: 8px 0 0;
+  font-size: 13px;
+  line-height: 1.5;
+  color: #64748b;
+}
+
+.v-profile-save-modal-detail-error {
+  color: #dc2626;
+}
+
+.v-profile-save-modal-actions {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 10px;
+  padding: 0 24px 24px;
+}
+
+.v-profile-save-modal-confirm {
+  width: 100%;
+}
+
+.v-profile-delete-modal-backdrop {
+  padding: 20px;
+}
+
+.v-profile-delete-modal {
+  width: min(420px, 100%);
+  border-radius: 24px;
+}
+
+.v-profile-delete-modal-body {
+  padding: 24px 24px 16px;
+}
+
+.v-profile-delete-modal-copy {
+  margin: 12px 0 0;
+  font-size: 14px;
+  line-height: 1.6;
+  color: #334155;
+}
+
+.v-profile-delete-modal-copy-muted {
+  margin-top: 6px;
+  color: #64748b;
+}
+
+.v-profile-delete-modal-error {
+  margin: 14px 0 0;
+  font-size: 13px;
+  color: #dc2626;
+}
+
+.v-profile-delete-modal-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  padding: 0 24px 24px;
+}
+
+.v-profile-delete-modal-confirm {
+  background: #dc2626;
+}
+
+.v-profile-delete-modal-confirm:hover {
+  background: #b91c1c;
+}
+
 @media (min-width: 900px) {
   .owner-edit-grid-2 {
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -1441,6 +1692,24 @@ onMounted(async () => {
 
   .owner-edit-image-grid {
     grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 767px) {
+  .v-profile-save-modal-body {
+    padding: 20px 18px 14px;
+  }
+
+  .v-profile-save-modal-actions {
+    padding: 0 18px 18px;
+  }
+
+  .v-profile-delete-modal-body {
+    padding: 20px 18px 14px;
+  }
+
+  .v-profile-delete-modal-actions {
+    padding: 0 18px 18px;
   }
 }
 </style>

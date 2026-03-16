@@ -110,7 +110,7 @@
                 <h3 class="v-owner-panel-title">기본 정보</h3>
                 <div class="v-owner-read-grid">
                   <p class="v-owner-read-item"><span>전화번호</span><strong>{{ gymOwnerForm.tel || '-' }}</strong></p>
-                  <p class="v-owner-read-item"><span>카테고리 ID</span><strong>{{ gymOwnerForm.categoryId || '-' }}</strong></p>
+                  <p class="v-owner-read-item"><span>카테고리</span><strong>{{ gymOwnerCategoryName }}</strong></p>
                   <p class="v-owner-read-item v-owner-read-item-full"><span>주소</span><strong>{{ gymOwnerForm.address || '-' }}</strong></p>
                 </div>
               </div>
@@ -750,8 +750,8 @@ const activeFollowList = computed(() => (
 const followerCountText = computed(() => formatFollowCount(followCounts.value.followerCount));
 const followingCountText = computed(() => formatFollowCount(followCounts.value.followingCount));
 const gymOwnerEditLink = computed(() => (
-  previewRole.value
-    ? { path: '/profile/edit', query: { previewRole: previewRole.value } }
+  (previewRole.value || (isOwnProfile.value && isGymOwner.value ? 'GYM_OWNER' : null))
+    ? { path: '/profile/edit', query: { previewRole: previewRole.value || 'GYM_OWNER' } }
     : { path: '/profile/edit' }
 ));
 
@@ -777,7 +777,8 @@ const gymOwnerForm = ref({
   name: '',
   address: '',
   description: '',
-  categoryId: 1,
+  categoryId: null,
+  categoryName: '',
   tel: '',
 });
 const gymOwnerHours = ref(defaultHours());
@@ -807,6 +808,14 @@ const isUploadingGymImages = ref(false);
 const isDeletingGymImage = ref(false);
 const gymOwnerMessage = ref('');
 const gymOwnerError = ref('');
+const gymOwnerCategoryName = computed(() => {
+  const categoryName = String(
+    gymOwnerForm.value.categoryName
+    || gymOwnerForm.value.category
+    || '',
+  ).trim();
+  return categoryName || '-';
+});
 const amenityCount = computed(() => gymOwnerAmenitiesInput.value
   .split(',')
   .map((item) => item.trim())
@@ -1074,7 +1083,14 @@ const applyGymOwnerData = (payload = {}) => {
   gymOwnerForm.value.name = payload.name || '';
   gymOwnerForm.value.address = payload.address || '';
   gymOwnerForm.value.description = payload.description || '';
-  gymOwnerForm.value.categoryId = Number(payload.categoryId || 1);
+  const categoryId = Number(payload.categoryId ?? payload.category?.id ?? 0);
+  gymOwnerForm.value.categoryId = Number.isFinite(categoryId) && categoryId > 0 ? categoryId : null;
+  gymOwnerForm.value.categoryName = String(
+    payload.categoryName
+    || payload.category?.name
+    || (typeof payload.category === 'string' ? payload.category : '')
+    || '',
+  ).trim();
   gymOwnerForm.value.tel = payload.tel || payload.phone || '';
 
   const hours = payload.hours || payload.businessHours || payload.gymHours || [];
@@ -1363,6 +1379,7 @@ const loadProfileData = async () => {
     } else {
       logs.value = [];
     }
+
     let gymPayload = null;
     if (isGymOwner.value) {
       if (isOwnProfile.value) {
@@ -2127,6 +2144,25 @@ onBeforeUnmount(() => {
 }
 
 @media (max-width: 767px) {
+  .v-profile-activity-grid-scroll {
+    overflow-x: auto;
+    overflow-y: hidden;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior-x: contain;
+    padding-bottom: 6px;
+  }
+
+  .v-profile-activity-grid-scroll::-webkit-scrollbar {
+    display: none;
+  }
+
+  .v-profile-heatmap-month-row,
+  .v-profile-activity-grid-scroll .sx-views-user-profile-profileview-012 {
+    width: max-content;
+    min-width: max-content;
+    grid-template-columns: repeat(var(--heatmap-week-count, 53), 14px);
+  }
+
   .v-profile-year-button {
     width: auto;
     min-height: auto;

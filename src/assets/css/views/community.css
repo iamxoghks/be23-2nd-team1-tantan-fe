@@ -317,7 +317,6 @@
 .sx-views-community-communitywriteview-005 { @apply flex flex-wrap gap-3; }
 .sx-views-community-communitywriteview-006 { @apply relative w-[92px] h-[92px] rounded-xl overflow-hidden border border-[#e5e7eb] bg-[#f8fafc]; }
 .sx-views-community-communitywriteview-007 { @apply flex items-center gap-3.5 md:gap-6 overflow-x-auto py-1 mr-2; }
-.sx-views-community-communitywriteview-008 { @apply flex items-center gap-1.5 md:gap-3 shrink-0; }
 .sx-views-community-communitywriteview-009 { @apply p-1; }
 .sx-views-community-communitywriteview-010 { @apply flex justify-between items-center mb-1; }
 .v-community-write-screen { @apply h-[100dvh] w-full flex bg-white overflow-hidden; }

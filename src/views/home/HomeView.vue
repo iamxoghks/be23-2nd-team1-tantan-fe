@@ -7,6 +7,7 @@
         :class="[
           isSearchPanelCollapsed ? 'home-panel-state-collapsed' : 'home-panel-state-open',
           hasMobileSearchKeyword && !selectedGym ? 'home-panel-mobile-search-results' : '',
+          mobileSheetState === 'full' && selectedGym ? 'home-panel-mobile-detail-open' : '',
           mobileSheetStateClass,
         ]"
       >
