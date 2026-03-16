@@ -18,7 +18,8 @@
         ]"
         type="button"
         :aria-pressed="isCategorySelected(category)"
-        @click="handleCategoryClick(category)"
+        :style="getCategoryAccentStyle(category)"
+        @click="handleCategoryClick($event, category)"
       >
         <span class="category-pill-icon material-symbols-rounded" :style="{ color: category.color }">
           {{ category.material }}
@@ -48,7 +49,8 @@
         ]"
         type="button"
         :aria-pressed="isCategorySelected(category)"
-        @click="handleCategoryClick(category)"
+        :style="getCategoryAccentStyle(category)"
+        @click="handleCategoryClick($event, category)"
       >
         <span class="category-pill-icon material-symbols-rounded" :style="{ color: category.color }">
           {{ category.material }}
@@ -138,14 +140,36 @@ const isCategorySelected = (category) => {
   return current.length > 0 && current === target;
 };
 
+const hexToRgb = (hex) => {
+  const normalized = String(hex || '').trim().replace('#', '');
+  if (!/^[\da-fA-F]{6}$/.test(normalized)) return null;
+
+  return {
+    r: Number.parseInt(normalized.slice(0, 2), 16),
+    g: Number.parseInt(normalized.slice(2, 4), 16),
+    b: Number.parseInt(normalized.slice(4, 6), 16),
+  };
+};
+
+const getCategoryAccentStyle = (category) => {
+  const accent = String(category?.color || '#2563eb').trim();
+  const rgb = hexToRgb(accent);
+  return {
+    '--category-pill-accent': accent,
+    '--category-pill-accent-soft': rgb ? `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.12)` : '#eff6ff',
+    '--category-pill-accent-shadow': rgb ? `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.18)` : 'rgba(37, 99, 235, 0.14)',
+  };
+};
+
 const handleWheel = (event) => {
   if (!pillScroller.value) return;
   pillScroller.value.scrollLeft += event.deltaY + event.deltaX;
 };
 
-const handleCategoryClick = (category) => {
+const handleCategoryClick = (event, category) => {
   emit('select', category);
   isMoreOpen.value = false;
+  event?.currentTarget?.blur?.();
 };
 
 const toggleMorePanel = () => {

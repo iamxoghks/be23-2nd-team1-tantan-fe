@@ -5,10 +5,6 @@
     <div class="app-main-column app-main-column-no-scroll">
       <main class="sx-views-community-communityview-004 v-community-detail-main">
         <div class="v-community-detail-content">
-          <div class="v-community-detail-head">
-            <button class="v-community-detail-back" @click="goBackToList">← 목록으로</button>
-          </div>
-
           <div v-if="isLoading" class="ux-views-community-communityview-023">게시글을 불러오는 중...</div>
           <div v-else-if="errorMessage" class="v-community-detail-error-wrap">
             <p class="ux-views-community-communityview-024">{{ errorMessage }}</p>
@@ -205,6 +201,8 @@
                       placeholder="대화에 참여하세요..."
                       class="v-community-comment-input v-community-ig-input"
                       @input="handleCommentInput"
+                      @compositionstart="handleCommentCompositionStart"
+                      @compositionend="handleCommentCompositionEnd"
                       @keydown="handleCommentInputKeydown"
                       @keydown.enter.exact.prevent="submitComment"
                     />
@@ -296,6 +294,7 @@ const comments = ref([]);
 const commentInput = ref('');
 const commentInputEl = ref(null);
 const replyTarget = ref(null);
+const isCommentComposing = ref(false);
 const replyLoadingMap = ref({});
 const isLoading = ref(false);
 const errorMessage = ref('');
@@ -451,22 +450,18 @@ const extractDateOnly = (value) => {
 };
 
 const toWorkoutStats = (detail = {}) => {
-  const weight = Number(detail?.weight);
-  const setCount = Number(detail?.setCount);
-  const rep = Number(detail?.rep);
+  const weight = Number(detail?.weight ?? detail?.totalWeight ?? detail?.volume ?? detail?.kg);
+  const setCount = Number(detail?.setCount ?? detail?.sets ?? detail?.set);
+  const rep = Number(detail?.rep ?? detail?.reps ?? detail?.repCount ?? detail?.count);
 
-  if (Number.isFinite(weight) && Number.isFinite(setCount)) {
-    return `${weight}kg x ${setCount} sets`;
-  }
-  if (Number.isFinite(weight) && Number.isFinite(rep)) {
-    return `${weight}kg x ${rep} reps`;
-  }
-  if (Number.isFinite(setCount) && Number.isFinite(rep)) {
-    return `${setCount} sets x ${rep} reps`;
-  }
-  if (Number.isFinite(weight)) return `${weight}kg`;
-  if (Number.isFinite(setCount)) return `${setCount} sets`;
-  if (Number.isFinite(rep)) return `${rep} reps`;
+  const parts = [];
+  if (Number.isFinite(weight)) parts.push(`${weight}kg`);
+  if (Number.isFinite(setCount)) parts.push(`${setCount}세트`);
+  if (Number.isFinite(rep)) parts.push(`${rep}회`);
+  if (parts.length > 0) return parts.join(', ');
+
+  const fallback = String(detail?.stats || detail?.summary || detail?.record || '').trim();
+  if (fallback) return fallback;
   return '-';
 };
 
@@ -714,16 +709,30 @@ const clearReplyTarget = () => {
   replyTarget.value = null;
 };
 
-const handleCommentInput = () => {
+const syncReplyTargetState = (value) => {
   if (!replyTarget.value) return;
-  if (String(commentInput.value || '').trim().length === 0) {
+  if (String(value ?? '').trim().length === 0) {
     clearReplyTarget();
   }
 };
 
+const handleCommentInput = (event) => {
+  if (!replyTarget.value || isCommentComposing.value || event?.isComposing) return;
+  syncReplyTargetState(event?.target?.value ?? commentInput.value ?? '');
+};
+
+const handleCommentCompositionStart = () => {
+  isCommentComposing.value = true;
+};
+
+const handleCommentCompositionEnd = (event) => {
+  isCommentComposing.value = false;
+  syncReplyTargetState(event?.target?.value ?? commentInput.value ?? '');
+};
+
 const handleCommentInputKeydown = (event) => {
-  if (!replyTarget.value) return;
-  if (event?.key !== 'Backspace') return;
+  if (!replyTarget.value || isCommentComposing.value || event?.isComposing) return;
+  if (event?.key !== 'Backspace' && event?.key !== 'Delete') return;
   if (String(commentInput.value || '').length > 0) return;
   clearReplyTarget();
 };

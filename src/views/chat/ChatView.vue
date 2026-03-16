@@ -43,7 +43,7 @@
               :key="room.id"
               class="chat-room-item"
               :class="selectedRoomId === room.id ? 'chat-room-item-active' : 'chat-room-item-hover'"
-              @click="selectedRoomId = room.id"
+              @click="selectRoom(room.id)"
             >
               <div class="v-chat-room-avatar" :style="roomAvatarStyle(room)">
                 <img
@@ -188,7 +188,10 @@
           </div>
 
           <div v-else class="chat-empty-panel">
-            <div class="v-chat-empty-state"><div class="v-chat-empty-icon"><MessageSquare :size="40" class="v-text-white" /></div><p class="v-chat-empty-title">대화내역이 없습니다.</p></div>
+            <div class="v-chat-empty-state">
+              <div class="v-chat-empty-icon"><MessageSquare :size="40" class="v-text-white" /></div>
+              <p class="v-chat-empty-title">{{ chatEmptyStateTitle }}</p>
+            </div>
           </div>
         </div>
       </div>
@@ -217,6 +220,12 @@ const messageSearchTerm = ref('');
 const isMessageSearchOpen = ref(false);
 const messageSearchInputRef = ref(null);
 const selectedRoom = computed(() => chatRoomsData.value.find((r) => r.id === selectedRoomId.value));
+const hasChatRooms = computed(() => chatRoomsData.value.length > 0);
+const chatEmptyStateTitle = computed(() => (
+  hasChatRooms.value
+    ? '채팅방을 선택해주세요.'
+    : '대화내역이 없습니다.'
+));
 const currentUserId = ref(null);
 const isLoadingRooms = ref(false);
 const chatLoadError = ref('');
@@ -301,6 +310,22 @@ const toggleMessageSearch = async () => {
 
 const toggleRoomMenu = () => {
   isRoomMenuOpen.value = !isRoomMenuOpen.value;
+};
+
+const clearRoomUnread = (roomId) => {
+  const normalizedRoomId = String(roomId || '');
+  if (!normalizedRoomId) return;
+
+  chatRoomsData.value = chatRoomsData.value.map((room) => (
+    String(room.id) === normalizedRoomId
+      ? { ...room, unread: 0 }
+      : room
+  ));
+};
+
+const selectRoom = (roomId) => {
+  clearRoomUnread(roomId);
+  selectedRoomId.value = roomId;
 };
 
 const scrollMessagesToBottom = async () => {
@@ -678,7 +703,7 @@ const leaveSelectedRoom = async () => {
     const nextMessagesByRoom = { ...messagesByRoom.value };
     delete nextMessagesByRoom[room.roomKey || room.id];
     messagesByRoom.value = nextMessagesByRoom;
-    selectedRoomId.value = chatRoomsData.value[0]?.id || null;
+    selectedRoomId.value = null;
   } catch (error) {
     window.alert(toFriendlyApiError(error, '채팅방 나가기에 실패했습니다.'));
   }
@@ -802,10 +827,6 @@ const loadRooms = async () => {
     } else {
       chatRoomsData.value = [];
     }
-
-    if (!selectedRoomId.value && chatRoomsData.value.length > 0) {
-      selectedRoomId.value = chatRoomsData.value[0].id;
-    }
   } catch (error) {
     chatLoadError.value = toFriendlyApiError(error, '채팅방 목록을 불러오지 못했습니다.');
   } finally {
@@ -868,6 +889,7 @@ watch(selectedRoomId, async (next, prev) => {
   }
   const requestSeq = ++roomSelectionRequestSeq;
   chatLoadError.value = '';
+  clearRoomUnread(next);
   await loadMessages(next, { requestSeq });
   if (requestSeq !== roomSelectionRequestSeq || String(selectedRoomId.value) !== String(next)) return;
   if (chatConnectionState.value === 'connected') {
