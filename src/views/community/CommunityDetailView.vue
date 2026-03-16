@@ -5,10 +5,6 @@
     <div class="app-main-column app-main-column-no-scroll">
       <main class="sx-views-community-communityview-004 v-community-detail-main">
         <div class="v-community-detail-content">
-          <div class="v-community-detail-head">
-            <button class="v-community-detail-back" @click="goBackToList">← 목록으로</button>
-          </div>
-
           <div v-if="isLoading" class="ux-views-community-communityview-023">게시글을 불러오는 중...</div>
           <div v-else-if="errorMessage" class="v-community-detail-error-wrap">
             <p class="ux-views-community-communityview-024">{{ errorMessage }}</p>
@@ -714,9 +710,10 @@ const clearReplyTarget = () => {
   replyTarget.value = null;
 };
 
-const handleCommentInput = () => {
+const handleCommentInput = (event) => {
   if (!replyTarget.value) return;
-  if (String(commentInput.value || '').trim().length === 0) {
+  const nextValue = String(event?.target?.value ?? commentInput.value ?? '');
+  if (nextValue.trim().length === 0) {
     clearReplyTarget();
   }
 };
