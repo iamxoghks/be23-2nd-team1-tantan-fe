@@ -766,3 +766,14 @@ onBeforeUnmount(() => {
   });
 });
 </script>
+
+<style scoped>
+.v-community-write-screen,
+.sx-views-community-communitywriteview-001,
+.sx-views-community-communitywriteview-003,
+.v-community-write-form,
+.v-write-header,
+.v-write-footer {
+  background: #ffffff;
+}
+</style>

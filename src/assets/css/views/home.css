@@ -828,10 +828,10 @@
 }
 
 .search-panel-action-row {
-  margin-bottom: 16px;
+  margin-bottom: 10px;
   display: flex;
   align-items: center;
-  justify-content: space-around;
+  justify-content: stretch;
 }
 
 .search-panel-reservation-shortcut {
@@ -885,7 +885,7 @@
 
 .search-panel-action-divider {
   width: 1px;
-  height: 40px;
+  height: 32px;
   background: var(--color-surface-soft);
 }
 
@@ -943,6 +943,7 @@
 }
 
 .search-panel-detail-section-info,
+.search-panel-detail-section-location,
 .search-panel-detail-section-contact {
   padding-inline: 0;
 }
@@ -1369,6 +1370,22 @@
   flex-direction: column;
 }
 
+.search-panel-review-load-more {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 10px 0 18px;
+}
+
+.search-panel-review-load-spinner {
+  width: 24px;
+  height: 24px;
+  border-radius: 999px;
+  border: 2.5px solid rgba(148, 163, 184, 0.28);
+  border-top-color: #2563eb;
+  animation: search-panel-review-spin 0.8s linear infinite;
+}
+
 .search-panel-review-entry {
   padding: 14px 0 18px;
   border-top: 1px solid var(--color-border-base);
@@ -1382,52 +1399,80 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 10px;
-  margin-bottom: 6px;
+  gap: 12px;
+  margin-bottom: 10px;
 }
 
 .search-panel-review-author {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
   min-width: 0;
+  flex: 1 1 auto;
+}
+
+.search-panel-review-author-link {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  text-align: left;
+}
+
+.search-panel-review-author-link:disabled {
+  cursor: default;
 }
 
 .search-panel-review-avatar {
-  width: 38px;
-  height: 38px;
-  flex: 0 0 38px;
+  width: 32px;
+  height: 32px;
+  flex: 0 0 32px;
   border-radius: 999px;
   background: linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%);
   color: #1d4ed8;
-  font-size: 16px;
+  font-size: 14px;
   font-weight: 800;
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  overflow: hidden;
+}
+
+.search-panel-review-avatar-image-wrap {
+  background: #eff6ff;
+}
+
+.search-panel-review-avatar-image {
+  width: 100%;
+  height: 100%;
+  display: block;
+  object-fit: cover;
 }
 
 .search-panel-review-author-copy {
   min-width: 0;
-  display: grid;
-  gap: 4px;
+  display: flex;
+  align-items: center;
 }
 
 .search-panel-review-author-copy strong {
-  font-size: 16px;
+  font-size: 14px;
   font-weight: 800;
   color: #111827;
+  line-height: 1.2;
 }
 
-.search-panel-review-author-copy span {
-  font-size: 12px;
-  color: #6b7280;
+.search-panel-review-head-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex: 0 0 auto;
 }
 
 .search-panel-review-edit-btn {
-  width: 32px;
-  height: 32px;
-  flex: 0 0 32px;
+  width: 28px;
+  height: 28px;
+  flex: 0 0 28px;
   border: 1px solid #e5e7eb;
   border-radius: 999px;
   background: #ffffff;
@@ -1437,17 +1482,14 @@
   justify-content: center;
 }
 
-.search-panel-review-score-line {
-  margin-bottom: 10px;
-}
-
 .search-panel-review-score {
   display: inline-flex;
   align-items: center;
   gap: 4px;
   color: #ef4444;
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 800;
+  line-height: 1;
 }
 
 .search-panel-review-media {
@@ -1463,12 +1505,12 @@
 
 .search-panel-review-media-many .search-panel-review-media-button:first-child {
   grid-column: 1 / -1;
-  aspect-ratio: 16 / 10;
+  aspect-ratio: 12 / 5;
 }
 
 .search-panel-review-media-button {
   width: 100%;
-  aspect-ratio: 1 / 1;
+  aspect-ratio: 3 / 2;
   padding: 0;
   border: 0;
   border-radius: 14px;
@@ -1478,7 +1520,7 @@
 }
 
 .search-panel-review-media-single .search-panel-review-media-button {
-  aspect-ratio: 4 / 5;
+  aspect-ratio: 6 / 5;
 }
 
 .search-panel-review-media-image {
@@ -1520,6 +1562,10 @@
   width: 100%;
   display: block;
   object-fit: cover;
+  border-radius: inherit;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+  transform: translateZ(0);
   transition: transform 0.24s ease;
 }
 
@@ -1538,12 +1584,18 @@
   margin-bottom: 12px;
   overflow: hidden;
   break-inside: avoid;
+  -webkit-appearance: none;
+  appearance: none;
   border: 0;
   border-radius: 18px;
+  clip-path: inset(0 round 18px);
+  -webkit-mask-image: -webkit-radial-gradient(white, black);
   padding: 0;
   background: #e5e7eb;
   box-shadow: none;
   cursor: pointer;
+  isolation: isolate;
+  transform: translateZ(0);
 }
 
 .search-panel-photo-item-square .search-panel-photo-image {
@@ -1677,6 +1729,43 @@
   object-fit: contain;
 }
 
+.search-panel-share-toast {
+  position: fixed;
+  left: 50%;
+  top: 50%;
+  z-index: 3400;
+  transform: translate(-50%, -50%);
+  min-width: 220px;
+  max-width: min(88vw, 420px);
+  padding: 12px 18px;
+  border-radius: 999px;
+  text-align: center;
+  font-size: 14px;
+  font-weight: 700;
+  box-shadow: 0 12px 28px rgba(15, 23, 42, 0.24);
+}
+
+.search-panel-share-toast-success {
+  background: rgba(15, 23, 42, 0.92);
+  color: #ffffff;
+}
+
+.search-panel-share-toast-error {
+  background: #fee2e2;
+  color: #b91c1c;
+}
+
+.search-panel-share-toast-fade-enter-active,
+.search-panel-share-toast-fade-leave-active {
+  transition: opacity 0.18s ease, transform 0.18s ease;
+}
+
+.search-panel-share-toast-fade-enter-from,
+.search-panel-share-toast-fade-leave-to {
+  opacity: 0;
+  transform: translate(-50%, calc(-50% + 8px));
+}
+
 .search-panel-empty {
   display: flex;
   flex-direction: column;
@@ -1695,6 +1784,12 @@
   justify-content: center;
   border-radius: 9999px;
   background: var(--color-surface-soft);
+}
+
+@keyframes search-panel-review-spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .search-panel-review-modal-backdrop {
@@ -2347,7 +2442,16 @@
 }
 
 .sx-components-sections-searchpanel-001 {}
-.sx-components-sections-searchpanel-002 {}
+.sx-components-sections-searchpanel-002 {
+  flex: 1 1 0;
+  min-height: 56px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  text-align: center;
+}
 .sx-components-sections-searchpanel-003 { @apply text-[16px] font-bold text-gray-900 mb-4; }
 .sx-components-sections-searchpanel-004 { @apply text-[15px] font-medium text-blue-600 mb-1; }
 .sx-components-sections-searchpanel-005 { @apply relative; }
@@ -2919,6 +3023,7 @@
   .search-panel-photo-item {
     margin-bottom: 10px;
     border-radius: 16px;
+    clip-path: inset(0 round 16px);
   }
 
   .search-panel-content-reservation {
