@@ -129,9 +129,13 @@ import { TERMS_VERSION, PRIVACY_VERSION } from '@/constants/legal';
 const route = useRoute();
 const router = useRouter();
 const { openAuthModal } = useAuthModal();
+const SUPPORTED_SOCIAL_PROVIDERS = ['google', 'kakao'];
 
-const socialProvider = ref(String(route.query.provider || ''));
-const isSocialVerified = ref(route.query.socialVerified === '1');
+const socialProviderFromQuery = String(route.query.provider || '').trim().toLowerCase();
+const socialProvider = ref(
+  SUPPORTED_SOCIAL_PROVIDERS.includes(socialProviderFromQuery) ? socialProviderFromQuery : '',
+);
+const isSocialVerified = ref(Boolean(socialProvider.value) && route.query.socialVerified === '1');
 
 const userName = ref(String(route.query.userName || ''));
 const nickName = ref(String(route.query.nickName || ''));
@@ -155,7 +159,6 @@ const agreePrivacy = ref(false);
 const socialProviderLabel = computed(() => {
   if (socialProvider.value === 'google') return '구글';
   if (socialProvider.value === 'kakao') return '카카오';
-  if (socialProvider.value === 'naver') return '네이버';
   return '';
 });
 

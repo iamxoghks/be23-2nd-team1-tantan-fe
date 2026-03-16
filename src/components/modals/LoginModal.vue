@@ -23,10 +23,6 @@
             <span class="v-login-social-icon v-login-social-icon-kakao">K</span>
             카카오로 계속하기
           </button>
-          <button type="button" class="v-login-social-btn" @click="handleSocialLogin('naver')">
-            <span class="v-login-social-icon v-login-social-icon-naver">N</span>
-            네이버로 계속하기
-          </button>
         </div>
 
         <div class="v-login-divider"><span>또는</span></div>
@@ -103,7 +99,7 @@ watch(isAuthModalOpen, (isOpen) => {
 
 const handleSocialLogin = (provider) => {
   const normalizedProvider = String(provider || '').trim().toLowerCase();
-  if (!['google', 'kakao', 'naver'].includes(normalizedProvider)) {
+  if (!['google', 'kakao'].includes(normalizedProvider)) {
     errorMessage.value = '지원하지 않는 소셜 로그인입니다.';
     return;
   }
