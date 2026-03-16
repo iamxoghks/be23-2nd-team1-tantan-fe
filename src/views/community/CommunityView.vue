@@ -110,7 +110,7 @@
                       :disabled="!canOpenAuthorProfile(post)"
                       @click.stop="openAuthorProfile(post)"
                     >
-                      <img :src="post.authorImage" alt="" class="v-user-avatar" />
+                      <img :src="post.authorImage" alt="" class="v-user-avatar" @error="handleUserAvatarError" />
                     </button>
                     <div>
                       <button
@@ -228,6 +228,7 @@ import { communityLikeApi, communityPostApi, reportApi } from '@/services/apis';
 import { useSession } from '@/composables/useSession';
 import { normalizeCommunityPost } from '@/utils/postNormalizer';
 import { extractList, extractPayload } from '@/utils/api';
+import { handleUserAvatarError } from '@/utils/userAvatar';
 
 const categories = ['전체', '자유게시판', '운동 공유', '운동 꿀팁', '헬스장 리뷰', '식단 공유', '질문게시판'];
 const route = useRoute();

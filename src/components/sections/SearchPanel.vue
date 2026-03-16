@@ -471,10 +471,14 @@
                           :disabled="!review.userId"
                           @click="openReviewAuthorProfile(review)"
                         >
-                          <div v-if="review.profileImageUrl" class="search-panel-review-avatar search-panel-review-avatar-image-wrap">
-                            <img :src="review.profileImageUrl" :alt="`${review.nickname || '익명'} 프로필 이미지`" class="search-panel-review-avatar-image" />
+                          <div class="search-panel-review-avatar search-panel-review-avatar-image-wrap">
+                            <img
+                              :src="review.profileImageUrl"
+                              :alt="`${review.nickname || '익명'} 프로필 이미지`"
+                              class="search-panel-review-avatar-image"
+                              @error="handleUserAvatarError"
+                            />
                           </div>
-                          <div v-else class="search-panel-review-avatar">{{ review.initial }}</div>
                           <div class="search-panel-review-author-copy">
                             <strong>{{ review.nickname || '익명' }}</strong>
                           </div>
@@ -809,6 +813,7 @@ import { gymApi, reservationApi, reviewApi } from '@/services/apis';
 import { useSession } from '@/composables/useSession';
 import { normalizeRole } from '@/services/token';
 import { extractList, extractPayload } from '@/utils/api';
+import { resolveUserAvatar, handleUserAvatarError } from '@/utils/userAvatar';
 import {
   getPrimaryOriginalImageUrl,
   toImageVariantItems,
@@ -1224,12 +1229,6 @@ const selectedGymDefaultPhotoItems = computed(() => {
   return toImageVariantItems(props.selectedGym?.image);
 });
 
-const getReviewNicknameInitial = (nickname) => {
-  const value = String(nickname || '').trim();
-  if (!value) return '익';
-  return value.slice(0, 1).toUpperCase();
-};
-
 const getReviewKey = (review) => String(review?.reviewId ?? review?.id ?? '');
 
 const getReviewPreviewText = (comment) => {
@@ -1257,12 +1256,11 @@ const reviewDisplayItems = computed(() =>
   reviewItems.value.map((review) => ({
     ...review,
     userId: review?.userId ?? review?.user?.id ?? null,
-    profileImageUrl: review?.profileImageUrl
+    profileImageUrl: resolveUserAvatar(review?.profileImageUrl
       ?? review?.user?.profileThumbnailUrl
       ?? review?.user?.profileImageUrl
-      ?? '',
+      ?? ''),
     imageItems: toImageVariantItems(review?.images),
-    initial: getReviewNicknameInitial(review?.nickname),
     reviewKey: getReviewKey(review),
     commentText: String(review?.comment || ''),
     isExpandable: String(review?.comment || '').length > reviewPreviewCharacterLimit,

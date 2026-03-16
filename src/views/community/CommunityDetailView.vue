@@ -56,7 +56,7 @@
                   :disabled="!canOpenAuthorProfile"
                   @click="openAuthorProfile"
                 >
-                  <img :src="post.authorImage" alt="" class="sx-views-community-communityview-023" />
+                  <img :src="post.authorImage" alt="" class="sx-views-community-communityview-023" @error="handleUserAvatarError" />
                 </button>
                 <div>
                   <button
@@ -121,7 +121,7 @@
                 <div class="v-community-ig-list">
                   <article v-for="comment in comments" :key="comment.id" class="v-community-thread">
                     <div class="v-community-ig-item">
-                      <img :src="comment.authorImage" :alt="comment.author" class="v-community-ig-avatar" />
+                      <img :src="comment.authorImage" :alt="comment.author" class="v-community-ig-avatar" @error="handleUserAvatarError" />
                       <div class="v-community-ig-body">
                         <p class="v-community-ig-content">
                           <span class="v-community-ig-author">{{ comment.author }}</span>
@@ -149,7 +149,7 @@
                         :key="reply.id"
                         class="v-community-ig-item v-community-ig-reply"
                       >
-                        <img :src="reply.authorImage" :alt="reply.author" class="v-community-ig-avatar" />
+                        <img :src="reply.authorImage" :alt="reply.author" class="v-community-ig-avatar" @error="handleUserAvatarError" />
                         <div class="v-community-ig-body">
                           <p class="v-community-ig-content">
                             <span class="v-community-ig-author">{{ reply.author }}</span>
@@ -195,7 +195,7 @@
                 </div>
 
                 <div class="v-community-ig-input-wrap">
-                  <img :src="myProfileImage" alt="내 프로필" class="v-community-ig-input-avatar" />
+                  <img :src="myProfileImage" alt="내 프로필" class="v-community-ig-input-avatar" @error="handleUserAvatarError" />
                   <div class="v-community-ig-input-box">
                     <span v-if="replyTarget" class="v-community-ig-input-mention">@{{ replyTarget.nickName }}</span>
                     <input
@@ -274,6 +274,7 @@ import { useSession } from '@/composables/useSession';
 import { normalizeCommunityPost } from '@/utils/postNormalizer';
 import { extractList } from '@/utils/api';
 import { formatTimeAgo } from '@/utils/time';
+import { resolveUserAvatar, handleUserAvatarError } from '@/utils/userAvatar';
 
 const route = useRoute();
 const router = useRouter();
@@ -312,10 +313,11 @@ const reportTargetType = ref('POST');
 const reportToastMessage = ref('');
 let reportToastTimer = null;
 const myProfileImage = computed(() => (
-  sessionProfile.value?.raw?.profileThumbnailUrl
-  || sessionProfile.value?.raw?.profileImageUrl
-  || sessionProfile.value?.raw?.profileImage
-  || fallbackAvatar(sessionProfile.value?.displayName || sessionProfile.value?.userName || 'me')
+  resolveUserAvatar(
+    sessionProfile.value?.raw?.profileThumbnailUrl
+    || sessionProfile.value?.raw?.profileImageUrl
+    || sessionProfile.value?.raw?.profileImage,
+  )
 ));
 const authorUserId = computed(() => {
   const parsed = Number(post.value?.userId ?? post.value?.authorId ?? post.value?.writerId ?? 0);
@@ -339,8 +341,6 @@ const totalCommentCount = computed(() => {
   if (Number.isFinite(serverCount) && serverCount > 0) return serverCount;
   return comments.value.reduce((sum, comment) => sum + 1 + Math.max(comment.replyCount || 0, comment.replies.length), 0);
 });
-
-const fallbackAvatar = (seed) => `https://api.dicebear.com/9.x/initials/svg?seed=${encodeURIComponent(seed || 'user')}&backgroundType=gradientLinear`;
 
 const toNumber = (value, fallback = 0) => {
   const parsed = Number(value);
@@ -379,7 +379,7 @@ const normalizeCommentItem = (item = {}, index = 0, parentCommentId = null) => {
     id: item?.id ?? `comment-${index}`,
     userId: item?.userId ?? null,
     author: author || `user_${index + 1}`,
-    authorImage: item?.profileImageUrl || item?.authorImage || item?.profileImage || fallbackAvatar(author || `user_${index + 1}`),
+    authorImage: resolveUserAvatar(item?.profileImageUrl || item?.authorImage || item?.profileImage),
     content: String(item?.contents || item?.content || '').trim(),
     createdTime: item?.createdTime || item?.createdAt || '',
     timeAgo: formatTimeAgo(item?.createdTime || item?.createdAt),

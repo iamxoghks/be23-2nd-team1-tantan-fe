@@ -1,4 +1,5 @@
 import { formatTimeAgo } from '@/utils/time';
+import { resolveUserAvatar } from '@/utils/userAvatar';
 
 const API_BASE_URL =
   import.meta.env.VUE_APP_API_BASE_URL ||
@@ -38,8 +39,6 @@ const toBoolean = (value, fallback = false) => {
 };
 
 const isObject = (value) => Boolean(value) && typeof value === 'object' && !Array.isArray(value);
-
-const fallbackAvatar = (seed) => `https://api.dicebear.com/9.x/initials/svg?seed=${encodeURIComponent(seed || 'user')}&backgroundType=gradientLinear`;
 
 const resolveMediaUrl = (rawUrl) => {
   const url = asTrimmedString(rawUrl);
@@ -294,7 +293,7 @@ const extractAuthorName = (post = {}, fallback = '작성자') => firstNonEmptySt
   post.user?.nickName,
 ) || fallback;
 
-const extractAuthorImage = (post = {}, authorName = '') => resolveMediaUrl(firstNonEmptyString(
+const extractAuthorImage = (post = {}) => resolveUserAvatar(resolveMediaUrl(firstNonEmptyString(
   post.authorImage,
   post.profileImage,
   post.profileImageUrl,
@@ -302,7 +301,7 @@ const extractAuthorImage = (post = {}, authorName = '') => resolveMediaUrl(first
   post.writerProfileImage,
   post.user?.profileImageUrl,
   post.user?.profileImage,
-)) || fallbackAvatar(authorName);
+)));
 
 export const normalizeCommunityPost = (item = {}, index = 0) => {
   const post = isObject(item?.post) ? { ...item, ...item.post } : item;
