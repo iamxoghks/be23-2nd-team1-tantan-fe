@@ -144,7 +144,7 @@
             <div class="v-profile-head-row v-profile-head-row-fit">
               <div class="sx-views-user-profile-profileview-002">
                 <div class="v-profile-avatar-frame">
-                  <img :src="displayProfileImage" alt="프로필" class="v-cover-image" />
+                  <img :src="displayProfileImage" alt="프로필" class="v-cover-image" @error="handleUserAvatarError" />
                 </div>
                 <div class="sx-views-user-profile-profileview-003">
                   <CheckCircle2 :size="16" fill="currentColor" class="v-text-white" />
@@ -423,7 +423,7 @@
               class="v-follow-modal-item"
               @click="moveToProfile(item.userId)"
             >
-              <img :src="item.profileImageUrl" :alt="item.displayName" class="v-follow-modal-avatar" />
+              <img :src="item.profileImageUrl" :alt="item.displayName" class="v-follow-modal-avatar" @error="handleUserAvatarError" />
               <div class="v-follow-modal-meta">
                 <strong>{{ item.displayName }}</strong>
                 <span>@{{ item.userName }}</span>
@@ -590,6 +590,7 @@ import { chatApi, followApi, gymApi, gymFavoriteApi, userApi, workoutApi, reserv
 import { useSession } from '@/composables/useSession';
 import { normalizeRole } from '@/services/token';
 import { formatTimeAgo } from '@/utils/time';
+import { resolveUserAvatar, handleUserAvatarError } from '@/utils/userAvatar';
 
 const days = ['월', '수', '금'];
 const selectedHeatmapYear = ref(new Date().getFullYear());
@@ -710,9 +711,12 @@ const displayProfileBio = computed(() => (
   || '등록된 소개가 없습니다.'
 ));
 const displayProfileImage = computed(() => (
-  profile.value?.profileImageUrl
-  || profile.value?.profileImage
-  || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?q=80&w=200&h=200&auto=format&fit=crop'
+  resolveUserAvatar(
+    profile.value?.profileThumbnailUrl
+    || profile.value?.thumbnailUrl
+    || profile.value?.profileImageUrl
+    || profile.value?.profileImage,
+  )
 ));
 const viewedGymId = computed(() => {
   const fromProfile = Number(profile.value?.gymId ?? profile.value?.homeGymId ?? 0);
@@ -884,9 +888,7 @@ const toFollowUserList = (payload) => {
         userId,
         userName: String(item?.userName || item?.nickname || '').trim() || `user${userId}`,
         displayName: String(item?.displayName || item?.nickname || item?.userName || '').trim() || `사용자 ${userId}`,
-        profileImageUrl: item?.profileImageUrl
-          || item?.profileImage
-          || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?q=80&w=100&h=100&auto=format&fit=crop',
+        profileImageUrl: resolveUserAvatar(item?.profileThumbnailUrl || item?.profileImageUrl || item?.profileImage),
         isFollowedByMe: Boolean(item?.isFollowedByMe),
       };
     })

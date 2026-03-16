@@ -63,7 +63,7 @@
                 <div v-if="!notif.isRead" class="v-noti-dot" />
 
                 <div class="sx-views-notifications-notificationsview-004">
-                  <img :src="notif.actor.image" alt="" class="v-noti-actor ux-views-notifications-notificationsview-003" />
+                  <img :src="notif.actor.image" alt="" class="v-noti-actor ux-views-notifications-notificationsview-003" @error="handleUserAvatarError" />
                   <div class="v-noti-type-icon-wrap" :class="typeIconWrapClass(notif.type)">
                     <component
                       :is="iconByType[notif.type] || Info"
@@ -154,6 +154,7 @@ import { communityPostApi, notificationApi } from '@/services/apis';
 import { registerAuthCleanup } from '@/services/authLifecycle';
 import { extractList, extractPayload } from '@/utils/api';
 import { useNotificationCenter } from '@/composables/useNotificationCenter';
+import { resolveUserAvatar, handleUserAvatarError } from '@/utils/userAvatar';
 
 const tabs = [
   { id: 'all', label: '전체' },
@@ -260,8 +261,6 @@ const fallbackMessageByRefType = (refTypeRaw) => {
   return '새로운 알림이 도착했습니다.';
 };
 
-const fallbackAvatar = (seed) => `https://api.dicebear.com/9.x/initials/svg?seed=${encodeURIComponent(seed || 'user')}&backgroundType=gradientLinear`;
-
 const splitActorFromMessage = (message) => {
   const normalized = typeof message === 'string' ? message.trim() : '';
   if (!normalized) return { actor: '', content: '' };
@@ -294,8 +293,6 @@ const normalizeNotification = (item, index) => {
   const content = (!explicitActorName && parsed.actor && type !== 'system')
     ? parsed.content
     : messageForDisplay;
-  const actorImageSeed = actorName || type || 'user';
-
   return {
     id: String(item?.id ?? item?.notificationId ?? index),
     refType: item?.refType || '',
@@ -303,7 +300,7 @@ const normalizeNotification = (item, index) => {
     type,
     actor: {
       name: actorName,
-      image: item?.actorImage || item?.senderImage || item?.profileImage || fallbackAvatar(actorImageSeed),
+      image: resolveUserAvatar(item?.actorImage || item?.senderImage || item?.profileImage),
     },
     content,
     timestamp: toTimeAgo(item?.createdTime || item?.createdAt || item?.timestamp || item?.sentAt),

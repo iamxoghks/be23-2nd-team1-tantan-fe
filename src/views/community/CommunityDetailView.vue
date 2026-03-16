@@ -40,7 +40,7 @@
                   <button
                     v-else
                     class="ui-modal-icon-btn ui-modal-icon-btn-outline ux-views-community-communityview-028"
-                    @click="reportPost"
+                    @click="openReportModal({ refId: Number(post.id), refType: 'POST' })"
                   >
                     <Flag :size="18" />
                   </button>
@@ -56,7 +56,7 @@
                   :disabled="!canOpenAuthorProfile"
                   @click="openAuthorProfile"
                 >
-                  <img :src="post.authorImage" alt="" class="sx-views-community-communityview-023" />
+                  <img :src="post.authorImage" alt="" class="sx-views-community-communityview-023" @error="handleUserAvatarError" />
                 </button>
                 <div>
                   <button
@@ -121,7 +121,7 @@
                 <div class="v-community-ig-list">
                   <article v-for="comment in comments" :key="comment.id" class="v-community-thread">
                     <div class="v-community-ig-item">
-                      <img :src="comment.authorImage" :alt="comment.author" class="v-community-ig-avatar" />
+                      <img :src="comment.authorImage" :alt="comment.author" class="v-community-ig-avatar" @error="handleUserAvatarError" />
                       <div class="v-community-ig-body">
                         <p class="v-community-ig-content">
                           <span class="v-community-ig-author">{{ comment.author }}</span>
@@ -138,7 +138,7 @@
                           </button>
                         </div>
                       </div>
-                      <button class="v-community-report-btn" type="button" @click="reportComment(comment.id)">
+                      <button class="v-community-report-btn" type="button" @click="openReportModal({ refId: comment.id, refType: 'COMMENT' })">
                         <Flag :size="14" />
                       </button>
                     </div>
@@ -149,7 +149,7 @@
                         :key="reply.id"
                         class="v-community-ig-item v-community-ig-reply"
                       >
-                        <img :src="reply.authorImage" :alt="reply.author" class="v-community-ig-avatar" />
+                        <img :src="reply.authorImage" :alt="reply.author" class="v-community-ig-avatar" @error="handleUserAvatarError" />
                         <div class="v-community-ig-body">
                           <p class="v-community-ig-content">
                             <span class="v-community-ig-author">{{ reply.author }}</span>
@@ -172,7 +172,7 @@
                             </button>
                           </div>
                         </div>
-                        <button class="v-community-report-btn" type="button" @click="reportComment(reply.id)">
+                        <button class="v-community-report-btn" type="button" @click="openReportModal({ refId: reply.id, refType: 'COMMENT' })">
                           <Flag :size="14" />
                         </button>
                       </div>
@@ -195,7 +195,7 @@
                 </div>
 
                 <div class="v-community-ig-input-wrap">
-                  <img :src="myProfileImage" alt="내 프로필" class="v-community-ig-input-avatar" />
+                  <img :src="myProfileImage" alt="내 프로필" class="v-community-ig-input-avatar" @error="handleUserAvatarError" />
                   <div class="v-community-ig-input-box">
                     <span v-if="replyTarget" class="v-community-ig-input-mention">@{{ replyTarget.nickName }}</span>
                     <input
@@ -232,6 +232,35 @@
         </div>
       </div>
     </Teleport>
+
+    <Teleport to="body">
+      <div v-if="isReportModalOpen" class="v-report-modal-backdrop" @click.self="closeReportModal">
+        <div class="v-report-modal">
+          <h3 class="v-report-modal-title">신고하기</h3>
+          <p class="v-report-modal-desc">신고 사유를 입력해주세요. 5자 이상 500자 이하로 작성 가능합니다.</p>
+          <textarea
+            v-model="reportReason"
+            class="v-report-textarea"
+            placeholder="신고 사유를 입력해주세요."
+            maxlength="500"
+          />
+          <div class="v-report-modal-meta">
+            <span v-if="reportErrorMessage" class="v-report-error">{{ reportErrorMessage }}</span>
+            <span class="v-report-count">{{ reportReason.length }}/500</span>
+          </div>
+          <div class="v-report-actions">
+            <button type="button" class="v-report-cancel" :disabled="isSubmittingReport" @click="closeReportModal">취소</button>
+            <button type="button" class="v-report-submit" :disabled="isSubmittingReport" @click="submitReport">
+              {{ isSubmittingReport ? '접수 중...' : '신고 접수' }}
+            </button>
+          </div>
+        </div>
+      </div>
+    </Teleport>
+
+    <Teleport to="body">
+      <div v-if="reportToastMessage" class="v-report-toast">{{ reportToastMessage }}</div>
+    </Teleport>
   </div>
 </template>
 
@@ -245,6 +274,7 @@ import { useSession } from '@/composables/useSession';
 import { normalizeCommunityPost } from '@/utils/postNormalizer';
 import { extractList } from '@/utils/api';
 import { formatTimeAgo } from '@/utils/time';
+import { resolveUserAvatar, handleUserAvatarError } from '@/utils/userAvatar';
 
 const route = useRoute();
 const router = useRouter();
@@ -274,11 +304,20 @@ const isPostActionMenuOpen = ref(false);
 const postActionMenuRef = ref(null);
 const isDeleteModalOpen = ref(false);
 const isDeletingPost = ref(false);
+const isReportModalOpen = ref(false);
+const reportReason = ref('');
+const reportErrorMessage = ref('');
+const isSubmittingReport = ref(false);
+const reportTargetRefId = ref(null);
+const reportTargetType = ref('POST');
+const reportToastMessage = ref('');
+let reportToastTimer = null;
 const myProfileImage = computed(() => (
-  sessionProfile.value?.raw?.profileThumbnailUrl
-  || sessionProfile.value?.raw?.profileImageUrl
-  || sessionProfile.value?.raw?.profileImage
-  || fallbackAvatar(sessionProfile.value?.displayName || sessionProfile.value?.userName || 'me')
+  resolveUserAvatar(
+    sessionProfile.value?.raw?.profileThumbnailUrl
+    || sessionProfile.value?.raw?.profileImageUrl
+    || sessionProfile.value?.raw?.profileImage,
+  )
 ));
 const authorUserId = computed(() => {
   const parsed = Number(post.value?.userId ?? post.value?.authorId ?? post.value?.writerId ?? 0);
@@ -302,8 +341,6 @@ const totalCommentCount = computed(() => {
   if (Number.isFinite(serverCount) && serverCount > 0) return serverCount;
   return comments.value.reduce((sum, comment) => sum + 1 + Math.max(comment.replyCount || 0, comment.replies.length), 0);
 });
-
-const fallbackAvatar = (seed) => `https://api.dicebear.com/9.x/initials/svg?seed=${encodeURIComponent(seed || 'user')}&backgroundType=gradientLinear`;
 
 const toNumber = (value, fallback = 0) => {
   const parsed = Number(value);
@@ -342,7 +379,7 @@ const normalizeCommentItem = (item = {}, index = 0, parentCommentId = null) => {
     id: item?.id ?? `comment-${index}`,
     userId: item?.userId ?? null,
     author: author || `user_${index + 1}`,
-    authorImage: item?.profileImageUrl || item?.authorImage || item?.profileImage || fallbackAvatar(author || `user_${index + 1}`),
+    authorImage: resolveUserAvatar(item?.profileImageUrl || item?.authorImage || item?.profileImage),
     content: String(item?.contents || item?.content || '').trim(),
     createdTime: item?.createdTime || item?.createdAt || '',
     timeAgo: formatTimeAgo(item?.createdTime || item?.createdAt),
@@ -750,38 +787,59 @@ const submitComment = async () => {
   }
 };
 
-const reportPost = async () => {
-  if (!post.value?.id) return;
-  const reasonInput = window.prompt('신고 사유를 입력해주세요. (5~500자)');
-  if (reasonInput === null) return;
-  const reason = String(reasonInput || '').trim();
-  if (reason.length < 5 || reason.length > 500) {
-    window.alert('신고 사유는 5자 이상 500자 이하로 입력해주세요.');
-    return;
+const showReportToast = (message) => {
+  if (reportToastTimer) {
+    clearTimeout(reportToastTimer);
+    reportToastTimer = null;
   }
-  try {
-    await reportApi.create({ refId: Number(post.value.id), refType: 'POST', reason });
-    window.alert('신고가 접수되었습니다.');
-  } catch (error) {
-    window.alert('신고 처리에 실패했습니다.');
-  }
+  reportToastMessage.value = message;
+  reportToastTimer = window.setTimeout(() => {
+    reportToastMessage.value = '';
+    reportToastTimer = null;
+  }, 1800);
 };
 
-const reportComment = async (commentId) => {
-  const id = Number(commentId);
-  if (!id) return;
-  const reasonInput = window.prompt('신고 사유를 입력해주세요. (5~500자)');
-  if (reasonInput === null) return;
-  const reason = String(reasonInput || '').trim();
+const openReportModal = ({ refId, refType }) => {
+  const normalizedRefId = Number(refId || 0);
+  if (!normalizedRefId) return;
+  reportTargetRefId.value = normalizedRefId;
+  reportTargetType.value = String(refType || 'POST').toUpperCase();
+  reportReason.value = '';
+  reportErrorMessage.value = '';
+  isSubmittingReport.value = false;
+  isReportModalOpen.value = true;
+};
+
+const closeReportModal = () => {
+  if (isSubmittingReport.value) return;
+  isReportModalOpen.value = false;
+  reportReason.value = '';
+  reportErrorMessage.value = '';
+  reportTargetRefId.value = null;
+  reportTargetType.value = 'POST';
+};
+
+const submitReport = async () => {
+  const targetId = Number(reportTargetRefId.value || 0);
+  if (!targetId) return;
+  const reason = String(reportReason.value || '').trim();
   if (reason.length < 5 || reason.length > 500) {
-    window.alert('신고 사유는 5자 이상 500자 이하로 입력해주세요.');
+    reportErrorMessage.value = '신고 사유는 5자 이상 500자 이하로 입력해주세요.';
     return;
   }
+  reportErrorMessage.value = '';
+  isSubmittingReport.value = true;
   try {
-    await reportApi.create({ refId: id, refType: 'COMMENT', reason });
-    window.alert('신고가 접수되었습니다.');
+    await reportApi.create({ refId: targetId, refType: reportTargetType.value, reason });
+    isReportModalOpen.value = false;
+    reportReason.value = '';
+    reportTargetRefId.value = null;
+    reportTargetType.value = 'POST';
+    showReportToast('신고가 접수되었습니다.');
   } catch (error) {
-    window.alert('신고 처리에 실패했습니다.');
+    reportErrorMessage.value = '신고 처리에 실패했습니다.';
+  } finally {
+    isSubmittingReport.value = false;
   }
 };
 
@@ -800,6 +858,10 @@ onMounted(() => {
 
 onBeforeUnmount(() => {
   window.removeEventListener('pointerdown', handleDocumentPointerDown);
+  if (reportToastTimer) {
+    clearTimeout(reportToastTimer);
+    reportToastTimer = null;
+  }
 });
 </script>
 

@@ -47,12 +47,11 @@
             >
               <div class="v-chat-room-avatar" :style="roomAvatarStyle(room)">
                 <img
-                  v-if="room.avatarImageUrl"
                   :src="room.avatarImageUrl"
                   :alt="`${room.name} 프로필`"
                   class="v-chat-room-avatar-image"
+                  @error="handleUserAvatarError"
                 />
-                <span v-else>{{ room.avatar }}</span>
               </div>
               <div class="chat-room-content">
                 <div class="chat-room-head">
@@ -76,12 +75,11 @@
                 <button class="chat-back-btn chat-back-btn-mobile" @click="selectedRoomId = null"><ChevronLeft :size="24" /></button>
                 <button class="v-chat-room-avatar-sm v-chat-avatar-btn" :style="roomAvatarStyle(selectedRoom)" @click="goToCounterpartProfile">
                   <img
-                    v-if="selectedRoom.avatarImageUrl"
                     :src="selectedRoom.avatarImageUrl"
                     :alt="`${selectedRoom.name} 프로필`"
                     class="v-chat-room-avatar-image"
+                    @error="handleUserAvatarError"
                   />
-                  <span v-else>{{ selectedRoom.avatar }}</span>
                 </button>
                 <div class="v-chat-room-meta">
                   <span class="v-chat-room-name">{{ selectedRoom.name }}</span>
@@ -145,12 +143,11 @@
                 <template v-if="!message.isMine">
                   <button class="chat-msg-avatar chat-msg-avatar-btn" @click="goToCounterpartProfile">
                     <img
-                      v-if="selectedRoom?.avatarImageUrl"
                       :src="selectedRoom.avatarImageUrl"
                       :alt="`${selectedRoom?.name || '상대방'} 프로필`"
                       class="chat-msg-avatar-image"
+                      @error="handleUserAvatarError"
                     />
-                    <span v-else>{{ selectedRoom?.avatar }}</span>
                   </button>
                   <div class="chat-msg-col">
                     <span class="chat-msg-sender">{{ selectedRoom?.name }}</span>
@@ -210,6 +207,7 @@ import { extractList, extractPayload } from '@/utils/api';
 import { getAccessToken } from '@/services/token';
 import { registerAuthCleanup } from '@/services/authLifecycle';
 import { wsConfig } from '@/services/ws';
+import { resolveUserAvatar, handleUserAvatarError } from '@/utils/userAvatar';
 import { useRouter } from 'vue-router';
 
 const chatRoomsData = ref([]);
@@ -401,9 +399,10 @@ const mapRoom = (room, index) => {
   const roomName = otherProfile.displayName || room.roomName || room.otherUserName || room.name || `채팅방 ${index + 1}`;
   const lastMsg = room.lastMessage || room.lastMsg || '대화를 시작해보세요.';
   const unread = Number(room.unreadCount ?? room.unread ?? 0);
-  const avatar = String(roomName).slice(0, 2).toUpperCase();
   const lastMessageAt = room.lastMessageAt || room.lastMessageCreatedAt || room.updatedAt || room.createdAt || null;
-  const avatarImageUrl = otherProfile.profileImageUrl || room.profileImageUrl || room.otherUserProfileImageUrl || null;
+  const avatarImageUrl = resolveUserAvatar(
+    otherProfile.profileImageUrl || room.profileImageUrl || room.otherUserProfileImageUrl,
+  );
 
   return {
     id: String(roomKey),
@@ -414,7 +413,6 @@ const mapRoom = (room, index) => {
     date: formatRoomDate(lastMessageAt),
     lastMessageAt,
     unread,
-    avatar,
     avatarImageUrl,
     verified: false,
     colorHex: room.colorHex || '#1a1a1a',

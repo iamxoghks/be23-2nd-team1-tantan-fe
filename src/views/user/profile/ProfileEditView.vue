@@ -200,7 +200,7 @@
             <div class="v-profile-edit-main">
               <div class="v-profile-edit-avatar-wrap">
                 <div class="v-profile-edit-avatar-frame">
-                  <img :src="form.profileImage" alt="프로필" class="v-cover-image" />
+                  <img :src="form.profileImage" alt="프로필" class="v-cover-image" @error="handleUserAvatarError" />
                 </div>
                 <button class="v-profile-edit-avatar-btn" type="button" @click="openProfileImagePicker">
                   <Camera class="v-icon-18-md20" />
@@ -381,6 +381,7 @@ import { normalizeRole } from '@/services/token';
 import { notifyAuthInvalidated } from '@/services/authLifecycle';
 import { extractPayload } from '@/utils/api';
 import { useSession } from '@/composables/useSession';
+import { USER_AVATAR_PLACEHOLDER, resolveUserAvatar, handleUserAvatarError } from '@/utils/userAvatar';
 
 const router = useRouter();
 const route = useRoute();
@@ -403,7 +404,7 @@ const form = ref({
   nickName: '',
   email: '',
   bio: '',
-  profileImage: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?q=80&w=200&h=200&auto=format&fit=crop',
+  profileImage: USER_AVATAR_PLACEHOLDER,
   isPublic: true,
   showStats: true,
 });
@@ -823,7 +824,7 @@ const loadProfile = async () => {
     originalEmail.value = String(data.email || '').trim().toLowerCase();
     verifiedEmail.value = originalEmail.value;
     form.value.bio = String(data.bio ?? '');
-    form.value.profileImage = data.profileImageUrl || data.profileImage || form.value.profileImage;
+    form.value.profileImage = resolveUserAvatar(data.profileImageUrl || data.profileImage);
     form.value.isPublic = typeof data.isPublic === 'boolean' ? data.isPublic : true;
     form.value.showStats = typeof data.showStats === 'boolean' ? data.showStats : true;
   } catch (error) {

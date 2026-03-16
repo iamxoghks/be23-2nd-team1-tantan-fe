@@ -69,6 +69,15 @@
             </div>
 
             <div class="v-filter-row">
+              <button
+                v-if="canUseFollowOnly"
+                type="button"
+                class="v-follow-only-btn"
+                :class="isFollowOnly ? 'v-follow-only-btn-active' : 'v-follow-only-btn-inactive'"
+                @click="toggleFollowOnly"
+              >
+                팔로우
+              </button>
               <div class="v-sort-dropdown">
                 <button type="button" class="v-sort-btn v-sort-btn-trigger" @click="toggleSortMenu">
                   <ArrowUpDown :size="20" />
@@ -101,7 +110,7 @@
                       :disabled="!canOpenAuthorProfile(post)"
                       @click.stop="openAuthorProfile(post)"
                     >
-                      <img :src="post.authorImage" alt="" class="v-user-avatar" />
+                      <img :src="post.authorImage" alt="" class="v-user-avatar" @error="handleUserAvatarError" />
                     </button>
                     <div>
                       <button
@@ -164,7 +173,7 @@
                     v-if="!isMyPost(post)"
                     class="v-community-report-btn ux-views-community-communityview-022"
                     :disabled="isReportingPostId === post.id"
-                    @click.stop="reportPost(post)"
+                    @click.stop="openReportModal({ refId: post.id, refType: 'POST' })"
                   >
                     <Flag :size="14" />
                   </button>
@@ -178,6 +187,35 @@
         </div>
       </main>
     </div>
+
+    <Teleport to="body">
+      <div v-if="isReportModalOpen" class="v-report-modal-backdrop" @click.self="closeReportModal">
+        <div class="v-report-modal">
+          <h3 class="v-report-modal-title">신고하기</h3>
+          <p class="v-report-modal-desc">신고 사유를 입력해주세요. 5자 이상 500자 이하로 작성 가능합니다.</p>
+          <textarea
+            v-model="reportReason"
+            class="v-report-textarea"
+            placeholder="신고 사유를 입력해주세요."
+            maxlength="500"
+          />
+          <div class="v-report-modal-meta">
+            <span v-if="reportErrorMessage" class="v-report-error">{{ reportErrorMessage }}</span>
+            <span class="v-report-count">{{ reportReason.length }}/500</span>
+          </div>
+          <div class="v-report-actions">
+            <button type="button" class="v-report-cancel" :disabled="isSubmittingReport" @click="closeReportModal">취소</button>
+            <button type="button" class="v-report-submit" :disabled="isSubmittingReport" @click="submitReport">
+              {{ isSubmittingReport ? '접수 중...' : '신고 접수' }}
+            </button>
+          </div>
+        </div>
+      </div>
+    </Teleport>
+
+    <Teleport to="body">
+      <div v-if="reportToastMessage" class="v-report-toast">{{ reportToastMessage }}</div>
+    </Teleport>
   </div>
 </template>
 
@@ -190,6 +228,7 @@ import { communityLikeApi, communityPostApi, reportApi } from '@/services/apis';
 import { useSession } from '@/composables/useSession';
 import { normalizeCommunityPost } from '@/utils/postNormalizer';
 import { extractList, extractPayload } from '@/utils/api';
+import { handleUserAvatarError } from '@/utils/userAvatar';
 
 const categories = ['전체', '자유게시판', '운동 공유', '운동 꿀팁', '헬스장 리뷰', '식단 공유', '질문게시판'];
 const route = useRoute();
@@ -207,8 +246,16 @@ const isSortMenuOpen = ref(false);
 const isLoadingPosts = ref(false);
 const postLoadError = ref('');
 const isReportingPostId = ref(null);
+const isReportModalOpen = ref(false);
+const reportReason = ref('');
+const reportErrorMessage = ref('');
+const isSubmittingReport = ref(false);
+const reportToastMessage = ref('');
+const reportTargetRefId = ref(null);
+const reportTargetType = ref('POST');
 let suggestDebounceTimer = null;
 let suggestRequestId = 0;
+let reportToastTimer = null;
 const sortOptions = [
   { value: 'LATEST', label: '최신순' },
   { value: 'LIKE', label: '좋아요순' },
@@ -226,6 +273,7 @@ const selectedSortLabel = computed(() => (
 const hasSearchTerm = computed(() => String(searchTerm.value || '').length > 0);
 const hasSuggestTarget = computed(() => String(searchTerm.value || '').trim().length >= 2);
 const showSuggestionPanel = computed(() => isSearchFocused.value && hasSuggestTarget.value);
+const isFollowOnly = ref(false);
 
 const getNumber = (value, fallback = 0) => {
   const parsed = Number(value);
@@ -254,6 +302,7 @@ const currentUserId = computed(() => {
   );
   return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
 });
+const canUseFollowOnly = computed(() => Boolean(currentUserId.value));
 const canOpenAuthorProfile = (post) => Boolean(resolveAuthorUserId(post));
 const isMyPost = (post) => {
   const authorId = resolveAuthorUserId(post);
@@ -371,6 +420,7 @@ const buildListQuery = () => {
   if (category && category !== '전체') query.category = category;
   if (keyword) query.q = keyword;
   if (sortType) query.sortType = sortType;
+  if (isFollowOnly.value && canUseFollowOnly.value) query.followOnly = 'true';
   return query;
 };
 
@@ -394,6 +444,7 @@ const loadPosts = async (
       sortType: normalizedSortType,
       ...(category && category !== '전체' ? { category } : {}),
       ...(trimmedKeyword ? { title: trimmedKeyword, content: trimmedKeyword } : {}),
+      ...(isFollowOnly.value && canUseFollowOnly.value ? { followOnly: true } : {}),
     };
     const response = await communityPostApi.list(params);
     const list = extractList(extractPayload(response));
@@ -434,6 +485,13 @@ const handleCategoryChange = (category) => {
   selectedCategory.value = category;
   syncListQuery();
   loadPosts(category, searchTerm.value, selectedSortType.value);
+};
+
+const toggleFollowOnly = () => {
+  if (!canUseFollowOnly.value) return;
+  isFollowOnly.value = !isFollowOnly.value;
+  syncListQuery();
+  loadPosts(selectedCategory.value, searchTerm.value, selectedSortType.value);
 };
 
 const applySearch = () => {
@@ -585,30 +643,67 @@ const toFriendlyReportError = (error) => {
   return '신고 처리에 실패했습니다.';
 };
 
-const reportPost = async (post) => {
-  const postId = Number(post?.id || 0);
-  if (!postId) return;
+const showReportToast = (message) => {
+  if (reportToastTimer) {
+    clearTimeout(reportToastTimer);
+    reportToastTimer = null;
+  }
+  reportToastMessage.value = message;
+  reportToastTimer = window.setTimeout(() => {
+    reportToastMessage.value = '';
+    reportToastTimer = null;
+  }, 1800);
+};
 
-  const reasonInput = window.prompt('신고 사유를 입력해주세요. (5~500자)');
-  if (reasonInput === null) return;
+const openReportModal = ({ refId, refType }) => {
+  const normalizedRefId = Number(refId || 0);
+  if (!normalizedRefId) return;
+  reportTargetRefId.value = normalizedRefId;
+  reportTargetType.value = String(refType || 'POST').toUpperCase();
+  reportReason.value = '';
+  reportErrorMessage.value = '';
+  isSubmittingReport.value = false;
+  isReportModalOpen.value = true;
+};
 
-  const reason = String(reasonInput || '').trim();
+const closeReportModal = () => {
+  if (isSubmittingReport.value) return;
+  isReportModalOpen.value = false;
+  reportReason.value = '';
+  reportErrorMessage.value = '';
+  reportTargetRefId.value = null;
+  reportTargetType.value = 'POST';
+};
+
+const submitReport = async () => {
+  const targetId = Number(reportTargetRefId.value || 0);
+  if (!targetId) return;
+  const reason = String(reportReason.value || '').trim();
   if (reason.length < 5 || reason.length > 500) {
-    window.alert('신고 사유는 5자 이상 500자 이하로 입력해주세요.');
+    reportErrorMessage.value = '신고 사유는 5자 이상 500자 이하로 입력해주세요.';
     return;
   }
-
-  isReportingPostId.value = post.id;
+  reportErrorMessage.value = '';
+  isSubmittingReport.value = true;
+  if (reportTargetType.value === 'POST') {
+    isReportingPostId.value = targetId;
+  }
   try {
     await reportApi.create({
-      refId: postId,
-      refType: 'POST',
+      refId: targetId,
+      refType: reportTargetType.value,
       reason,
     });
-    window.alert('신고가 접수되었습니다.');
+    isReportModalOpen.value = false;
+    reportReason.value = '';
+    reportErrorMessage.value = '';
+    reportTargetRefId.value = null;
+    reportTargetType.value = 'POST';
+    showReportToast('신고가 접수되었습니다.');
   } catch (error) {
-    window.alert(toFriendlyReportError(error));
+    reportErrorMessage.value = toFriendlyReportError(error);
   } finally {
+    isSubmittingReport.value = false;
     isReportingPostId.value = null;
   }
 };
@@ -639,6 +734,7 @@ onMounted(() => {
   const queryCategory = String(route.query?.category || '').trim();
   const queryKeyword = String(route.query?.q || '').trim();
   const querySortType = normalizeSortType(route.query?.sortType);
+  const queryFollowOnly = String(route.query?.followOnly || '').trim().toLowerCase();
 
   if (queryCategory && categories.includes(queryCategory)) {
     selectedCategory.value = queryCategory;
@@ -647,6 +743,7 @@ onMounted(() => {
     searchTerm.value = queryKeyword;
   }
   selectedSortType.value = querySortType;
+  isFollowOnly.value = queryFollowOnly === 'true' || queryFollowOnly === '1';
 
   if (refId) {
     router.replace({
@@ -661,11 +758,28 @@ onMounted(() => {
   loadPosts(selectedCategory.value, searchTerm.value, selectedSortType.value);
 });
 
+watch(canUseFollowOnly, (next) => {
+  if (isFollowOnly.value && next) {
+    syncListQuery();
+    loadPosts(selectedCategory.value, searchTerm.value, selectedSortType.value);
+    return;
+  }
+  if (!next && isFollowOnly.value) {
+    isFollowOnly.value = false;
+    syncListQuery();
+    loadPosts(selectedCategory.value, searchTerm.value, selectedSortType.value);
+  }
+});
+
 onBeforeUnmount(() => {
   document.removeEventListener('click', handleOutsideClick);
   if (suggestDebounceTimer) {
     clearTimeout(suggestDebounceTimer);
     suggestDebounceTimer = null;
+  }
+  if (reportToastTimer) {
+    clearTimeout(reportToastTimer);
+    reportToastTimer = null;
   }
 });
 </script>
