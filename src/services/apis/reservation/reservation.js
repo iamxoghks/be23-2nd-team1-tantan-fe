@@ -16,4 +16,8 @@ export const reservationApi = {
   create(payload) {
     return apiClient.post('/api/v1/reservations/create', payload);
   },
+
+  createDailySlots(gymId, payload) {
+    return apiClient.post(`/api/v1/gyms/${gymId}/slots/daily`, payload);
+  },
 };

@@ -69,14 +69,39 @@
                 </div>
               </div>
 
-              <div class="view-card-sm v-owner-panel-card">
-                <h3 class="v-owner-panel-title">짐 이미지</h3>
-                <div v-if="gymOwnerImages.length > 0" class="v-owner-image-grid">
-                  <div v-for="image in gymOwnerImages" :key="image.key" class="v-owner-image-card">
-                    <img :src="image.url" alt="짐 이미지" class="v-owner-image-thumb" />
+              <div class="v-owner-info-grid">
+                <div class="view-card-sm v-owner-panel-card">
+                  <h3 class="v-owner-panel-title">짐 이미지</h3>
+                  <div v-if="gymOwnerImages.length > 0" class="v-owner-image-grid">
+                    <div v-for="image in gymOwnerImages" :key="image.key" class="v-owner-image-card">
+                      <img :src="image.url" alt="짐 이미지" class="v-owner-image-thumb" />
+                    </div>
                   </div>
+                  <p v-else class="v-owner-read-text">등록된 이미지가 없습니다.</p>
                 </div>
-                <p v-else class="v-owner-read-text">등록된 이미지가 없습니다.</p>
+
+                <div class="view-card-sm v-owner-panel-card">
+                  <div class="sx-views-user-profile-profileview-016">
+                    <h3 class="v-owner-panel-title" style="margin-bottom: 0;">예약 슬롯 현황</h3>
+                    <input type="date" v-model="selectedSlotDate" @change="loadGymSlots" class="v-modal-line-input" style="width: auto; padding: 2px 8px; min-height: 32px; font-size: 13px;" />
+                  </div>
+                  <div v-if="gymOwnerSlots.length > 0" class="v-owner-row-gap" style="margin-top: 12px; max-height: 200px; overflow-y: auto; padding-right: 4px;">
+                    <div v-for="slot in gymOwnerSlots" :key="slot.id" class="v-owner-exception-row">
+                      <div>
+                        <p class="v-owner-exception-date">{{ formatGymOwnerTime(slot.slotDateTime) }} ~ {{ formatGymOwnerTime(slot.endTime) }}</p>
+                        <p class="v-owner-exception-help">
+                          {{ slot.slotName }} ({{ slot.price.toLocaleString() }}원)
+                        </p>
+                      </div>
+                      <div style="text-align: right;">
+                        <span class="v-profile-activity-pill" :class="slot.remainingCount > 0 ? 'v-profile-activity-pill-green' : 'v-profile-activity-pill-gray'" style="min-height: 24px; padding: 0 10px; font-size: 11px;">
+                          {{ slot.remainingCount > 0 ? `잔여 ${slot.remainingCount}명` : '마감' }}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                  <p v-else class="v-owner-read-text" style="margin-top: 12px;">해당 날짜에 생성된 예약 슬롯이 없습니다.</p>
+                </div>
               </div>
             </div>
 
@@ -561,7 +586,7 @@ import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { RouterLink, useRoute, useRouter } from 'vue-router';
 import NavigationRail from '@/components/sections/NavigationRail.vue';
 import { Plus, History, Trash2, X, CheckCircle2 } from 'lucide-vue-next';
-import { chatApi, followApi, gymApi, gymFavoriteApi, userApi, workoutApi } from '@/services/apis';
+import { chatApi, followApi, gymApi, gymFavoriteApi, userApi, workoutApi, reservationApi } from '@/services/apis';
 import { useSession } from '@/composables/useSession';
 import { normalizeRole } from '@/services/token';
 import { formatTimeAgo } from '@/utils/time';
@@ -758,6 +783,10 @@ const gymOwnerExceptions = ref([]);
 const gymOwnerImages = ref([]);
 const gymOwnerPendingImages = ref([]);
 const gymOwnerSelectedImageNames = ref([]);
+const gymOwnerSlots = ref([]);
+const selectedSlotDate = ref(
+  `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}-${String(new Date().getDate()).padStart(2, '0')}`
+);
 const gymOwnerExceptionForm = ref({
   specificDate: '',
   openTime: '09:00',
@@ -778,6 +807,17 @@ const amenityCount = computed(() => gymOwnerAmenitiesInput.value
   .split(',')
   .map((item) => item.trim())
   .filter(Boolean).length);
+
+const loadGymSlots = async () => {
+  if (!viewedGymId.value) return;
+  try {
+    const response = await reservationApi.getSlots(viewedGymId.value, selectedSlotDate.value);
+    const payload = response?.data?.data || response?.data?.result || response?.data || [];
+    gymOwnerSlots.value = Array.isArray(payload) ? payload : [];
+  } catch (error) {
+    gymOwnerSlots.value = [];
+  }
+};
 
 const toDateTimeInputValue = (input = new Date()) => {
   const date = input instanceof Date ? input : new Date(input);
@@ -1337,6 +1377,7 @@ const loadProfileData = async () => {
         workoutForm.value.place = gymPayload.name;
       }
       applyGymOwnerData(gymPayload);
+      await loadGymSlots();
       if (isOwnProfile.value && isGymOwner.value) {
         await loadGymOwnerExceptions();
       }

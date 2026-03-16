@@ -163,6 +163,33 @@
               </div>
             </section>
 
+            <section class="owner-edit-section">
+              <h2>예약 슬롯 관리 (자동 생성)</h2>
+              <div class="owner-edit-grid owner-edit-grid-2">
+                <label class="owner-edit-field">
+                  <span>날짜</span>
+                  <input v-model="reservationForm.date" type="date" class="v-modal-line-input" />
+                </label>
+                <label class="owner-edit-field">
+                  <span>예약명</span>
+                  <input v-model="reservationForm.slotName" type="text" placeholder="예: 1:1 PT 수업" class="v-modal-line-input" />
+                </label>
+              </div>
+              <div class="owner-edit-grid owner-edit-grid-2">
+                <label class="owner-edit-field">
+                  <span>가격 (원)</span>
+                  <input v-model.number="reservationForm.price" type="number" min="0" step="1000" class="v-modal-line-input" />
+                </label>
+                <label class="owner-edit-field">
+                  <span>정원 (명)</span>
+                  <input v-model.number="reservationForm.maxCapacity" type="number" min="1" class="v-modal-line-input" />
+                </label>
+              </div>
+              <button type="button" class="v-modal-save-btn owner-edit-action-btn" :disabled="isCreatingReservation" @click="createDailySlots">
+                {{ isCreatingReservation ? '생성 중...' : '예약 슬롯 일괄 생성' }}
+              </button>
+            </section>
+
             <p v-if="ownerMessage" class="owner-edit-message">{{ ownerMessage }}</p>
             <p v-if="ownerError" class="owner-edit-error">{{ ownerError }}</p>
           </div>
@@ -349,7 +376,7 @@ import {
 import { useRouter, RouterLink, useRoute } from 'vue-router';
 import NavigationRail from '@/components/sections/NavigationRail.vue';
 import { ArrowLeft, UserRound, Camera } from 'lucide-vue-next';
-import { gymApi, userApi } from '@/services/apis';
+import { gymApi, userApi, reservationApi } from '@/services/apis';
 import { normalizeRole } from '@/services/token';
 import { notifyAuthInvalidated } from '@/services/authLifecycle';
 import { extractPayload } from '@/utils/api';
@@ -635,9 +662,17 @@ const isSavingProducts = ref(false);
 const isCreatingException = ref(false);
 const isUploadingImages = ref(false);
 const isDeletingImage = ref(false);
+const isCreatingReservation = ref(false);
 const ownerMessage = ref('');
 const ownerError = ref('');
 const isProcessingAccountAction = ref(false);
+const gymId = ref(null);
+const reservationForm = ref({
+  date: '',
+  slotName: '1:1 PT 수업',
+  price: 50000,
+  maxCapacity: 1,
+});
 
 const toHHmm = (value, fallback = '00:00') => {
   if (!value) return fallback;
@@ -896,7 +931,9 @@ const loadExceptions = async () => {
 const loadGym = async () => {
   try {
     const response = await gymApi.myGym();
-    applyGymData(extractPayload(response));
+    const payload = extractPayload(response);
+    gymId.value = payload.id || payload.gymId || null;
+    applyGymData(payload);
     await loadExceptions();
   } catch (error) {
     ownerError.value = '짐 정보를 불러오지 못했습니다.';
@@ -920,6 +957,49 @@ const saveGymProfile = async () => {
     ownerError.value = '짐 기본 정보 저장에 실패했습니다.';
   } finally {
     isSavingGymProfile.value = false;
+  }
+};
+
+const createDailySlots = async () => {
+  if (!gymId.value) {
+    ownerError.value = '짐 정보를 불러오지 못했습니다. 새로고침 후 다시 시도해주세요.';
+    return;
+  }
+  if (!reservationForm.value.date) {
+    ownerError.value = '예약 슬롯을 생성할 날짜를 선택해주세요.';
+    return;
+  }
+  if (reservationForm.value.price < 0) {
+    ownerError.value = '가격은 0원 이상이어야 합니다.';
+    return;
+  }
+  if (reservationForm.value.maxCapacity < 1) {
+    ownerError.value = '정원은 1명 이상이어야 합니다.';
+    return;
+  }
+
+  isCreatingReservation.value = true;
+  ownerMessage.value = '';
+  ownerError.value = '';
+
+  try {
+    await reservationApi.createDailySlots(gymId.value, {
+      date: reservationForm.value.date,
+      slotName: reservationForm.value.slotName,
+      price: reservationForm.value.price,
+      maxCapacity: reservationForm.value.maxCapacity,
+    });
+    
+    ownerMessage.value = `${reservationForm.value.date} 예약 슬롯이 성공적으로 생성되었습니다.`;
+    
+    reservationForm.value.date = '';
+    reservationForm.value.slotName = '1:1 PT 수업';
+    reservationForm.value.price = 50000;
+    reservationForm.value.maxCapacity = 1;
+  } catch (error) {
+    ownerError.value = error?.response?.data?.message || '예약 슬롯 생성에 실패했습니다. 영업시간이 설정되어 있는지 확인해주세요.';
+  } finally {
+    isCreatingReservation.value = false;
   }
 };
 
