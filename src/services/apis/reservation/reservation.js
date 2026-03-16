@@ -13,6 +13,10 @@ export const reservationApi = {
     });
   },
 
+  listMine() {
+    return apiClient.get('/api/v1/reservations/list');
+  },
+
   create(payload) {
     return apiClient.post('/api/v1/reservations/create', payload);
   },

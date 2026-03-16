@@ -35,17 +35,75 @@
               </div>
               <label class="owner-edit-field">
                 <span>주소</span>
-                <input v-model="gymForm.address" type="text" class="v-modal-line-input" />
+                <div class="owner-edit-address-row">
+                  <input
+                    :value="gymForm.address"
+                    type="text"
+                    readonly
+                    placeholder="주소 검색으로 시설 주소를 선택하세요"
+                    class="v-modal-line-input owner-edit-address-input"
+                  />
+                  <button type="button" class="v-modal-cancel-btn owner-edit-address-btn" @click="openAddressSearchModal">
+                    주소 검색
+                  </button>
+                </div>
               </label>
-              <label class="owner-edit-field">
-                <span>카테고리 ID</span>
-                <input v-model.number="gymForm.categoryId" type="number" min="1" class="v-modal-line-input" />
-              </label>
+              <div class="owner-edit-field">
+                <span>카테고리</span>
+                <select
+                  :value="String(gymForm.categoryId ?? '')"
+                  class="v-modal-line-input owner-edit-select"
+                  :disabled="isLoadingGymCategories"
+                  @change="handleGymCategoryChange"
+                >
+                  <option value="" disabled>
+                    {{ isLoadingGymCategories ? '카테고리 불러오는 중...' : '카테고리 선택' }}
+                  </option>
+                  <option
+                    v-for="category in gymCategoryOptions"
+                    :key="category.id"
+                    :value="String(category.id)"
+                  >
+                    {{ category.name }}
+                  </option>
+                </select>
+              </div>
               <label class="owner-edit-field">
                 <span>소개</span>
-                <textarea v-model="gymForm.description" rows="4" class="v-modal-line-input owner-edit-textarea" />
+                <div class="v-profile-edit-bio-wrap" :class="{ 'is-over-limit': isGymDescriptionOverLimit }">
+                  <textarea
+                    v-model="gymForm.description"
+                    rows="4"
+                    placeholder="헬스장을 소개해 보세요"
+                    class="v-profile-edit-textarea owner-edit-textarea"
+                    :class="{ 'is-over-limit': isGymDescriptionOverLimit }"
+                  />
+                </div>
+                <div class="v-profile-edit-bio-meter-row">
+                  <div class="v-profile-edit-bio-meter-group">
+                    <div class="v-profile-edit-bio-meter" :class="{ 'is-over-limit': isGymDescriptionOverLimit }">
+                      <svg viewBox="0 0 28 28" class="v-profile-edit-bio-meter-svg" aria-hidden="true">
+                        <circle class="v-profile-edit-bio-meter-track" cx="14" cy="14" r="10" />
+                        <circle
+                          class="v-profile-edit-bio-meter-progress"
+                          :class="{ 'is-over-limit': isGymDescriptionOverLimit }"
+                          cx="14"
+                          cy="14"
+                          r="10"
+                          :style="{
+                            strokeDasharray: `${BIO_CIRCLE_CIRCUMFERENCE} ${BIO_CIRCLE_CIRCUMFERENCE}`,
+                            strokeDashoffset: `${gymDescriptionCircleDashOffset}`,
+                          }"
+                        />
+                      </svg>
+                    </div>
+                    <p class="v-profile-edit-bio-count" :class="{ 'is-over-limit': isGymDescriptionOverLimit }">
+                      {{ isGymDescriptionOverLimit ? gymDescriptionRemaining : `${gymDescriptionLength}/${PROFILE_BIO_MAX_LENGTH}` }}
+                    </p>
+                  </div>
+                </div>
               </label>
-              <button class="v-modal-save-btn owner-edit-action-btn" :disabled="isSavingGymProfile" @click="saveGymProfile">
+              <button class="v-modal-save-btn owner-edit-action-btn" :disabled="isSavingGymProfile || isGymDescriptionOverLimit" @click="saveGymProfile">
                 {{ isSavingGymProfile ? '저장 중...' : '기본 정보 저장' }}
               </button>
             </section>
@@ -84,13 +142,18 @@
 
             <section class="owner-edit-section">
               <h2>짐 이미지</h2>
-              <label class="owner-edit-field">
-                <span>이미지 업로드</span>
-                <input type="file" accept="image/*" multiple @change="handleImageChange" />
-              </label>
+              <input
+                ref="gymImageInputRef"
+                type="file"
+                accept="image/*"
+                multiple
+                class="u-hidden"
+                @change="handleImageChange"
+              />
+              <p class="owner-edit-help">버튼을 눌러 이미지를 선택하고 업로드하세요.</p>
               <p v-if="selectedImageNames.length" class="owner-edit-help">선택 파일: {{ selectedImageNames.join(', ') }}</p>
-              <button class="v-modal-save-btn owner-edit-action-btn" :disabled="isUploadingImages || pendingImages.length === 0" @click="uploadImages">
-                {{ isUploadingImages ? '업로드 중...' : '이미지 업로드' }}
+              <button class="v-modal-save-btn owner-edit-action-btn" :disabled="isUploadingImages" @click="handleGymImageAction">
+                {{ isUploadingImages ? '업로드 중...' : (pendingImages.length > 0 ? '선택한 이미지 업로드' : '이미지 선택') }}
               </button>
               <div v-if="gymImages.length > 0" class="owner-edit-image-grid">
                 <div v-for="image in gymImages" :key="image.key" class="owner-edit-image-card">
@@ -107,7 +170,14 @@
               <div class="owner-edit-row-gap">
                 <div v-for="(item, idx) in products" :key="idx" class="owner-edit-product-row">
                   <input v-model="item.productName" type="text" placeholder="상품명" class="v-modal-line-input" />
-                  <input v-model.number="item.price" type="number" min="0" placeholder="가격" class="v-modal-line-input" />
+                  <input
+                    :value="item.price"
+                    type="number"
+                    min="0"
+                    placeholder="가격"
+                    class="v-modal-line-input owner-edit-product-price-input"
+                    @input="handleProductPriceInput(idx, $event)"
+                  />
                   <button type="button" class="owner-edit-small-btn" @click="removeProduct(idx)">삭제</button>
                 </div>
               </div>
@@ -166,10 +236,13 @@
             <section class="owner-edit-section">
               <h2>예약 슬롯 관리 (자동 생성)</h2>
               <div class="owner-edit-grid owner-edit-grid-2">
-                <label class="owner-edit-field">
+                <div class="owner-edit-field">
                   <span>날짜</span>
-                  <input v-model="reservationForm.date" type="date" class="v-modal-line-input" />
-                </label>
+                  <label class="v-history-control-btn v-history-date-filter owner-edit-date-filter">
+                    <Calendar :size="18" />
+                    <input v-model="reservationForm.date" type="date" class="v-history-date-input owner-edit-date-input" />
+                  </label>
+                </div>
                 <label class="owner-edit-field">
                   <span>예약명</span>
                   <input v-model="reservationForm.slotName" type="text" placeholder="예: 1:1 PT 수업" class="v-modal-line-input" />
@@ -298,25 +371,27 @@
                     ></div>
                   </div>
                   <div class="v-profile-edit-bio-meter-row">
-                    <div class="v-profile-edit-bio-meter" :class="{ 'is-over-limit': isBioOverLimit }">
-                      <svg viewBox="0 0 28 28" class="v-profile-edit-bio-meter-svg" aria-hidden="true">
-                        <circle class="v-profile-edit-bio-meter-track" cx="14" cy="14" r="10" />
-                        <circle
-                          class="v-profile-edit-bio-meter-progress"
-                          :class="{ 'is-over-limit': isBioOverLimit }"
-                          cx="14"
-                          cy="14"
-                          r="10"
-                          :style="{
-                            strokeDasharray: `${BIO_CIRCLE_CIRCUMFERENCE} ${BIO_CIRCLE_CIRCUMFERENCE}`,
-                            strokeDashoffset: `${bioCircleDashOffset}`,
-                          }"
-                        />
-                      </svg>
+                    <div class="v-profile-edit-bio-meter-group">
+                      <div class="v-profile-edit-bio-meter" :class="{ 'is-over-limit': isBioOverLimit }">
+                        <svg viewBox="0 0 28 28" class="v-profile-edit-bio-meter-svg" aria-hidden="true">
+                          <circle class="v-profile-edit-bio-meter-track" cx="14" cy="14" r="10" />
+                          <circle
+                            class="v-profile-edit-bio-meter-progress"
+                            :class="{ 'is-over-limit': isBioOverLimit }"
+                            cx="14"
+                            cy="14"
+                            r="10"
+                            :style="{
+                              strokeDasharray: `${BIO_CIRCLE_CIRCUMFERENCE} ${BIO_CIRCLE_CIRCUMFERENCE}`,
+                              strokeDashoffset: `${bioCircleDashOffset}`,
+                            }"
+                          />
+                        </svg>
+                      </div>
+                      <p class="v-profile-edit-bio-count" :class="{ 'is-over-limit': isBioOverLimit }">
+                        {{ isBioOverLimit ? bioRemaining : `${bioLength}/${PROFILE_BIO_MAX_LENGTH}` }}
+                      </p>
                     </div>
-                    <p class="v-profile-edit-bio-count" :class="{ 'is-over-limit': isBioOverLimit }">
-                      {{ isBioOverLimit ? bioRemaining : `${bioLength}/${PROFILE_BIO_MAX_LENGTH}` }}
-                    </p>
                   </div>
                 </label>
 
@@ -424,6 +499,47 @@
         </div>
       </div>
     </div>
+
+    <div
+      v-if="isAddressSearchModalOpen"
+      class="view-modal-backdrop v-profile-save-modal-backdrop"
+      role="button"
+      tabindex="0"
+      aria-label="주소 검색 모달 닫기"
+      @click.self="closeAddressSearchModal"
+      @keyup.enter="closeAddressSearchModal"
+    >
+      <div class="view-modal-panel owner-edit-address-modal" role="dialog" aria-modal="true" aria-labelledby="owner-address-search-title" @click.stop>
+        <div class="v-profile-save-modal-body">
+          <h2 id="owner-address-search-title" class="v-modal-title">주소 검색</h2>
+          <p class="v-profile-save-modal-copy">네이버 지도 주소 검색으로 시설 주소를 찾습니다.</p>
+          <div class="owner-edit-address-search-row">
+            <input
+              v-model="addressSearchQuery"
+              type="text"
+              class="v-modal-line-input owner-edit-address-search-input"
+              placeholder="도로명 주소 또는 지번을 입력하세요"
+              @keydown.enter.prevent="searchAddress"
+            />
+            <button type="button" class="v-modal-save-btn owner-edit-address-search-submit" :disabled="isSearchingAddress" @click="searchAddress">
+              {{ isSearchingAddress ? '검색 중...' : '검색' }}
+            </button>
+          </div>
+          <p v-if="addressSearchError" class="owner-edit-error">{{ addressSearchError }}</p>
+          <div v-else-if="addressSearchResult" class="owner-edit-address-result">
+            <strong>{{ addressSearchResult.roadAddress || addressSearchResult.jibunAddress }}</strong>
+            <p v-if="addressSearchResult.roadAddress">도로명: {{ addressSearchResult.roadAddress }}</p>
+            <p v-if="addressSearchResult.jibunAddress">지번: {{ addressSearchResult.jibunAddress }}</p>
+          </div>
+        </div>
+        <div class="v-profile-save-modal-actions owner-edit-address-modal-actions">
+          <button type="button" class="v-modal-cancel-btn" @click="closeAddressSearchModal">닫기</button>
+          <button type="button" class="v-modal-save-btn" :disabled="!addressSearchResult" @click="applySearchedAddress">
+            이 주소 사용
+          </button>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -437,11 +553,11 @@ import {
 } from 'vue';
 import { useRouter, RouterLink, useRoute } from 'vue-router';
 import NavigationRail from '@/components/sections/NavigationRail.vue';
-import { ArrowLeft, UserRound, Camera } from 'lucide-vue-next';
-import { gymApi, userApi, reservationApi } from '@/services/apis';
+import { ArrowLeft, UserRound, Camera, Calendar } from 'lucide-vue-next';
+import { gymApi, userApi, reservationApi, mapApi } from '@/services/apis';
 import { normalizeRole, setAuthTokens } from '@/services/token';
 import { notifyAuthInvalidated } from '@/services/authLifecycle';
-import { extractPayload } from '@/utils/api';
+import { extractList, extractPayload } from '@/utils/api';
 import { useSession } from '@/composables/useSession';
 import { USER_AVATAR_PLACEHOLDER, resolveUserAvatar, handleUserAvatarError } from '@/utils/userAvatar';
 
@@ -505,6 +621,12 @@ const bioSafeText = computed(() => bioChars.value.slice(0, PROFILE_BIO_MAX_LENGT
 const bioOverflowText = computed(() => bioChars.value.slice(PROFILE_BIO_MAX_LENGTH).join(''));
 const bioCircleRatio = computed(() => Math.min(bioLength.value / PROFILE_BIO_MAX_LENGTH, 1));
 const bioCircleDashOffset = computed(() => BIO_CIRCLE_CIRCUMFERENCE * (1 - bioCircleRatio.value));
+const gymDescriptionChars = computed(() => Array.from(String(gymForm.value.description || '')));
+const gymDescriptionLength = computed(() => gymDescriptionChars.value.length);
+const gymDescriptionRemaining = computed(() => PROFILE_BIO_MAX_LENGTH - gymDescriptionLength.value);
+const isGymDescriptionOverLimit = computed(() => gymDescriptionRemaining.value < 0);
+const gymDescriptionCircleRatio = computed(() => Math.min(gymDescriptionLength.value / PROFILE_BIO_MAX_LENGTH, 1));
+const gymDescriptionCircleDashOffset = computed(() => BIO_CIRCLE_CIRCUMFERENCE * (1 - gymDescriptionCircleRatio.value));
 const normalizedCurrentEmail = computed(() => String(form.value.email || '').trim().toLowerCase());
 const normalizedOriginalEmail = computed(() => String(originalEmail.value || '').trim().toLowerCase());
 const isEmailChangeRequested = computed(() => (
@@ -704,9 +826,12 @@ const gymForm = ref({
   name: '',
   address: '',
   description: '',
-  categoryId: 1,
+  categoryId: null,
+  categoryName: '',
   tel: '',
 });
+const gymCategoryOptions = ref([]);
+const isLoadingGymCategories = ref(false);
 const gymHours = ref(defaultHours());
 const availableAmenities = [
   { code: 'FREE_WIFI', label: '무료 Wi-Fi' },
@@ -730,6 +855,12 @@ const exceptionForm = ref({
 const gymImages = ref([]);
 const pendingImages = ref([]);
 const selectedImageNames = ref([]);
+const gymImageInputRef = ref(null);
+const isAddressSearchModalOpen = ref(false);
+const isSearchingAddress = ref(false);
+const addressSearchQuery = ref('');
+const addressSearchResult = ref(null);
+const addressSearchError = ref('');
 
 const isSavingGymProfile = ref(false);
 const isSavingGymHours = ref(false);
@@ -765,11 +896,38 @@ const toHHmmss = (value, fallback = '00:00:00') => {
 
 const formatTime = (value) => toHHmm(value, '--:--');
 
+const normalizeCategoryOption = (item = {}) => ({
+  id: Number(item?.id ?? 0),
+  name: String(item?.name || '').trim(),
+  sortOrder: Number(item?.sortOrder ?? 999),
+});
+
+const syncGymCategorySelection = () => {
+  if (!gymCategoryOptions.value.length) return;
+
+  const matchedById = gymCategoryOptions.value.find((category) => category.id === Number(gymForm.value.categoryId));
+  if (matchedById) {
+    gymForm.value.categoryName = matchedById.name;
+    return;
+  }
+
+  const currentCategoryName = String(gymForm.value.categoryName || '').trim();
+  if (!currentCategoryName) return;
+
+  const matchedByName = gymCategoryOptions.value.find((category) => category.name === currentCategoryName);
+  if (matchedByName) {
+    gymForm.value.categoryId = matchedByName.id;
+    gymForm.value.categoryName = matchedByName.name;
+  }
+};
+
 const applyGymData = (payload = {}) => {
   gymForm.value.name = payload.name || '';
   gymForm.value.address = payload.address || '';
   gymForm.value.description = payload.description || '';
-  gymForm.value.categoryId = Number(payload.categoryId || 1);
+  const categoryId = Number(payload.categoryId ?? payload.category?.id ?? 0);
+  gymForm.value.categoryId = Number.isFinite(categoryId) && categoryId > 0 ? categoryId : null;
+  gymForm.value.categoryName = String(payload.categoryName || payload.category?.name || '').trim();
   gymForm.value.tel = payload.tel || payload.phone || '';
 
   const hours = payload.hours || payload.businessHours || payload.gymHours || [];
@@ -812,6 +970,107 @@ const applyGymData = (payload = {}) => {
       })
       .filter(Boolean)
     : [];
+
+  syncGymCategorySelection();
+};
+
+const loadGymCategories = async () => {
+  isLoadingGymCategories.value = true;
+  try {
+    const response = await mapApi.categories();
+    const payload = extractPayload(response, []);
+    const list = extractList(payload)
+      .map(normalizeCategoryOption)
+      .filter((category) => category.id > 0 && category.name)
+      .sort((left, right) => left.sortOrder - right.sortOrder);
+    gymCategoryOptions.value = list;
+    syncGymCategorySelection();
+  } catch (error) {
+    gymCategoryOptions.value = [];
+  } finally {
+    isLoadingGymCategories.value = false;
+  }
+};
+
+const handleGymCategoryChange = (event) => {
+  const rawValue = String(event?.target?.value || '').trim();
+  const nextId = Number(rawValue);
+
+  if (!Number.isFinite(nextId) || nextId <= 0) {
+    gymForm.value.categoryId = null;
+    gymForm.value.categoryName = '';
+    return;
+  }
+
+  const selectedCategory = gymCategoryOptions.value.find((category) => category.id === nextId);
+  gymForm.value.categoryId = nextId;
+  gymForm.value.categoryName = selectedCategory?.name || '';
+};
+
+const openAddressSearchModal = () => {
+  addressSearchQuery.value = String(gymForm.value.address || '').trim();
+  addressSearchResult.value = null;
+  addressSearchError.value = '';
+  isAddressSearchModalOpen.value = true;
+};
+
+const closeAddressSearchModal = () => {
+  if (isSearchingAddress.value) return;
+  isAddressSearchModalOpen.value = false;
+  addressSearchError.value = '';
+  addressSearchResult.value = null;
+};
+
+const searchAddress = async () => {
+  const query = String(addressSearchQuery.value || '').trim();
+  if (!query) {
+    addressSearchError.value = '검색할 주소를 입력해주세요.';
+    addressSearchResult.value = null;
+    return;
+  }
+
+  isSearchingAddress.value = true;
+  addressSearchError.value = '';
+  addressSearchResult.value = null;
+  try {
+    const response = await mapApi.geocode(query);
+    const payload = extractPayload(response, {});
+    const roadAddress = String(payload?.roadAddress || '').trim();
+    const jibunAddress = String(payload?.jibunAddress || '').trim();
+
+    if (!roadAddress && !jibunAddress) {
+      addressSearchError.value = '검색 결과가 없습니다.';
+      return;
+    }
+
+    addressSearchResult.value = {
+      roadAddress,
+      jibunAddress,
+    };
+  } catch (error) {
+    addressSearchError.value = String(
+      error?.response?.data?.message
+      || error?.response?.data?.error
+      || '주소 검색에 실패했습니다.',
+    ).trim();
+  } finally {
+    isSearchingAddress.value = false;
+  }
+};
+
+const applySearchedAddress = () => {
+  const nextAddress = String(
+    addressSearchResult.value?.roadAddress
+    || addressSearchResult.value?.jibunAddress
+    || '',
+  ).trim();
+
+  if (!nextAddress) return;
+
+  gymForm.value.address = nextAddress;
+  isAddressSearchModalOpen.value = false;
+  addressSearchError.value = '';
+  addressSearchResult.value = null;
 };
 
 const toFriendlyEmailVerifyError = (error, fallbackMessage) => {
@@ -964,13 +1223,13 @@ const initializeProfileEditView = async () => {
   }
 
   if (previewRole.value === 'GYM_OWNER' || normalizeRole(sessionProfile.value?.role) === 'GYM_OWNER') {
-    await loadGym();
+    await Promise.all([loadGymCategories(), loadGym()]);
     return;
   }
 
   await loadProfile();
   if (isGymOwner.value) {
-    await loadGym();
+    await Promise.all([loadGymCategories(), loadGym()]);
   }
 };
 
@@ -1116,6 +1375,17 @@ const loadGym = async () => {
 };
 
 const saveGymProfile = async () => {
+  if (!gymForm.value.categoryId) {
+    ownerError.value = '카테고리를 선택해주세요.';
+    ownerMessage.value = '';
+    return;
+  }
+  if (isGymDescriptionOverLimit.value) {
+    ownerError.value = `소개는 최대 ${PROFILE_BIO_MAX_LENGTH}자까지 입력할 수 있습니다.`;
+    ownerMessage.value = '';
+    return;
+  }
+
   isSavingGymProfile.value = true;
   ownerMessage.value = '';
   ownerError.value = '';
@@ -1215,6 +1485,11 @@ const addProduct = () => {
   products.value.push({ productName: '', price: 0 });
 };
 
+const handleProductPriceInput = (index, event) => {
+  const digitsOnly = String(event?.target?.value || '').replace(/[^\d]/g, '');
+  products.value[index].price = digitsOnly ? Number(digitsOnly) : 0;
+};
+
 const removeProduct = (index) => {
   products.value = products.value.filter((_, idx) => idx !== index);
 };
@@ -1286,6 +1561,21 @@ const handleImageChange = (event) => {
   selectedImageNames.value = files.map((file) => file.name);
 };
 
+const openGymImagePicker = () => {
+  if (gymImageInputRef.value) {
+    gymImageInputRef.value.value = '';
+  }
+  gymImageInputRef.value?.click();
+};
+
+const handleGymImageAction = () => {
+  if (pendingImages.value.length > 0) {
+    uploadImages();
+    return;
+  }
+  openGymImagePicker();
+};
+
 const uploadImages = async () => {
   if (pendingImages.value.length === 0) return;
   isUploadingImages.value = true;
@@ -1295,6 +1585,9 @@ const uploadImages = async () => {
     await gymApi.addImages(pendingImages.value);
     pendingImages.value = [];
     selectedImageNames.value = [];
+    if (gymImageInputRef.value) {
+      gymImageInputRef.value.value = '';
+    }
     await loadGym();
     ownerMessage.value = '짐 이미지가 업로드되었습니다.';
   } catch (error) {
@@ -1421,6 +1714,24 @@ onMounted(async () => {
   color: #334155;
 }
 
+.owner-edit-address-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+}
+
+.owner-edit-address-input {
+  cursor: default;
+}
+
+.owner-edit-address-btn {
+  min-width: 96px;
+}
+
+.owner-edit-select {
+  appearance: auto;
+}
+
 .owner-edit-textarea {
   min-height: 96px;
   padding-top: 10px;
@@ -1465,6 +1776,16 @@ onMounted(async () => {
   align-items: center;
 }
 
+.owner-edit-product-price-input::-webkit-outer-spin-button,
+.owner-edit-product-price-input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.owner-edit-product-price-input {
+  -moz-appearance: textfield;
+}
+
 .owner-edit-small-btn {
   border: 1px solid #cbd5e1;
   border-radius: 10px;
@@ -1483,6 +1804,15 @@ onMounted(async () => {
 
 .owner-edit-action-btn {
   min-height: 44px;
+}
+
+.owner-edit-date-filter {
+  width: 100%;
+  min-width: 0;
+}
+
+.owner-edit-date-input {
+  width: 100%;
 }
 
 .owner-edit-image-grid {
@@ -1541,6 +1871,47 @@ onMounted(async () => {
   margin: 0;
   font-size: 13px;
   color: #dc2626;
+}
+
+.owner-edit-address-modal {
+  width: min(520px, 100%);
+  border-radius: 24px;
+}
+
+.owner-edit-address-search-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.owner-edit-address-search-submit {
+  min-width: 88px;
+}
+
+.owner-edit-address-result {
+  margin-top: 16px;
+  border: 1px solid #dbeafe;
+  border-radius: 14px;
+  background: #eff6ff;
+  padding: 14px;
+  display: grid;
+  gap: 6px;
+}
+
+.owner-edit-address-result strong {
+  color: #1e3a8a;
+  font-size: 14px;
+}
+
+.owner-edit-address-result p {
+  margin: 0;
+  color: #475569;
+  font-size: 13px;
+}
+
+.owner-edit-address-modal-actions {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
 .settings-amenities-grid {
@@ -1696,6 +2067,16 @@ onMounted(async () => {
 }
 
 @media (max-width: 767px) {
+  .owner-edit-address-row,
+  .owner-edit-address-search-row {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .owner-edit-address-btn,
+  .owner-edit-address-search-submit {
+    width: 100%;
+  }
+
   .v-profile-save-modal-body {
     padding: 20px 18px 14px;
   }

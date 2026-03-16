@@ -6,7 +6,7 @@
       <div class="v-profile-history-wrap">
         <div class="sx-views-user-profile-profilehistoryview-002">
           <div class="sx-views-community-communityview-016">
-            <RouterLink to="/profile" class="v-history-back-btn"><ArrowLeft class="v-icon-18-md20" /></RouterLink>
+            <RouterLink :to="profileRouteLink" class="v-history-back-btn"><ArrowLeft class="v-icon-18-md20" /></RouterLink>
             <div>
               <h1 class="v-history-title">
                 <CalendarDays class="v-history-title-icon" />
@@ -80,7 +80,16 @@
                       <span class="v-profile-history-duration">{{ workout.duration || 'Daily' }}</span>
                     </div>
                     <h4 class="sx-views-user-profile-profilehistoryview-008">{{ workout.title }}</h4>
-                    <!-- <p class="u-text-meta-truncate">{{ workout.tags }}</p> -->
+                    <div v-if="workout.exercises && workout.exercises.length > 0" class="v-history-exercise-list">
+                      <div
+                        v-for="(exercise, exerciseIndex) in workout.exercises"
+                        :key="`${workout.id}-${exerciseIndex}-${exercise.name}`"
+                        class="v-history-exercise-item"
+                      >
+                        <span class="v-history-exercise-name">{{ exercise.name }}</span>
+                        <span class="v-history-exercise-stats">{{ exercise.stats }}</span>
+                      </div>
+                    </div>
 
                     <div class="v-history-stat-row">
                       <div
@@ -95,6 +104,7 @@
                   </div>
                 </div>
                 <button
+                  v-if="isOwnWorkoutHistory"
                   type="button"
                   class="v-history-delete-btn v-history-delete-btn-align v-day-history-delete-btn"
                   :disabled="isDeletingWorkout(workout.id)"
@@ -146,10 +156,13 @@ import { RouterLink, useRoute } from 'vue-router';
 import { ArrowLeft, CalendarDays, Search, Calendar, Trash2 } from 'lucide-vue-next';
 import NavigationRail from '@/components/sections/NavigationRail.vue';
 import { workoutApi } from '@/services/apis';
+import { useSession } from '@/composables/useSession';
+import { buildWorkoutTags, buildWorkoutTitle, extractWorkoutExercises } from '@/utils/workoutDisplay';
 
 const PAGE_SIZE = 20;
 
 const route = useRoute();
+const { sessionProfile, primeSessionFromToken } = useSession();
 
 const isLoading = ref(false);
 const isLoadingMore = ref(false);
@@ -171,6 +184,24 @@ const parseDateParam = (value) => {
 };
 
 const selectedDate = ref(parseDateParam(route.query?.date));
+const routeTargetUserId = computed(() => {
+  const raw = String(route.query?.userId || '').trim();
+  const parsed = Number(raw);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
+});
+const currentUserId = computed(() => {
+  const raw = Number(sessionProfile.value?.id ?? 0);
+  return Number.isFinite(raw) && raw > 0 ? raw : null;
+});
+const isOwnWorkoutHistory = computed(() => {
+  if (!routeTargetUserId.value) return true;
+  if (!currentUserId.value) return false;
+  return Number(routeTargetUserId.value) === Number(currentUserId.value);
+});
+const profileRouteLink = computed(() => ({
+  path: '/profile',
+  query: routeTargetUserId.value ? { userId: String(routeTargetUserId.value) } : undefined,
+}));
 
 const isAllMode = computed(() => !selectedDate.value);
 const normalizedDate = computed(() => parseDateParam(selectedDate.value));
@@ -247,25 +278,26 @@ const extractListPayload = (raw = {}) => {
 };
 
 const normalizeWorkout = (item, index) => {
-  const details = Array.isArray(item?.workoutDetails)
-    ? item.workoutDetails
-    : Array.isArray(item?.workoutDetailList)
-      ? item.workoutDetailList
-      : Array.isArray(item?.workoutDetailCreateDtoList)
-        ? item.workoutDetailCreateDtoList
-        : [];
+  const exercises = extractWorkoutExercises(item);
+  const hasExerciseValues = exercises.some((exercise) => exercise.hasWeight || exercise.hasSets || exercise.hasReps);
+  const totalWeight = exercises.reduce((sum, exercise) => sum + Number(exercise?.weight ?? 0), 0);
+  const totalSets = exercises.reduce((sum, exercise) => sum + Number(exercise?.sets ?? 0), 0);
+  const fallbackWeight = Number(item?.totalVolume ?? item?.totalWeight ?? item?.weight ?? 0);
+  const fallbackSets = Number(item?.totalSets ?? item?.setCount ?? item?.sets ?? 0);
+  const fallbackTitle = item?.workoutCondition || item?.title || item?.name || `운동 기록 ${index + 1}`;
 
   return {
     id: item?.workoutId ?? item?.id ?? `workout-${index + 1}`,
-    title: item?.workoutCondition || `운동 기록 ${index + 1}`,
+    title: buildWorkoutTitle(exercises, fallbackTitle),
     time: formatTime(item?.workoutDate || item?.createdAt || item?.createdTime),
     date: formatDate(item?.workoutDate || item?.createdAt || item?.createdTime),
     duration: 'Daily',
-    tags: details.map((detail) => detail?.workoutName).filter(Boolean).join(', ') || '운동',
+    tags: buildWorkoutTags(exercises),
+    exercises,
     stats: {
-      볼륨: `${details.reduce((sum, detail) => sum + Number(detail?.weight || 0), 0).toLocaleString()}kg`,
-      세트: details.reduce((sum, detail) => sum + Number(detail?.setCount || 0), 0),
-      종목: details.length,
+      볼륨: `${Number(hasExerciseValues ? totalWeight : fallbackWeight || 0).toLocaleString()}kg`,
+      세트: Number(hasExerciseValues ? totalSets : fallbackSets || 0),
+      종목: exercises.length,
     },
     bgColor: '#dbeafe',
     fgColor: '#2563eb',
@@ -356,6 +388,7 @@ const loadWorkouts = async ({ reset } = { reset: false }) => {
   }
 
   const targetPage = shouldReset ? 0 : currentPage.value + 1;
+  const requestedUserId = routeTargetUserId.value ? Number(routeTargetUserId.value) : null;
 
   try {
     const response = isAllMode.value
@@ -363,11 +396,13 @@ const loadWorkouts = async ({ reset } = { reset: false }) => {
         page: targetPage,
         size: PAGE_SIZE,
         sort: 'workoutDate,desc',
+        ...(requestedUserId ? { userId: requestedUserId } : {}),
       })
       : await workoutApi.day(normalizedDate.value, {
         page: targetPage,
         size: PAGE_SIZE,
         sort: 'workoutDate,desc',
+        ...(requestedUserId ? { userId: requestedUserId } : {}),
       });
 
     const {
@@ -429,7 +464,16 @@ watch(
   },
 );
 
+watch(
+  () => route.query?.userId,
+  () => {
+    loadWorkouts({ reset: true });
+  },
+);
+
 onBeforeUnmount(() => {
   disconnectInfiniteObserver();
 });
+
+primeSessionFromToken();
 </script>

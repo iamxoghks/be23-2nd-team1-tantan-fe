@@ -204,7 +204,7 @@
                   :disabled="isFollowBusy"
                   @click="toggleFollow"
                 >
-                  {{ isFollowBusy ? '처리 중...' : (isFollowing ? '팔로우 취소' : '팔로우') }}
+                  {{ isFollowBusy ? '처리 중...' : (isFollowing ? '팔로잉' : '팔로우') }}
                 </button>
               </template>
             </div>
@@ -288,7 +288,8 @@
                             heatmapColorClass(val),
                             isHeatmapCellClickable(i, j, val) ? 'v-heatmap-cell-clickable' : 'v-heatmap-cell-disabled',
                           ]"
-                          :title="getHeatmapCellDate(i, j) || ''"
+                          :data-hover-date="getHeatmapHoverDate(i, j, val) || null"
+                          :aria-label="getHeatmapAriaLabel(i, j, val) || null"
                           :disabled="!isHeatmapCellClickable(i, j, val)"
                           @click="openWorkoutByDate(i, j, val)"
                         />
@@ -309,7 +310,7 @@
                   <History :size="20" class="v-text-brand" />
                   최근 운동 기록
                 </div>
-                <RouterLink to="/workoutHistory" class="v-profile-view-all-link">전체 보기</RouterLink>
+                <RouterLink :to="profileWorkoutHistoryLink" class="v-profile-view-all-link">전체 보기</RouterLink>
               </div>
 
               <div class="u-col-gap-4">
@@ -321,10 +322,39 @@
                   <div class="sx-views-user-profile-profileview-019">
                     <div class="u-flex-1-min">
                       <h4 class="sx-views-user-profile-profileview-020 v-profile-log-title-hover">{{ log.exerciseName }}</h4>
-                      <div class="sx-views-user-profile-profileview-021">
-                        <div v-for="([key, val]) in Object.entries(log.stats || {})" :key="key" class="v-profile-log-stat-chip">
-                          <span class="v-profile-log-stat-key">{{ key }}</span>
-                          <span class="v-profile-log-stat-value">{{ val }}</span>
+                      <div v-if="log.exercises && log.exercises.length > 0" class="v-profile-log-exercise-list">
+                        <div
+                          v-for="(exercise, exerciseIndex) in log.exercises"
+                          :key="`${log.id}-${exerciseIndex}-${exercise.name}`"
+                          class="v-profile-log-exercise-item v-profile-log-exercise-card"
+                        >
+                          <span class="v-profile-log-exercise-name">{{ exercise.name }}</span>
+                          <div
+                            v-if="exercise.hasWeight || exercise.hasSets || exercise.hasReps"
+                            class="v-profile-log-exercise-metrics"
+                          >
+                            <div
+                              v-if="exercise.hasWeight && exercise.weight !== null"
+                              class="v-profile-log-stat-chip v-profile-log-exercise-metric"
+                            >
+                              <span class="v-profile-log-stat-key">중량</span>
+                              <span class="v-profile-log-stat-value">{{ formatWorkoutMetricValue(exercise.weight, 'kg') }}</span>
+                            </div>
+                            <div
+                              v-if="exercise.hasSets && exercise.sets !== null"
+                              class="v-profile-log-stat-chip v-profile-log-exercise-metric"
+                            >
+                              <span class="v-profile-log-stat-key">세트</span>
+                              <span class="v-profile-log-stat-value">{{ formatWorkoutMetricValue(exercise.sets) }}</span>
+                            </div>
+                            <div
+                              v-if="exercise.hasReps && exercise.reps !== null"
+                              class="v-profile-log-stat-chip v-profile-log-exercise-metric"
+                            >
+                              <span class="v-profile-log-stat-key">횟수</span>
+                              <span class="v-profile-log-stat-value">{{ formatWorkoutMetricValue(exercise.reps) }}</span>
+                            </div>
+                          </div>
                         </div>
                       </div>
                     </div>
@@ -350,15 +380,32 @@
               </div>
             </div>
 
-            <div class="view-card-sm">
-              <h3 class="sx-views-user-profile-profileview-024">짐 멤버십</h3>
-              <div class="sx-views-user-profile-profileview-026">
-                <div class="v-profile-membership-logo">짐</div>
-                <div>
-                  <h4 class="v-profile-membership-title">강남 머슬 팩토리</h4>
-                  <p class="v-profile-membership-dday">45일 남음</p>
-                </div>
+            <div v-if="isOwnProfile" class="view-card-sm">
+              <div class="v-profile-side-card-head">
+                <h3 class="sx-views-user-profile-profileview-024">예약 내역</h3>
+                <RouterLink to="/reservationHistory" class="v-profile-view-all-link">전체 보기</RouterLink>
               </div>
+
+              <div v-if="isLoadingReservationPreview" class="v-profile-reservation-preview v-profile-reservation-preview-loading">
+                예약 내역을 불러오는 중입니다.
+              </div>
+              <div v-else-if="nearestReservation" class="v-profile-reservation-preview">
+                <div class="v-profile-reservation-head">
+                  <span class="v-profile-reservation-phase" :class="reservationPreviewPhaseClass(nearestReservation)">
+                    {{ nearestReservation.phaseLabel }}
+                  </span>
+                  <span class="v-profile-reservation-relative">{{ nearestReservation.relativeLabel }}</span>
+                </div>
+                <h4 class="v-profile-membership-title">{{ nearestReservation.gymName }}</h4>
+                <p class="v-profile-membership-dday">{{ nearestReservation.date }} {{ nearestReservation.time }}</p>
+                <p v-if="nearestReservation.cancelReason" class="v-profile-reservation-note">
+                  취소 사유: {{ nearestReservation.cancelReason }}
+                </p>
+              </div>
+              <p v-else class="v-profile-log-empty">
+                예약 내역이 없습니다.<br />
+                원하는 시간대의 수업이나 슬롯을 예약해보세요.
+              </p>
             </div>
           </div>
         </div>
@@ -473,7 +520,7 @@
                     type="text"
                     inputmode="numeric"
                     placeholder="중량(kg)"
-                    class="v-modal-line-input sx-views-user-profile-profileview-038"
+                    class="v-modal-line-input sx-views-user-profile-profileview-038 v-profile-exercise-number-input v-profile-exercise-weight-input"
                     @input="handleExerciseNumberInput(idx, 'weight', $event)"
                   />
                   <input
@@ -481,7 +528,7 @@
                     type="text"
                     inputmode="numeric"
                     placeholder="세트"
-                    class="v-modal-line-input sx-views-user-profile-profileview-038"
+                    class="v-modal-line-input sx-views-user-profile-profileview-038 v-profile-exercise-number-input v-profile-exercise-sets-input"
                     @input="handleExerciseNumberInput(idx, 'sets', $event)"
                   />
                   <input
@@ -489,10 +536,10 @@
                     type="text"
                     inputmode="numeric"
                     placeholder="횟수"
-                    class="v-modal-line-input sx-views-user-profile-profileview-038"
+                    class="v-modal-line-input sx-views-user-profile-profileview-038 v-profile-exercise-number-input v-profile-exercise-reps-input"
                     @input="handleExerciseNumberInput(idx, 'reps', $event)"
                   />
-                  <button class="sx-views-user-profile-profileview-039" @click="removeExercise(idx)">
+                  <button class="sx-views-user-profile-profileview-039 v-profile-exercise-delete-btn" @click="removeExercise(idx)">
                     <Trash2 :size="18" />
                   </button>
                 </div>
@@ -590,9 +637,12 @@ import { chatApi, followApi, gymApi, gymFavoriteApi, userApi, workoutApi, reserv
 import { useSession } from '@/composables/useSession';
 import { normalizeRole } from '@/services/token';
 import { formatTimeAgo } from '@/utils/time';
+import { extractList, extractPayload } from '@/utils/api';
+import { normalizeReservationRecord, pickNearestReservation, sortReservationRecords } from '@/utils/reservationHistory';
 import { resolveUserAvatar, handleUserAvatarError } from '@/utils/userAvatar';
+import { buildWorkoutTags, buildWorkoutTitle, extractWorkoutExercises } from '@/utils/workoutDisplay';
 
-const days = ['월', '수', '금'];
+const days = ['일', '월', '화', '수', '목', '금', '토'];
 const selectedHeatmapYear = ref(new Date().getFullYear());
 const earliestHeatmapYear = ref(new Date().getFullYear());
 const heatmapContributionTotal = ref(0);
@@ -656,6 +706,8 @@ const profile = ref({});
 const heatmapData = ref([]);
 const heatmapDateData = ref([]);
 const logs = ref([]);
+const reservationPreviewList = ref([]);
+const isLoadingReservationPreview = ref(false);
 const route = useRoute();
 const router = useRouter();
 const { sessionProfile, primeSessionFromToken, syncSessionFromServer } = useSession();
@@ -687,6 +739,10 @@ const routeTargetGymId = computed(() => {
   const parsed = Number(raw);
   return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
 });
+const profileWorkoutHistoryLink = computed(() => ({
+  path: '/workoutHistory',
+  query: routeTargetUserId.value ? { userId: String(routeTargetUserId.value) } : undefined,
+}));
 const viewedRole = computed(() => (
   normalizeRole(profile.value?.role)
   || previewRole.value
@@ -754,6 +810,7 @@ const gymOwnerEditLink = computed(() => (
     ? { path: '/profile/edit', query: { previewRole: previewRole.value || 'GYM_OWNER' } }
     : { path: '/profile/edit' }
 ));
+const nearestReservation = computed(() => pickNearestReservation(reservationPreviewList.value));
 
 const DAY_ORDER = ['MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY', 'SUNDAY'];
 const dayLabelMap = {
@@ -765,6 +822,12 @@ const dayLabelMap = {
   SATURDAY: '토',
   SUNDAY: '일',
 };
+
+const reservationPreviewPhaseClass = (reservation) => ({
+  'v-profile-reservation-phase-upcoming': reservation?.phase === 'upcoming',
+  'v-profile-reservation-phase-past': reservation?.phase === 'past',
+  'v-profile-reservation-phase-cancelled': reservation?.phase === 'cancelled',
+});
 
 const defaultHours = () => DAY_ORDER.map((day) => ({
   dayOfWeek: day,
@@ -878,6 +941,12 @@ const formatFollowCount = (value) => {
     return `${compact}천`;
   }
   return count.toLocaleString();
+};
+
+const formatWorkoutMetricValue = (value, unit = '') => {
+  const normalized = Number(value);
+  if (!Number.isFinite(normalized)) return '-';
+  return `${normalized.toLocaleString()}${unit}`;
 };
 
 const toFollowUserList = (payload) => {
@@ -995,38 +1064,27 @@ const moveToProfile = (userId) => {
 };
 
 const normalizeWorkout = (item, index) => {
-  const details = Array.isArray(item?.workoutDetails)
-    ? item.workoutDetails
-    : Array.isArray(item?.workoutDetailList)
-    ? item.workoutDetailList
-    : Array.isArray(item?.workoutDetailCreateDtoList)
-      ? item.workoutDetailCreateDtoList
-      : [];
-  const firstNamedDetail = details.find((detail) => String(
-    detail?.workoutName || detail?.exerciseName || detail?.name || '',
-  ).trim());
-  const totalWeight = details.reduce((sum, detail) => sum + Number(
-    detail?.weight ?? detail?.totalWeight ?? detail?.volume ?? detail?.kg ?? 0,
-  ), 0);
-  const totalSets = details.reduce((sum, detail) => sum + Number(
-    detail?.setCount ?? detail?.sets ?? detail?.set ?? 0,
-  ), 0);
-  const totalReps = details.reduce((sum, detail) => sum + Number(
-    detail?.rep ?? detail?.reps ?? detail?.repCount ?? detail?.count ?? 0,
-  ), 0);
+  const exercises = extractWorkoutExercises(item);
+  const hasExerciseValues = exercises.some((exercise) => exercise.hasWeight || exercise.hasSets || exercise.hasReps);
+  const totalWeight = exercises.reduce((sum, exercise) => sum + Number(exercise?.weight ?? 0), 0);
+  const totalSets = exercises.reduce((sum, exercise) => sum + Number(exercise?.sets ?? 0), 0);
+  const totalReps = exercises.reduce((sum, exercise) => sum + Number(exercise?.reps ?? 0), 0);
   const fallbackWeight = Number(item?.totalVolume ?? item?.totalWeight ?? item?.weight ?? 0);
   const fallbackSets = Number(item?.totalSets ?? item?.setCount ?? item?.sets ?? 0);
   const fallbackReps = Number(item?.totalReps ?? item?.rep ?? item?.reps ?? item?.repCount ?? 0);
+  const fallbackTitle = item.workoutCondition || item.title || item.name || `운동 ${index + 1}`;
 
   return {
     ...item,
     id: item.workoutId ?? item.id ?? `workout-${index + 1}`,
-    exerciseName: String(firstNamedDetail?.workoutName || item.workoutCondition || item.title || item.name || `운동 ${index + 1}`).trim(),
+    exerciseName: buildWorkoutTitle(exercises, fallbackTitle),
+    exercises,
+    tags: buildWorkoutTags(exercises),
     timeAgo: item.timeAgo || formatTimeAgo(item.workoutDate || item.createdTime || item.createdAt),
     stats: {
-      중량: `${Number(totalWeight || fallbackWeight || 0).toLocaleString()}kg`,
-      세트: Number(totalSets || fallbackSets || 0),
-      횟수: Number(totalReps || fallbackReps || 0),
+      중량: `${Number(hasExerciseValues ? totalWeight : fallbackWeight || 0).toLocaleString()}kg`,
+      세트: Number(hasExerciseValues ? totalSets : fallbackSets || 0),
+      횟수: Number(hasExerciseValues ? totalReps : fallbackReps || 0),
     },
   };
 };
@@ -1363,7 +1421,13 @@ const loadProfileData = async () => {
 
     if (!isGymOwner.value && !shouldMaskPrivateProfile.value) {
       try {
-        const workoutResponse = await workoutApi.list({ page: 0, size: 5, sort: 'workoutDate,desc' });
+        const requestedUserId = Number(normalizedProfileUserId.value || 0) || null;
+        const workoutResponse = await workoutApi.list({
+          page: 0,
+          size: 5,
+          sort: 'workoutDate,desc',
+          ...(requestedUserId ? { userId: requestedUserId } : {}),
+        });
         const payload = workoutResponse?.data?.data || workoutResponse?.data?.result || workoutResponse?.data;
         const list = Array.isArray(payload)
           ? payload
@@ -1378,6 +1442,27 @@ const loadProfileData = async () => {
       }
     } else {
       logs.value = [];
+    }
+
+    if (isOwnProfile.value && !isGymOwner.value && !shouldMaskPrivateProfile.value) {
+      isLoadingReservationPreview.value = true;
+      try {
+        const reservationResponse = await reservationApi.listMine();
+        const reservationPayload = extractPayload(reservationResponse, []);
+        const reservationList = extractList(reservationPayload);
+        const now = Date.now();
+        reservationPreviewList.value = sortReservationRecords(
+          reservationList.map((item, index) => normalizeReservationRecord(item, index, now)),
+          now,
+        );
+      } catch (error) {
+        reservationPreviewList.value = [];
+      } finally {
+        isLoadingReservationPreview.value = false;
+      }
+    } else {
+      reservationPreviewList.value = [];
+      isLoadingReservationPreview.value = false;
     }
 
     let gymPayload = null;
@@ -1628,16 +1713,45 @@ const getHeatmapCellDate = (weekIndex, dayIndex) => (
   heatmapDateData.value?.[weekIndex]?.[dayIndex] || null
 );
 
+const formatHeatmapHoverDate = (value) => {
+  const normalized = String(value ?? '').trim();
+  if (!normalized) return '';
+
+  const [year, month, day] = normalized.split('-').map(Number);
+  if (![year, month, day].every(Number.isFinite)) return normalized;
+
+  const date = new Date(year, month - 1, day);
+  if (Number.isNaN(date.getTime())) return normalized;
+
+  return `${year}.${String(month).padStart(2, '0')}.${String(day).padStart(2, '0')} ${days[date.getDay()]}요일`;
+};
+
 const isHeatmapCellClickable = (weekIndex, dayIndex, value) => {
   const date = getHeatmapCellDate(weekIndex, dayIndex);
   return Boolean(date) && Number(value || 0) > 0;
+};
+
+const getHeatmapHoverDate = (weekIndex, dayIndex, value) => {
+  if (!isHeatmapCellClickable(weekIndex, dayIndex, value)) return null;
+  return formatHeatmapHoverDate(getHeatmapCellDate(weekIndex, dayIndex));
+};
+
+const getHeatmapAriaLabel = (weekIndex, dayIndex, value) => {
+  const hoverDate = getHeatmapHoverDate(weekIndex, dayIndex, value);
+  return hoverDate ? `${hoverDate} 운동 기록 보기` : null;
 };
 
 const openWorkoutByDate = (weekIndex, dayIndex, value) => {
   if (!isHeatmapCellClickable(weekIndex, dayIndex, value)) return;
   const date = getHeatmapCellDate(weekIndex, dayIndex);
   if (!date) return;
-  router.push({ path: '/workoutHistory', query: { date } });
+  router.push({
+    path: '/workoutHistory',
+    query: {
+      date,
+      ...(routeTargetUserId.value ? { userId: String(routeTargetUserId.value) } : {}),
+    },
+  });
 };
 
 const loadHeatmapData = async () => {
@@ -1873,6 +1987,18 @@ onBeforeUnmount(() => {
 .v-profile-activity-days {
   padding-top: 24px;
   flex-shrink: 0;
+  display: grid;
+  grid-template-rows: repeat(7, minmax(0, 1fr));
+  gap: 4px;
+  align-items: center;
+}
+
+.v-profile-activity-days span {
+  font-size: 11px;
+  line-height: 1;
+  color: #94a3b8;
+  text-align: center;
+  min-height: 14px;
 }
 
 .v-profile-activity-grid-scroll {
@@ -1989,9 +2115,56 @@ onBeforeUnmount(() => {
   border-radius: 3px;
 }
 
+.v-profile-activity-main .v-heatmap-cell-clickable {
+  position: relative;
+}
+
 .v-profile-activity-main .v-profile-heatmap-month-cell {
   width: 14px;
   min-width: 14px;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .v-profile-activity-grid-scroll {
+    padding-bottom: 32px;
+  }
+
+  .v-profile-activity-main .v-heatmap-cell-clickable[data-hover-date]:hover::after,
+  .v-profile-activity-main .v-heatmap-cell-clickable[data-hover-date]:focus-visible::after {
+    content: attr(data-hover-date);
+    position: absolute;
+    left: 50%;
+    top: calc(100% + 10px);
+    transform: translateX(-50%);
+    padding: 8px 12px;
+    border-radius: 9999px;
+    border: 1px solid rgba(148, 163, 184, 0.28);
+    background: linear-gradient(180deg, #1e293b 0%, #0f172a 100%);
+    box-shadow: 0 14px 28px rgba(15, 23, 42, 0.22);
+    color: #ffffff;
+    font-size: 12px;
+    font-weight: 700;
+    line-height: 1;
+    white-space: nowrap;
+    z-index: 20;
+    pointer-events: none;
+  }
+
+  .v-profile-activity-main .v-heatmap-cell-clickable[data-hover-date]:hover::before,
+  .v-profile-activity-main .v-heatmap-cell-clickable[data-hover-date]:focus-visible::before {
+    content: '';
+    position: absolute;
+    left: 50%;
+    top: calc(100% + 4px);
+    width: 10px;
+    height: 10px;
+    transform: translateX(-50%) rotate(45deg);
+    background: #1e293b;
+    border-inline-start: 1px solid rgba(148, 163, 184, 0.28);
+    border-top: 1px solid rgba(148, 163, 184, 0.28);
+    z-index: 19;
+    pointer-events: none;
+  }
 }
 
 .v-follow-modal-backdrop {
@@ -2144,6 +2317,10 @@ onBeforeUnmount(() => {
 }
 
 @media (max-width: 767px) {
+  .v-profile-activity-days span:not(:nth-child(1)):not(:nth-child(4)):not(:nth-child(7)) {
+    visibility: hidden;
+  }
+
   .v-profile-activity-grid-scroll {
     overflow-x: auto;
     overflow-y: hidden;
@@ -2209,6 +2386,74 @@ onBeforeUnmount(() => {
   text-align: left;
 }
 
+.v-profile-side-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.v-profile-reservation-preview {
+  display: grid;
+  gap: 10px;
+  padding: 18px 16px;
+  border-radius: 16px;
+  background: linear-gradient(180deg, #f8fbff 0%, #eff6ff 100%);
+  border: 1px solid #dbeafe;
+}
+
+.v-profile-reservation-preview-loading {
+  color: #64748b;
+  font-size: 14px;
+}
+
+.v-profile-reservation-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.v-profile-reservation-phase {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 28px;
+  padding: 0 10px;
+  border-radius: 9999px;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.v-profile-reservation-phase-upcoming {
+  background: #dbeafe;
+  color: #1d4ed8;
+}
+
+.v-profile-reservation-phase-past {
+  background: #f1f5f9;
+  color: #475569;
+}
+
+.v-profile-reservation-phase-cancelled {
+  background: #fee2e2;
+  color: #dc2626;
+}
+
+.v-profile-reservation-relative {
+  font-size: 13px;
+  font-weight: 600;
+  color: #64748b;
+}
+
+.v-profile-reservation-note {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.5;
+  color: #64748b;
+}
+
 .v-owner-hero-card {
   display: grid;
   gap: 20px;
@@ -2228,6 +2473,12 @@ onBeforeUnmount(() => {
 }
 
 @media (max-width: 767px) {
+  .v-profile-side-card-head,
+  .v-profile-reservation-head {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
   .v-owner-head {
     flex-direction: column;
   }

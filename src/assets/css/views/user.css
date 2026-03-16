@@ -69,6 +69,42 @@
   justify-content: space-between;
 }
 
+.v-profile-log-exercise-list,
+.v-history-exercise-list {
+  display: grid;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.v-profile-log-exercise-item,
+.v-history-exercise-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.v-profile-log-exercise-name,
+.v-history-exercise-name {
+  min-width: 0;
+  font-size: 13px;
+  font-weight: 700;
+  color: #334155;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.v-profile-log-exercise-stats,
+.v-history-exercise-stats {
+  flex-shrink: 0;
+  font-size: 12px;
+  font-weight: 600;
+  color: #64748b;
+  text-align: right;
+  white-space: nowrap;
+}
+
 .v-profile-log-stat-chip {
   background: #ffffff;
   border: 1px solid #f1f5f9;
@@ -77,6 +113,28 @@
   display: flex;
   flex-direction: column;
   flex-shrink: 0;
+}
+
+.v-profile-log-exercise-card {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: flex-start;
+  gap: 10px;
+  padding: 12px 14px;
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+  background: #ffffff;
+}
+
+.v-profile-log-exercise-metrics {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.v-profile-log-exercise-metric {
+  min-width: 72px;
 }
 
 .v-profile-achievement-box {
@@ -161,6 +219,17 @@
 
 .v-profile-exercise-name-input {
   min-width: 0;
+}
+
+.v-profile-exercise-number-input,
+.v-profile-exercise-delete-btn {
+  min-width: 0;
+}
+
+.v-profile-exercise-delete-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .v-profile-exercise-error {
@@ -622,7 +691,14 @@
   display: flex;
   align-items: center;
   justify-content: flex-end;
+}
+
+.v-profile-edit-bio-meter-group {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
   gap: 8px;
+  flex: 0 0 auto;
 }
 
 .v-profile-edit-bio-meter {
@@ -663,8 +739,10 @@
   font-size: 12px;
   color: #94a3b8;
   font-weight: 700;
-  min-width: 44px;
+  min-width: max-content;
   text-align: right;
+  white-space: nowrap;
+  margin: 0;
 }
 
 .v-profile-edit-bio-count.is-over-limit {
@@ -1091,6 +1169,47 @@
 
   .v-owner-form-grid {
     grid-template-columns: minmax(0, 1fr);
+  }
+
+  .v-profile-exercise-row {
+    grid-template-columns: repeat(3, minmax(0, 1fr)) 44px;
+    grid-template-areas:
+      "name name name name"
+      "weight sets reps delete";
+    gap: 10px;
+  }
+
+  .v-profile-exercise-name-input {
+    grid-area: name;
+  }
+
+  .v-profile-exercise-weight-input {
+    grid-area: weight;
+  }
+
+  .v-profile-exercise-sets-input {
+    grid-area: sets;
+  }
+
+  .v-profile-exercise-reps-input {
+    grid-area: reps;
+  }
+
+  .v-profile-exercise-delete-btn {
+    grid-area: delete;
+    align-self: stretch;
+  }
+
+  .v-profile-log-exercise-item,
+  .v-history-exercise-item {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .v-profile-log-exercise-stats,
+  .v-history-exercise-stats {
+    text-align: left;
+    white-space: normal;
   }
 
   .v-owner-section-title {
