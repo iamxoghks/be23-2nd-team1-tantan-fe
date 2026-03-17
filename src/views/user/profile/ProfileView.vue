@@ -1503,7 +1503,8 @@ const loadProfileData = async () => {
       try {
         const checkResponse = await gymFavoriteApi.check(viewedGymId.value);
         const checkPayload = checkResponse?.data?.data ?? checkResponse?.data?.result ?? checkResponse?.data;
-        isFavoriteGym.value = Boolean(checkPayload?.isFavorite ?? checkPayload?.favorite ?? checkPayload);
+        // 객체 자체가 아닌 실제 불린 필드값을 확인하도록 수정
+        isFavoriteGym.value = checkPayload === true || checkPayload?.isFavorite === true || checkPayload?.favorite === true;
       } catch (error) {
         isFavoriteGym.value = false;
       }
@@ -1580,7 +1581,9 @@ const toggleGymFavorite = async () => {
       isFavoriteGym.value = true;
     }
   } catch (error) {
-    // no-op
+    // 에러 발생 시 상태를 서버와 맞추기 위해 현재 상태를 반전시키거나 알림을 줄 수 있습니다.
+    // 여기서는 실패 메시지만 출력하고 상태는 유지합니다.
+    console.error('즐겨찾기 처리 실패:', error);
   } finally {
     isFavoriteBusy.value = false;
   }
