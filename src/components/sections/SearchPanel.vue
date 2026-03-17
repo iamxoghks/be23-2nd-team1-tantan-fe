@@ -195,6 +195,15 @@
                     <span class="ux-components-sections-searchpanel-008">저장</span>
                   </button>
                   <div class="search-panel-action-divider" />
+                  <button 
+                    class="sx-components-sections-searchpanel-002" 
+                    @click="startChatWithGymOwner"
+                    :disabled="isCreatingChat"
+                  >
+                    <MessageSquare :size="24" class="u-text-gray-400" />
+                    <span class="ux-components-sections-searchpanel-008">{{ isCreatingChat ? '연결 중' : '상담' }}</span>
+                  </button>
+                  <div class="search-panel-action-divider" />
                   <button class="sx-components-sections-searchpanel-002" @click="handleShareGym">
                     <Share2 :size="24" class="u-text-gray-400" />
                     <span class="ux-components-sections-searchpanel-009">공유</span>
@@ -809,7 +818,7 @@ import {
   LogIn,
 } from 'lucide-vue-next';
 import UiIconButton from '@/components/ui/UiIconButton.vue';
-import { gymApi, reservationApi, reviewApi } from '@/services/apis';
+import { gymApi, reservationApi, reviewApi, chatApi } from '@/services/apis';
 import { useSession } from '@/composables/useSession';
 import { normalizeRole } from '@/services/token';
 import { extractList, extractPayload } from '@/utils/api';
@@ -935,6 +944,7 @@ const reservationSelectedSlotDateTime = ref('');
 const reservationSubmitting = ref(false);
 const reservationFeedbackMessage = ref('');
 const reservationFeedbackTone = ref('info');
+const isCreatingChat = ref(false);
 const maxReviewImageCount = 10;
 const reviewPageSize = 5;
 const reviewLoadMoreThreshold = 160;
@@ -2490,6 +2500,39 @@ const handleShareGym = async () => {
   } catch (error) {
     console.error('Failed to copy share link:', error);
     showShareToast('링크 복사에 실패했습니다.', 'error');
+  }
+};
+
+const startChatWithGymOwner = async () => {
+  const gymOwnerId = Number(selectedGymDetail.value?.userId || selectedGymDetail.value?.ownerId || props.selectedGym?.userId || props.selectedGym?.ownerId || 0);
+  if (!gymOwnerId) {
+    window.alert('해당 헬스장 사장님 정보를 찾을 수 없습니다.');
+    return;
+  }
+  
+  if (!isAuthenticated.value) {
+    if (typeof props.onRequireAuth === 'function') {
+      props.onRequireAuth();
+      return;
+    }
+    window.alert('로그인이 필요합니다.');
+    return;
+  }
+
+  if (gymOwnerId === Number(sessionUserId.value)) {
+    window.alert('본인의 헬스장입니다.');
+    return;
+  }
+
+  isCreatingChat.value = true;
+  try {
+    await chatApi.createRoom({ otherUserId: gymOwnerId });
+    router.push('/chat');
+  } catch (error) {
+    console.error('Failed to create chat room:', error);
+    window.alert('채팅방 생성에 실패했습니다.');
+  } finally {
+    isCreatingChat.value = false;
   }
 };
 

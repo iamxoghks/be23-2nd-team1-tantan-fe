@@ -33,14 +33,22 @@
               >
                 시설 정보 수정
               </RouterLink>
-              <button
-                v-else
-                class="v-profile-action-primary v-profile-action-btn v-owner-head-action"
-                :disabled="isFavoriteBusy"
-                @click="toggleGymFavorite"
-              >
-                {{ isFavoriteBusy ? '처리 중...' : (isFavoriteGym ? '즐겨찾기 해제' : '즐겨찾기') }}
-              </button>
+              <div v-else class="u-flex u-gap-2 u-flex-wrap" style="justify-content: flex-end;">
+                <button
+                  class="v-profile-action-primary v-profile-action-btn v-owner-head-action"
+                  :disabled="isCreatingChat || !canStartChat"
+                  @click="startChatWithUser"
+                >
+                  {{ isCreatingChat ? '연결 중...' : '상담하기' }}
+                </button>
+                <button
+                  class="v-profile-action-secondary v-profile-action-btn v-owner-head-action"
+                  :disabled="isFavoriteBusy"
+                  @click="toggleGymFavorite"
+                >
+                  {{ isFavoriteBusy ? '처리 중...' : (isFavoriteGym ? '즐겨찾기 해제' : '즐겨찾기') }}
+                </button>
+              </div>
             </div>
           </div>
 
@@ -837,6 +845,8 @@ const defaultHours = () => DAY_ORDER.map((day) => ({
 }));
 
 const gymOwnerForm = ref({
+  id: null,
+  userId: null,
   name: '',
   address: '',
   description: '',
@@ -1138,6 +1148,7 @@ const toHHmmss = (value, fallback = '00:00:00') => {
 
 const applyGymOwnerData = (payload = {}) => {
   gymOwnerForm.value.id = Number(payload.id || payload.gymId || 0) || null;
+  gymOwnerForm.value.userId = Number(payload.userId || payload.ownerId || 0) || null;
   gymOwnerForm.value.name = payload.name || '';
   gymOwnerForm.value.address = payload.address || '';
   gymOwnerForm.value.description = payload.description || '';
@@ -1516,8 +1527,8 @@ const loadProfileData = async () => {
 };
 
 const startChatWithUser = async () => {
-  const otherUserId = Number(viewedUserId.value || 0);
-  if (!otherUserId || isOwnProfile.value || !canStartChat.value) return;
+  const otherUserId = Number(viewedUserId.value || (isGymOwner.value ? gymOwnerForm.value.userId : 0) || 0);
+  if (!otherUserId || isOwnProfile.value) return;
   isCreatingChat.value = true;
   try {
     await chatApi.createRoom({ otherUserId });
