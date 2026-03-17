@@ -670,11 +670,11 @@
 
 .rail-item-dot {
   position: absolute;
-  top: -2px;
-  right: -2px;
-  width: 5px;
-  height: 5px;
-  border: 1px solid var(--color-surface-base);
+  top: -4px;
+  right: -4px;
+  width: 10px;
+  height: 10px;
+  border: 2px solid var(--color-surface-base);
   border-radius: 9999px;
   background: var(--color-danger);
 }
