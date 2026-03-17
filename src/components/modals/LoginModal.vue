@@ -85,10 +85,17 @@ const errorMessage = ref('');
 
 const { isAuthModalOpen, closeAuthModal } = useAuthModal();
 const { syncSessionFromServer } = useSession();
-const API_BASE_URL =
-  import.meta.env.VUE_APP_API_BASE_URL ||
-  import.meta.env.VITE_API_BASE_URL ||
-  'http://server.nahcb572.shop';
+const getValidApiBaseUrl = () => {
+  const envVite = import.meta.env.VITE_API_BASE_URL;
+  const envVue = import.meta.env.VUE_APP_API_BASE_URL;
+  
+  if (envVite && envVite.startsWith('http')) return envVite;
+  if (envVue && envVue.startsWith('http')) return envVue;
+  
+  return 'http://localhost:8080';
+};
+
+const API_BASE_URL = getValidApiBaseUrl();
 
 watch(isAuthModalOpen, (isOpen) => {
   if (!isOpen) return;
