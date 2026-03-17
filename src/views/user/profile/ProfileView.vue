@@ -1148,7 +1148,7 @@ const toHHmmss = (value, fallback = '00:00:00') => {
 
 const applyGymOwnerData = (payload = {}) => {
   gymOwnerForm.value.id = Number(payload.id || payload.gymId || 0) || null;
-  gymOwnerForm.value.userId = Number(payload.userId || payload.ownerId || 0) || null;
+  gymOwnerForm.value.userId = Number(payload.ownerId || payload.userId || 0) || null;
   gymOwnerForm.value.name = payload.name || '';
   gymOwnerForm.value.address = payload.address || '';
   gymOwnerForm.value.description = payload.description || '';
