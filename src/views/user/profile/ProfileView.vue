@@ -283,7 +283,7 @@
                     </div>
                   </div>
                 </div>
-                <div class="v-profile-activity-grid-wrap">
+                <div class="v-profile-activity-grid-wrap" :style="heatmapLayoutStyle">
                   <div class="sx-views-user-profile-profileview-010 v-profile-activity-days">
                     <span v-for="(day, index) in heatmapDayLabels" :key="`heatmap-day-${index}`">{{ day }}</span>
                   </div>
@@ -668,12 +668,20 @@ import { buildWorkoutTags, buildWorkoutTitle, extractWorkoutExercises } from '@/
 
 const weekdayNames = ['일', '월', '화', '수', '목', '금', '토'];
 const heatmapDayLabels = ['', '월', '', '수', '', '금', ''];
+const DEFAULT_HEATMAP_CELL_SIZE = 14;
+const DEFAULT_HEATMAP_MONTH_OFFSET = 18;
 const selectedHeatmapYear = ref(new Date().getFullYear());
 const earliestHeatmapYear = ref(new Date().getFullYear());
 const heatmapContributionTotal = ref(0);
 const heatmapMonthLabelByWeek = ref([]);
 const heatmapWeekCount = computed(() => Math.max(1, Number(heatmapData.value?.length || heatmapMonthLabelByWeek.value?.length || 0)));
 const heatmapActivityMainRef = ref(null);
+const heatmapCellSize = ref(DEFAULT_HEATMAP_CELL_SIZE);
+const heatmapMonthOffset = ref(DEFAULT_HEATMAP_MONTH_OFFSET);
+const heatmapLayoutStyle = computed(() => ({
+  '--heatmap-cell-size': `${heatmapCellSize.value}px`,
+  '--heatmap-month-offset': `${heatmapMonthOffset.value}px`,
+}));
 const heatmapTooltip = ref({
   visible: false,
   text: '',
@@ -1768,6 +1776,29 @@ const applyHeatmap = (payload = {}) => {
   heatmapContributionTotal.value = Number(payload.totalContributions || 0);
 };
 
+const toHeatmapMetric = (value, fallback) => {
+  const numeric = Number.parseFloat(String(value ?? ''));
+  return Number.isFinite(numeric) && numeric > 0 ? Number(numeric.toFixed(2)) : fallback;
+};
+
+const syncHeatmapLayoutMetrics = () => {
+  if (typeof window === 'undefined') return;
+
+  const root = heatmapActivityMainRef.value;
+  if (!root) return;
+
+  const firstCell = root.querySelector('.v-heatmap-cell');
+  const monthRow = root.querySelector('.v-profile-heatmap-month-row');
+  const nextCellSize = toHeatmapMetric(firstCell?.getBoundingClientRect?.().height, DEFAULT_HEATMAP_CELL_SIZE);
+  const nextMonthRowHeight = toHeatmapMetric(monthRow?.getBoundingClientRect?.().height, DEFAULT_HEATMAP_MONTH_OFFSET - 6);
+  const nextMonthRowMarginBottom = monthRow
+    ? toHeatmapMetric(window.getComputedStyle(monthRow).marginBottom, 0)
+    : 0;
+
+  heatmapCellSize.value = nextCellSize;
+  heatmapMonthOffset.value = Number((nextMonthRowHeight + nextMonthRowMarginBottom).toFixed(2));
+};
+
 const getHeatmapCellDate = (weekIndex, dayIndex) => (
   heatmapDateData.value?.[weekIndex]?.[dayIndex] || null
 );
@@ -1993,13 +2024,23 @@ watch(
   },
 );
 
+watch(
+  [heatmapData, heatmapMonthLabelByWeek],
+  () => {
+    syncHeatmapLayoutMetrics();
+  },
+  { flush: 'post' },
+);
+
 onMounted(() => {
   document.addEventListener('click', handleDocumentClick);
+  window.addEventListener('resize', syncHeatmapLayoutMetrics);
   loadProfileData();
 });
 
 onBeforeUnmount(() => {
   document.removeEventListener('click', handleDocumentClick);
+  window.removeEventListener('resize', syncHeatmapLayoutMetrics);
 });
 </script>
 
@@ -2094,24 +2135,27 @@ onBeforeUnmount(() => {
   display: flex;
   gap: 8px;
   min-width: 0;
+  --heatmap-cell-size: 14px;
+  --heatmap-month-offset: 18px;
 }
 
 .v-profile-activity-days {
-  padding-top: 24px;
+  padding-top: var(--heatmap-month-offset);
   flex-shrink: 0;
   display: grid;
-  grid-template-rows: repeat(7, minmax(0, 1fr));
+  grid-template-rows: repeat(7, var(--heatmap-cell-size));
   gap: 4px;
-  align-items: center;
+  align-items: start;
 }
 
 .v-profile-activity-days span {
   width: 14px;
+  height: var(--heatmap-cell-size);
   font-size: 11px;
   line-height: 1;
   color: #94a3b8;
   text-align: right;
-  min-height: 14px;
+  min-height: var(--heatmap-cell-size);
   display: inline-flex;
   align-items: center;
   justify-content: flex-end;
