@@ -190,9 +190,9 @@ const iconByType = {
 
 const filteredNotifications = computed(() => notifications.value.filter((n) => {
   if (activeTab.value === 'all') return true;
-  if (activeTab.value === 'activity') return ['workout', 'achievement'].includes(n.type);
-  if (activeTab.value === 'community') return ['like', 'comment', 'follow'].includes(n.type);
-  if (activeTab.value === 'system') return n.type === 'system';
+  if (activeTab.value === 'activity') return n.section === 'activity';
+  if (activeTab.value === 'community') return n.section === 'community';
+  if (activeTab.value === 'system') return n.section === 'system';
   return true;
 }));
 
@@ -228,6 +228,14 @@ const inferType = (item) => {
   if (raw.includes('follow')) return 'follow';
   if (raw.includes('workout') || raw.includes('gym') || raw.includes('notice')) return 'workout';
   if (raw.includes('achievement') || raw.includes('badge')) return 'achievement';
+  return 'system';
+};
+
+const inferSection = (refTypeRaw) => {
+  const refType = String(refTypeRaw || '').toUpperCase();
+
+  if (refType === 'FOLLOW') return 'activity';
+  if (refType === 'COMMENT_NEW' || refType === 'LIKE_POST') return 'community';
   return 'system';
 };
 
@@ -298,6 +306,7 @@ const normalizeNotification = (item, index) => {
     refType: item?.refType || '',
     refId: item?.refId ?? null,
     type,
+    section: inferSection(item?.refType || item?.type || item?.notificationType),
     actor: {
       id: item?.actorId || item?.senderId || item?.fromUserId || item?.userId || null,
       name: actorName,

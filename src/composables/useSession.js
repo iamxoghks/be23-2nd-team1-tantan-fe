@@ -66,6 +66,11 @@ const primeSessionFromToken = () => {
   const role = getTokenRole(token);
   if (!role) return null;
 
+  const currentRole = normalizeRole(sessionProfile.value?.role);
+  if (isSessionHydrated.value && currentRole) {
+    return sessionProfile.value;
+  }
+
   sessionProfile.value = {
     ...(sessionProfile.value || {}),
     role,

@@ -244,7 +244,27 @@
           />
           <div class="v-report-modal-meta">
             <span v-if="reportErrorMessage" class="v-report-error">{{ reportErrorMessage }}</span>
-            <span class="v-report-count">{{ reportReason.length }}/500</span>
+            <div class="v-report-meter-group">
+              <div class="v-report-meter" aria-hidden="true">
+                <svg viewBox="0 0 28 28" class="v-report-meter-svg">
+                  <circle class="v-report-meter-track" cx="14" cy="14" r="10" />
+                  <circle
+                    class="v-report-meter-progress"
+                    :class="{ 'is-over-limit': isReportReasonOverLimit }"
+                    cx="14"
+                    cy="14"
+                    r="10"
+                    :style="{
+                      strokeDasharray: `${REPORT_REASON_METER_CIRCUMFERENCE} ${REPORT_REASON_METER_CIRCUMFERENCE}`,
+                      strokeDashoffset: `${reportReasonMeterDashOffset}`,
+                    }"
+                  />
+                </svg>
+              </div>
+              <span class="v-report-count" :class="{ 'is-over-limit': isReportReasonOverLimit }">
+                {{ reportReasonCountLabel }}
+              </span>
+            </div>
           </div>
           <div class="v-report-actions">
             <button type="button" class="v-report-cancel" :disabled="isSubmittingReport" @click="closeReportModal">취소</button>
@@ -310,6 +330,9 @@ const isSubmittingReport = ref(false);
 const reportTargetRefId = ref(null);
 const reportTargetType = ref('POST');
 const reportToastMessage = ref('');
+const REPORT_REASON_MAX_LENGTH = 500;
+const REPORT_REASON_METER_RADIUS = 10;
+const REPORT_REASON_METER_CIRCUMFERENCE = 2 * Math.PI * REPORT_REASON_METER_RADIUS;
 let reportToastTimer = null;
 const myProfileImage = computed(() => (
   resolveUserAvatar(
@@ -335,6 +358,16 @@ const myUserId = computed(() => {
 });
 const isMyPost = computed(() => Boolean(myUserId.value) && Boolean(authorUserId.value) && myUserId.value === authorUserId.value);
 const showWorkoutPanel = computed(() => Boolean(post.value?.type === 'workout' || post.value?.hasWorkout));
+const reportReasonLength = computed(() => Array.from(String(reportReason.value || '')).length);
+const reportReasonRemaining = computed(() => REPORT_REASON_MAX_LENGTH - reportReasonLength.value);
+const isReportReasonOverLimit = computed(() => reportReasonRemaining.value < 0);
+const reportReasonCountLabel = computed(() => (
+  isReportReasonOverLimit.value ? String(reportReasonRemaining.value) : `${reportReasonLength.value}/${REPORT_REASON_MAX_LENGTH}`
+));
+const reportReasonMeterRatio = computed(() => Math.min(reportReasonLength.value / REPORT_REASON_MAX_LENGTH, 1));
+const reportReasonMeterDashOffset = computed(() => (
+  REPORT_REASON_METER_CIRCUMFERENCE * (1 - reportReasonMeterRatio.value)
+));
 const totalCommentCount = computed(() => {
   const serverCount = Number(post.value?.comments ?? post.value?.commentCount);
   if (Number.isFinite(serverCount) && serverCount > 0) return serverCount;

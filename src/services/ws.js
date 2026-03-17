@@ -36,6 +36,9 @@ export const wsConfig = {
   connectEndpoint: '/ws',
   sendDestination: '/app/send',
   typingDestination: '/app/typing',
+  inboxTopic() {
+    return '/user/queue/chat/inbox';
+  },
   roomTopic(roomId) {
     return `/user/queue/chat/rooms/${roomId}`;
   },

@@ -43,9 +43,26 @@
             @compositionstart="onContentCompositionStart"
             @compositionend="onContentCompositionEnd"
           ></div>
-          <p class="v-write-content-count" :class="{ 'is-over-limit': isContentOverLimit }">
-            {{ isContentOverLimit ? contentRemaining : `${contentLength}/${CONTENT_MAX_LENGTH}` }}
-          </p>
+          <div class="v-write-content-count-wrap" :class="{ 'is-over-limit': isContentOverLimit }">
+            <span class="v-write-content-gauge" :class="{ 'is-over-limit': isContentOverLimit }" aria-hidden="true">
+              <svg viewBox="0 0 40 40" class="v-write-content-gauge-svg">
+                <circle class="v-write-content-gauge-track" cx="20" cy="20" r="16" />
+                <circle
+                  class="v-write-content-gauge-fill"
+                  cx="20"
+                  cy="20"
+                  r="16"
+                  :style="{
+                    strokeDasharray: `${CONTENT_GAUGE_CIRCUMFERENCE} ${CONTENT_GAUGE_CIRCUMFERENCE}`,
+                    strokeDashoffset: contentGaugeOffset,
+                  }"
+                />
+              </svg>
+            </span>
+            <p class="v-write-content-count" :class="{ 'is-over-limit': isContentOverLimit }">
+              {{ isContentOverLimit ? contentRemaining : `${contentLength}/${CONTENT_MAX_LENGTH}` }}
+            </p>
+          </div>
 
           <div v-if="attachedWorkout" class="v-write-workout-card">
             <div class="v-write-workout-top">
@@ -182,6 +199,13 @@ const contentChars = computed(() => Array.from(String(content.value || '')));
 const contentLength = computed(() => contentChars.value.length);
 const contentRemaining = computed(() => CONTENT_MAX_LENGTH - contentLength.value);
 const isContentOverLimit = computed(() => contentRemaining.value < 0);
+const CONTENT_GAUGE_CIRCUMFERENCE = 2 * Math.PI * 16;
+const contentGaugeProgress = computed(() => (
+  Math.min(contentLength.value, CONTENT_MAX_LENGTH) / CONTENT_MAX_LENGTH
+));
+const contentGaugeOffset = computed(() => (
+  CONTENT_GAUGE_CIRCUMFERENCE * (1 - contentGaugeProgress.value)
+));
 const contentSafeText = computed(() => contentChars.value.slice(0, CONTENT_MAX_LENGTH).join(''));
 const contentOverflowText = computed(() => contentChars.value.slice(CONTENT_MAX_LENGTH).join(''));
 const selectedImageTotalCount = computed(() => existingImagePreviews.value.length + selectedImages.value.length);
@@ -766,5 +790,62 @@ onBeforeUnmount(() => {
 .v-write-header,
 .v-write-footer {
   background: #ffffff;
+}
+
+.v-write-content-count-wrap {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  width: 100%;
+  margin-top: 12px;
+}
+
+.v-write-content-gauge {
+  width: 28px;
+  height: 28px;
+  color: #3b82f6;
+}
+
+.v-write-content-gauge-svg {
+  width: 100%;
+  height: 100%;
+  transform: rotate(-90deg);
+}
+
+.v-write-content-gauge-track,
+.v-write-content-gauge-fill {
+  fill: none;
+  stroke-width: 4;
+}
+
+.v-write-content-gauge-track {
+  stroke: #dbeafe;
+}
+
+.v-write-content-gauge-fill {
+  stroke: currentColor;
+  stroke-linecap: round;
+  transition: stroke-dashoffset 0.18s ease, stroke 0.18s ease;
+}
+
+.v-write-content-count-wrap.is-over-limit .v-write-content-gauge {
+  color: #ef4444;
+}
+
+.v-write-content-count-wrap.is-over-limit .v-write-content-gauge-track {
+  stroke: #fee2e2;
+}
+
+.v-write-content-count {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1;
+  color: #94a3b8;
+}
+
+.v-write-content-count.is-over-limit {
+  color: #ef4444;
 }
 </style>

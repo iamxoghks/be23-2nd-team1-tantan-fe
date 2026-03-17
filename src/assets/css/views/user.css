@@ -76,6 +76,10 @@
   margin-top: 12px;
 }
 
+.v-profile-log-exercise-list {
+  gap: 10px;
+}
+
 .v-profile-log-exercise-item,
 .v-history-exercise-item {
   display: flex;
@@ -135,6 +139,74 @@
 
 .v-profile-log-exercise-metric {
   min-width: 72px;
+}
+
+.v-profile-log-exercise-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  padding: 0;
+  color: #475569;
+  font-size: 14px;
+  line-height: 1.5;
+  flex-wrap: wrap;
+}
+
+.v-profile-log-exercise-row .v-profile-log-exercise-name {
+  color: #1e293b;
+}
+
+.v-profile-log-exercise-separator {
+  color: #cbd5e1;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.v-profile-log-exercise-inline-metric {
+  color: #64748b;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.v-workout-detail-box {
+  padding: 12px 14px;
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+  background: #ffffff;
+}
+
+.v-workout-detail-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  color: #475569;
+  font-size: 14px;
+  line-height: 1.5;
+  flex-wrap: wrap;
+}
+
+.v-workout-detail-name {
+  min-width: 0;
+  font-size: 15px;
+  font-weight: 700;
+  color: #1e293b;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.v-workout-detail-separator {
+  color: #cbd5e1;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.v-workout-detail-metric {
+  color: #64748b;
+  font-weight: 600;
+  white-space: nowrap;
 }
 
 .v-profile-achievement-box {

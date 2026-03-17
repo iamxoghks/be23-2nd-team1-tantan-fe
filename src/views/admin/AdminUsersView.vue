@@ -41,14 +41,14 @@
                 </tr>
               </thead>
               <tbody>
-                <tr v-for="item in users" :key="item.id">
-                  <td>{{ item.id }}</td>
+                <tr v-for="item in users" :key="resolveUserId(item)">
+                  <td>{{ resolveUserId(item) ?? '-' }}</td>
                   <td>{{ item.userName || item.name || '-' }}</td>
                   <td>{{ item.email || '-' }}</td>
                   <td>{{ item.role || '-' }}</td>
                   <td>{{ item.suspended ? '정지' : '정상' }}</td>
                   <td>
-                    <button class="admin-btn admin-btn-muted" @click="goUserDetail(item.id)">상세보기</button>
+                    <button class="admin-btn admin-btn-muted" @click="goUserDetail(resolveUserId(item))">상세보기</button>
                   </td>
                 </tr>
                 <tr v-if="users.length === 0">
@@ -94,7 +94,13 @@ const goBackToAdmin = () => {
   router.push('/admin');
 };
 
+const resolveUserId = (item) => item?.userId ?? item?.id ?? null;
+
 const goUserDetail = (id) => {
+  if (id == null) {
+    errorMessage.value = '사용자 식별자를 찾지 못했습니다.';
+    return;
+  }
   router.push(`/admin/users/${id}`);
 };
 
