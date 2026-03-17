@@ -209,6 +209,7 @@ import { extractList, extractPayload } from '@/utils/api';
 import { getAccessToken } from '@/services/token';
 import { registerAuthCleanup } from '@/services/authLifecycle';
 import { wsConfig } from '@/services/ws';
+import { useChatUnreadCenter } from '@/composables/useChatUnreadCenter';
 import { resolveUserAvatar, handleUserAvatarError } from '@/utils/userAvatar';
 import { useRouter } from 'vue-router';
 
@@ -231,7 +232,8 @@ const isLoadingRooms = ref(false);
 const chatLoadError = ref('');
 const chatConnectionState = ref('disconnected');
 const stompClient = ref(null);
-const roomSubscriptions = ref([]);
+const inboxSubscription = ref(null);
+const activeRoomSubscription = ref(null);
 const nowTick = ref(Date.now());
 let timeTicker = null;
 const router = useRouter();
@@ -249,6 +251,7 @@ let unregisterAuthCleanup = null;
 let roomSelectionRequestSeq = 0;
 const hasRoomSearchTerm = computed(() => String(roomSearchTerm.value || '').trim().length > 0);
 const hasMessageSearchTerm = computed(() => String(messageSearchTerm.value || '').trim().length > 0);
+const { setUnreadFromRooms } = useChatUnreadCenter();
 
 const filteredChatRooms = computed(() => {
   const keyword = String(roomSearchTerm.value || '').trim().toLowerCase();
@@ -312,15 +315,20 @@ const toggleRoomMenu = () => {
   isRoomMenuOpen.value = !isRoomMenuOpen.value;
 };
 
+const applyChatRooms = (nextRooms) => {
+  chatRoomsData.value = nextRooms;
+  setUnreadFromRooms(nextRooms);
+};
+
 const clearRoomUnread = (roomId) => {
   const normalizedRoomId = String(roomId || '');
   if (!normalizedRoomId) return;
 
-  chatRoomsData.value = chatRoomsData.value.map((room) => (
+  applyChatRooms(chatRoomsData.value.map((room) => (
     String(room.id) === normalizedRoomId
       ? { ...room, unread: 0 }
       : room
-  ));
+  )));
 };
 
 const selectRoom = (roomId) => {
@@ -566,7 +574,29 @@ const upsertRoomMeta = (roomKey, messageText) => {
   const nextRooms = [...chatRoomsData.value];
   nextRooms.splice(roomIndex, 1);
   nextRooms.push(updated);
-  chatRoomsData.value = sortRoomsByLastMessageDesc(nextRooms);
+  applyChatRooms(sortRoomsByLastMessageDesc(nextRooms));
+};
+
+const handleInboxFrame = async (rawBody) => {
+  let payload = null;
+  try {
+    payload = JSON.parse(rawBody || '{}');
+  } catch (error) {
+    payload = { message: String(rawBody || '') };
+  }
+
+  const { roomKey, type, message } = normalizeIncomingMessage(payload, null);
+  if (!roomKey) return;
+  if (type === 'TYPING_START' || type === 'TYPING_STOP') return;
+  if (!message.text) return;
+
+  const hasKnownRoom = chatRoomsData.value.some((room) => String(room.roomKey || room.id) === String(roomKey));
+  if (!hasKnownRoom) {
+    await loadRooms();
+    return;
+  }
+
+  upsertRoomMeta(roomKey, message.text);
 };
 
 const handleStompFrame = (rawBody, fallbackRoomKey) => {
@@ -699,7 +729,7 @@ const leaveSelectedRoom = async () => {
   try {
     await chatApi.leave(room.roomKey || room.id);
     isRoomMenuOpen.value = false;
-    chatRoomsData.value = chatRoomsData.value.filter((item) => String(item.id) !== String(room.id));
+    applyChatRooms(chatRoomsData.value.filter((item) => String(item.id) !== String(room.id)));
     const nextMessagesByRoom = { ...messagesByRoom.value };
     delete nextMessagesByRoom[room.roomKey || room.id];
     messagesByRoom.value = nextMessagesByRoom;
@@ -734,15 +764,24 @@ const reportChatMessage = async (message) => {
   }
 };
 
-const clearRoomSubscriptions = () => {
-  roomSubscriptions.value.forEach((sub) => {
-    try {
-      sub.unsubscribe();
-    } catch (error) {
-      // ignore
-    }
-  });
-  roomSubscriptions.value = [];
+const clearInboxSubscription = () => {
+  if (!inboxSubscription.value) return;
+  try {
+    inboxSubscription.value.unsubscribe();
+  } catch (error) {
+    // ignore
+  }
+  inboxSubscription.value = null;
+};
+
+const clearActiveRoomSubscription = () => {
+  if (!activeRoomSubscription.value) return;
+  try {
+    activeRoomSubscription.value.unsubscribe();
+  } catch (error) {
+    // ignore
+  }
+  activeRoomSubscription.value = null;
 };
 
 const resolveRoomKey = (roomId) => {
@@ -750,20 +789,23 @@ const resolveRoomKey = (roomId) => {
   return String(room?.roomKey || roomId || '');
 };
 
-const subscribeRoom = (roomId) => {
+const subscribeInbox = () => {
+  if (!stompClient.value?.connected || inboxSubscription.value) return;
+  inboxSubscription.value = stompClient.value.subscribe(wsConfig.inboxTopic(), (frame) => {
+    handleInboxFrame(frame.body);
+  });
+};
+
+const subscribeActiveRoom = (roomId) => {
   if (!roomId || !stompClient.value?.connected) return;
 
-  clearRoomSubscriptions();
+  clearActiveRoomSubscription();
   const roomKey = resolveRoomKey(roomId);
   if (!roomKey) return;
-  const topicCandidates = [wsConfig.roomTopic(roomKey)];
 
-  const subscriptions = topicCandidates.map((destination) => (
-    stompClient.value.subscribe(destination, (frame) => {
-      handleStompFrame(frame.body, roomKey);
-    })
-  ));
-  roomSubscriptions.value = subscriptions;
+  activeRoomSubscription.value = stompClient.value.subscribe(wsConfig.roomTopic(roomKey), (frame) => {
+    handleStompFrame(frame.body, roomKey);
+  });
 };
 
 const connectStomp = () => {
@@ -778,8 +820,9 @@ const connectStomp = () => {
     heartbeatOutgoing: 10000,
     onConnect: () => {
       chatConnectionState.value = 'connected';
+      subscribeInbox();
       if (selectedRoomId.value) {
-        subscribeRoom(selectedRoomId.value);
+        subscribeActiveRoom(selectedRoomId.value);
       }
     },
     onStompError: () => {
@@ -787,7 +830,8 @@ const connectStomp = () => {
     },
     onWebSocketClose: () => {
       chatConnectionState.value = 'disconnected';
-      clearRoomSubscriptions();
+      clearInboxSubscription();
+      clearActiveRoomSubscription();
     },
     onWebSocketError: () => {
       chatConnectionState.value = 'error';
@@ -800,7 +844,8 @@ const connectStomp = () => {
 };
 
 const disconnectStomp = () => {
-  clearRoomSubscriptions();
+  clearInboxSubscription();
+  clearActiveRoomSubscription();
   if (stompClient.value) {
     stompClient.value.deactivate();
     stompClient.value = null;
@@ -823,9 +868,9 @@ const loadRooms = async () => {
     const roomsPayload = extractPayload(roomsResponse);
     const roomList = extractList(roomsPayload);
     if (roomList.length > 0) {
-      chatRoomsData.value = sortRoomsByLastMessageDesc(roomList.map(mapRoom));
+      applyChatRooms(sortRoomsByLastMessageDesc(roomList.map(mapRoom)));
     } else {
-      chatRoomsData.value = [];
+      applyChatRooms([]);
     }
   } catch (error) {
     chatLoadError.value = toFriendlyApiError(error, '채팅방 목록을 불러오지 못했습니다.');
@@ -884,7 +929,7 @@ watch(selectedRoomId, async (next, prev) => {
   }
   if (!next) {
     roomSelectionRequestSeq += 1;
-    clearRoomSubscriptions();
+    clearActiveRoomSubscription();
     return;
   }
   const requestSeq = ++roomSelectionRequestSeq;
@@ -893,7 +938,7 @@ watch(selectedRoomId, async (next, prev) => {
   await loadMessages(next, { requestSeq });
   if (requestSeq !== roomSelectionRequestSeq || String(selectedRoomId.value) !== String(next)) return;
   if (chatConnectionState.value === 'connected') {
-    subscribeRoom(next);
+    subscribeActiveRoom(next);
   }
   await scrollMessagesToBottom();
 });

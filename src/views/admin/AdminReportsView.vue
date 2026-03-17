@@ -37,13 +37,14 @@
                   <td>{{ item.id }}</td>
                   <td>{{ item.refType }}</td>
                   <td>{{ item.reason }}</td>
-                  <td>{{ item.status }}</td>
+                  <td>{{ getStatusLabel(item) }}</td>
                   <td>
-                    <div class="admin-action-row">
+                    <div v-if="isPending(item)" class="admin-action-row">
                       <button class="admin-btn" @click="resolve(item.id, false)">해결</button>
                       <button class="admin-btn admin-btn-warn" @click="resolve(item.id, true)">해결+대상삭제</button>
                       <button class="admin-btn admin-btn-muted" @click="reject(item.id)">기각</button>
                     </div>
+                    <span v-else class="admin-status-text">{{ getStatusLabel(item) }}</span>
                   </td>
                 </tr>
                 <tr v-if="reports.length === 0">
@@ -93,6 +94,18 @@ const parseList = (payload) => {
 
 const goBackToAdmin = () => {
   router.push('/admin');
+};
+
+const isPending = (item) => String(item?.status || '').toUpperCase() === 'PENDING';
+
+const getStatusLabel = (item) => {
+  const status = String(item?.status || '').toUpperCase();
+  if (status === 'PENDING') return '대기';
+  if (status === 'REJECTED') return '기각';
+  if (status === 'RESOLVED') {
+    return item?.targetDeleted ? '해결+대상삭제' : '해결';
+  }
+  return item?.status || '-';
 };
 
 const loadReports = async (nextPage = 0) => {
@@ -238,6 +251,14 @@ onMounted(() => {
 .admin-empty {
   text-align: center;
   color: #94a3b8;
+}
+
+.admin-status-text {
+  display: inline-block;
+  color: #475569;
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 34px;
 }
 
 .admin-pagination {

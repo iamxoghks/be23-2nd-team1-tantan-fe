@@ -84,21 +84,23 @@
                       <div
                         v-for="(exercise, exerciseIndex) in workout.exercises"
                         :key="`${workout.id}-${exerciseIndex}-${exercise.name}`"
-                        class="v-history-exercise-item"
+                        class="v-workout-detail-box"
                       >
-                        <span class="v-history-exercise-name">{{ exercise.name }}</span>
-                        <span class="v-history-exercise-stats">{{ exercise.stats }}</span>
-                      </div>
-                    </div>
-
-                    <div class="v-history-stat-row">
-                      <div
-                        v-for="([key, val]) in Object.entries(workout.stats || {})"
-                        :key="key"
-                        class="v-profile-log-stat-chip v-history-stat-chip"
-                      >
-                        <span class="v-profile-log-stat-key">{{ key }}</span>
-                        <span class="v-history-stat-value">{{ val }}</span>
+                        <div class="v-workout-detail-row">
+                          <span class="v-workout-detail-name">{{ exercise.name }}</span>
+                          <span class="v-workout-detail-separator">|</span>
+                          <span class="v-workout-detail-metric">
+                            {{ exercise.hasWeight && exercise.weight !== null ? formatWorkoutMetricValue(exercise.weight, 'kg') : '-' }}
+                          </span>
+                          <span class="v-workout-detail-separator">|</span>
+                          <span class="v-workout-detail-metric">
+                            {{ exercise.hasSets && exercise.sets !== null ? `${formatWorkoutMetricValue(exercise.sets)}세트` : '-' }}
+                          </span>
+                          <span class="v-workout-detail-separator">|</span>
+                          <span class="v-workout-detail-metric">
+                            {{ exercise.hasReps && exercise.reps !== null ? `${formatWorkoutMetricValue(exercise.reps)}회` : '-' }}
+                          </span>
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -248,6 +250,12 @@ const formatTime = (value) => {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return '--:--';
   return `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
+};
+
+const formatWorkoutMetricValue = (value, unit = '') => {
+  const normalized = Number(value);
+  if (!Number.isFinite(normalized)) return '-';
+  return `${normalized.toLocaleString()}${unit}`;
 };
 
 const extractListPayload = (raw = {}) => {

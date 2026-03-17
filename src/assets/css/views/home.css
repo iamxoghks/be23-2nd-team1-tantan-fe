@@ -1181,7 +1181,7 @@
 }
 
 .search-panel-reservation-date-btn-selected {
-  color: #16a34a;
+  color: #2563eb;
 }
 
 .search-panel-reservation-date-btn-disabled {
@@ -1264,10 +1264,10 @@
 }
 
 .search-panel-reservation-slot-btn-selected {
-  border-color: #22c55e;
-  background: #16a34a;
+  border-color: #2563eb;
+  background: #2563eb;
   color: #ffffff;
-  box-shadow: 0 12px 24px rgba(22, 163, 74, 0.16);
+  box-shadow: 0 12px 24px rgba(37, 99, 235, 0.18);
 }
 
 .search-panel-reservation-slot-btn-selected span {
@@ -1333,9 +1333,9 @@
 
 .search-panel-reservation-submit-btn {
   border: 0;
-  background: linear-gradient(135deg, #16a34a 0%, #22c55e 100%);
+  background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
   color: #ffffff;
-  box-shadow: 0 16px 28px rgba(22, 163, 74, 0.2);
+  box-shadow: 0 16px 28px rgba(37, 99, 235, 0.2);
 }
 
 .search-panel-reservation-submit-btn:disabled {

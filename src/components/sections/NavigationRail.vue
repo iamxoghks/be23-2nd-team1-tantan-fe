@@ -48,7 +48,7 @@
               <component :is="item.icon" :size="22" :stroke-width="2.5" />
             </div>
             <span
-              v-if="item.hasDot && route.path !== item.to"
+              v-if="item.hasDot && (item.showDotWhenActive || route.path !== item.to)"
               class="rail-item-dot"
             />
           </div>
@@ -75,6 +75,7 @@ import { Home, Send, Share2, Bell, User, Dumbbell, LogIn, LogOut, Shield } from 
 import { useAuthModal } from '@/composables/useAuthModal';
 import { useSession } from '@/composables/useSession';
 import { useNotificationCenter } from '@/composables/useNotificationCenter';
+import { useChatUnreadCenter } from '@/composables/useChatUnreadCenter';
 import { userApi } from '@/services/apis';
 import { notifyAuthInvalidated } from '@/services/authLifecycle';
 
@@ -83,6 +84,11 @@ const router = useRouter();
 const { openAuthModal } = useAuthModal();
 const { sessionProfile, isAuthenticated, syncSessionFromServer, primeSessionFromToken } = useSession();
 const { hasUnread, clearUnread, syncUnreadCount } = useNotificationCenter();
+const {
+  hasUnread: hasUnreadChat,
+  clearUnread: clearUnreadChat,
+  syncUnreadCount: syncChatUnreadCount,
+} = useChatUnreadCenter();
 
 const logout = async () => {
   try {
@@ -107,9 +113,21 @@ const refreshUnreadBadge = async ({ force = false } = {}) => {
   }
 };
 
+const refreshChatUnreadBadge = async ({ force = false } = {}) => {
+  if (!isAuthenticated.value) {
+    clearUnreadChat();
+    return;
+  }
+  try {
+    await syncChatUnreadCount({ force });
+  } catch (error) {
+    // no-op: 채팅 unread badge는 마지막 정상값을 유지합니다.
+  }
+};
+
 const items = computed(() => {
   const chatItem = isAuthenticated.value
-    ? { id: 'chat', icon: Send, label: '채팅', to: '/chat' }
+    ? { id: 'chat', icon: Send, label: '채팅', to: '/chat', hasDot: hasUnreadChat.value, showDotWhenActive: true }
     : { id: 'chat', icon: Send, label: '채팅', action: openAuthModal };
   const communityItem = isAuthenticated.value
     ? { id: 'community', icon: Share2, label: '커뮤니티', to: '/community' }
@@ -157,6 +175,7 @@ onMounted(async () => {
 
   if (!isAuthenticated.value) {
     clearUnread();
+    clearUnreadChat();
     return;
   }
   try {
@@ -165,6 +184,7 @@ onMounted(async () => {
     // no-op: route guard will handle hard redirects
   }
   await refreshUnreadBadge({ force: true });
+  await refreshChatUnreadBadge({ force: true });
 });
 
 onBeforeUnmount(() => {
@@ -177,9 +197,11 @@ watch(
   (next) => {
     if (!next) {
       clearUnread();
+      clearUnreadChat();
       return;
     }
     refreshUnreadBadge({ force: true });
+    refreshChatUnreadBadge({ force: true });
   },
 );
 
@@ -191,16 +213,24 @@ watch(
     if (touchedNotifications) {
       refreshUnreadBadge({ force: true });
     }
+
+    const touchedChat = String(nextPath).startsWith('/chat')
+      || String(prevPath).startsWith('/chat');
+    if (touchedChat) {
+      refreshChatUnreadBadge({ force: true });
+    }
   },
 );
 
 const handleVisibilityChange = () => {
   if (document.visibilityState === 'visible') {
     refreshUnreadBadge({ force: true });
+    refreshChatUnreadBadge({ force: true });
   }
 };
 
 const handleWindowFocus = () => {
   refreshUnreadBadge({ force: true });
+  refreshChatUnreadBadge({ force: true });
 };
 </script>

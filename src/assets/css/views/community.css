@@ -75,10 +75,61 @@
   color: #ef4444;
 }
 
-.v-report-count {
+.v-report-meter-group {
   margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  flex: 0 0 auto;
+}
+
+.v-report-meter {
+  width: 20px;
+  height: 20px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.v-report-meter-svg {
+  width: 20px;
+  height: 20px;
+  transform: rotate(-90deg);
+}
+
+.v-report-meter-track,
+.v-report-meter-progress {
+  fill: none;
+  stroke-width: 2.5;
+}
+
+.v-report-meter-track {
+  stroke: #e2e8f0;
+}
+
+.v-report-meter-progress {
+  stroke: #3b82f6;
+  stroke-linecap: round;
+  transition: stroke-dashoffset 0.2s ease, stroke 0.2s ease;
+}
+
+.v-report-meter-progress.is-over-limit {
+  stroke: #ef4444;
+}
+
+.v-report-count {
   font-size: 12px;
   color: #94a3b8;
+  font-weight: 700;
+  min-width: max-content;
+  text-align: right;
+  white-space: nowrap;
+  margin: 0;
+}
+
+.v-report-count.is-over-limit {
+  color: #ef4444;
 }
 
 .v-report-actions {
@@ -928,12 +979,56 @@
   color: #ef4444;
 }
 
+.v-write-content-count-wrap {
+  margin: 8px 2px 0;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+}
+
+.v-write-content-gauge {
+  width: 20px;
+  height: 20px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+}
+
+.v-write-content-gauge-svg {
+  width: 20px;
+  height: 20px;
+  transform: rotate(-90deg);
+}
+
+.v-write-content-gauge-track,
+.v-write-content-gauge-fill {
+  fill: none;
+  stroke-width: 2.5;
+}
+
+.v-write-content-gauge-track {
+  stroke: #e2e8f0;
+}
+
+.v-write-content-gauge-fill {
+  stroke: #3b82f6;
+  stroke-linecap: round;
+  transition: stroke-dashoffset 0.2s ease, stroke 0.2s ease;
+}
+
+.v-write-content-gauge.is-over-limit .v-write-content-gauge-fill {
+  stroke: #ef4444;
+}
+
 .v-write-content-count {
-  margin-top: -8px;
-  text-align: right;
+  margin: 0 0 0 8px;
   font-size: 12px;
   font-weight: 700;
   color: #94a3b8;
+  min-width: max-content;
+  text-align: right;
+  white-space: nowrap;
 }
 
 .v-write-content-count.is-over-limit {

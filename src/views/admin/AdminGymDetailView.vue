@@ -31,7 +31,7 @@
             </div>
             <div class="admin-detail-card">
               <p class="admin-label">카테고리</p>
-              <strong>{{ gym.categoryId || gym.category || '-' }}</strong>
+              <strong>{{ gym.categoryName || gym.category || gym.categoryId || '-' }}</strong>
             </div>
             <div class="admin-detail-card">
               <p class="admin-label">상태</p>

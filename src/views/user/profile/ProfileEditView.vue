@@ -263,8 +263,6 @@
               </button>
             </section>
 
-            <p v-if="ownerMessage" class="owner-edit-message">{{ ownerMessage }}</p>
-            <p v-if="ownerError" class="owner-edit-error">{{ ownerError }}</p>
           </div>
         </template>
 
@@ -870,8 +868,6 @@ const isCreatingException = ref(false);
 const isUploadingImages = ref(false);
 const isDeletingImage = ref(false);
 const isCreatingReservation = ref(false);
-const ownerMessage = ref('');
-const ownerError = ref('');
 const isProcessingAccountAction = ref(false);
 const gymId = ref(null);
 const reservationForm = ref({
@@ -1178,6 +1174,23 @@ const openProfileSaveModal = ({ tone = 'success', title = '', message = '', deta
   };
 };
 
+const extractOwnerActionErrorMessage = (error, fallback = '잠시 후 다시 시도해주세요.') => String(
+  error?.response?.data?.message
+  || error?.response?.data?.error_message
+  || error?.response?.data?.error
+  || fallback
+).trim();
+
+const openOwnerActionModal = ({ tone = 'success', title = '', message = '', detail = '' } = {}) => {
+  openProfileSaveModal({
+    tone,
+    title,
+    message,
+    detail,
+    redirectToProfile: false,
+  });
+};
+
 const handleProfileSaveModalConfirm = () => {
   const shouldRedirect = Boolean(profileSaveModal.value.redirectToProfile);
   profileSaveModal.value = {
@@ -1217,7 +1230,7 @@ const loadProfile = async () => {
 const initializeProfileEditView = async () => {
   primeSessionFromToken();
   try {
-    await syncSessionFromServer();
+    await syncSessionFromServer({ force: true });
   } catch (error) {
     // preview mode fallback
   }
@@ -1370,25 +1383,38 @@ const loadGym = async () => {
     applyGymData(payload);
     await loadExceptions();
   } catch (error) {
-    ownerError.value = '짐 정보를 불러오지 못했습니다.';
+    openOwnerActionModal({
+      tone: 'error',
+      title: '짐 정보 불러오기 실패',
+      message: '짐 정보를 불러오지 못했습니다.',
+      detail: extractOwnerActionErrorMessage(error, '새로고침 후 다시 시도해주세요.'),
+    });
   }
 };
 
 const saveGymProfile = async () => {
   if (!gymForm.value.categoryId) {
-    ownerError.value = '카테고리를 선택해주세요.';
-    ownerMessage.value = '';
+    openProfileSaveModal({
+      tone: 'error',
+      title: '기본 정보 저장 실패',
+      message: '짐 기본 정보를 저장하지 못했습니다.',
+      detail: '카테고리를 선택해주세요.',
+      redirectToProfile: false,
+    });
     return;
   }
   if (isGymDescriptionOverLimit.value) {
-    ownerError.value = `소개는 최대 ${PROFILE_BIO_MAX_LENGTH}자까지 입력할 수 있습니다.`;
-    ownerMessage.value = '';
+    openProfileSaveModal({
+      tone: 'error',
+      title: '기본 정보 저장 실패',
+      message: '짐 기본 정보를 저장하지 못했습니다.',
+      detail: `소개는 최대 ${PROFILE_BIO_MAX_LENGTH}자까지 입력할 수 있습니다.`,
+      redirectToProfile: false,
+    });
     return;
   }
 
   isSavingGymProfile.value = true;
-  ownerMessage.value = '';
-  ownerError.value = '';
   try {
     await gymApi.updateProfile({
       name: gymForm.value.name,
@@ -1397,9 +1423,25 @@ const saveGymProfile = async () => {
       categoryId: Number(gymForm.value.categoryId || 1),
       tel: gymForm.value.tel,
     });
-    ownerMessage.value = '짐 기본 정보가 저장되었습니다.';
+    openProfileSaveModal({
+      tone: 'success',
+      title: '기본 정보 저장 완료',
+      message: '짐 기본 정보가 저장되었습니다.',
+      redirectToProfile: false,
+    });
   } catch (error) {
-    ownerError.value = '짐 기본 정보 저장에 실패했습니다.';
+    openProfileSaveModal({
+      tone: 'error',
+      title: '기본 정보 저장 실패',
+      message: '짐 기본 정보를 저장하지 못했습니다.',
+      detail: String(
+        error?.response?.data?.message
+        || error?.response?.data?.error_message
+        || error?.response?.data?.error
+        || '잠시 후 다시 시도해주세요.'
+      ).trim(),
+      redirectToProfile: false,
+    });
   } finally {
     isSavingGymProfile.value = false;
   }
@@ -1407,25 +1449,43 @@ const saveGymProfile = async () => {
 
 const createDailySlots = async () => {
   if (!gymId.value) {
-    ownerError.value = '짐 정보를 불러오지 못했습니다. 새로고침 후 다시 시도해주세요.';
+    openOwnerActionModal({
+      tone: 'error',
+      title: '예약 슬롯 생성 실패',
+      message: '예약 슬롯을 생성하지 못했습니다.',
+      detail: '짐 정보를 불러오지 못했습니다. 새로고침 후 다시 시도해주세요.',
+    });
     return;
   }
   if (!reservationForm.value.date) {
-    ownerError.value = '예약 슬롯을 생성할 날짜를 선택해주세요.';
+    openOwnerActionModal({
+      tone: 'error',
+      title: '예약 슬롯 생성 실패',
+      message: '예약 슬롯을 생성하지 못했습니다.',
+      detail: '예약 슬롯을 생성할 날짜를 선택해주세요.',
+    });
     return;
   }
   if (reservationForm.value.price < 0) {
-    ownerError.value = '가격은 0원 이상이어야 합니다.';
+    openOwnerActionModal({
+      tone: 'error',
+      title: '예약 슬롯 생성 실패',
+      message: '예약 슬롯을 생성하지 못했습니다.',
+      detail: '가격은 0원 이상이어야 합니다.',
+    });
     return;
   }
   if (reservationForm.value.maxCapacity < 1) {
-    ownerError.value = '정원은 1명 이상이어야 합니다.';
+    openOwnerActionModal({
+      tone: 'error',
+      title: '예약 슬롯 생성 실패',
+      message: '예약 슬롯을 생성하지 못했습니다.',
+      detail: '정원은 1명 이상이어야 합니다.',
+    });
     return;
   }
 
   isCreatingReservation.value = true;
-  ownerMessage.value = '';
-  ownerError.value = '';
 
   try {
     await reservationApi.createDailySlots(gymId.value, {
@@ -1434,15 +1494,23 @@ const createDailySlots = async () => {
       price: reservationForm.value.price,
       maxCapacity: reservationForm.value.maxCapacity,
     });
-    
-    ownerMessage.value = `${reservationForm.value.date} 예약 슬롯이 성공적으로 생성되었습니다.`;
+    openOwnerActionModal({
+      tone: 'success',
+      title: '예약 슬롯 생성 완료',
+      message: `${reservationForm.value.date} 예약 슬롯이 성공적으로 생성되었습니다.`,
+    });
     
     reservationForm.value.date = '';
     reservationForm.value.slotName = '1:1 PT 수업';
     reservationForm.value.price = 50000;
     reservationForm.value.maxCapacity = 1;
   } catch (error) {
-    ownerError.value = error?.response?.data?.message || '예약 슬롯 생성에 실패했습니다. 영업시간이 설정되어 있는지 확인해주세요.';
+    openOwnerActionModal({
+      tone: 'error',
+      title: '예약 슬롯 생성 실패',
+      message: '예약 슬롯을 생성하지 못했습니다.',
+      detail: extractOwnerActionErrorMessage(error, '영업시간이 설정되어 있는지 확인해주세요.'),
+    });
   } finally {
     isCreatingReservation.value = false;
   }
@@ -1450,8 +1518,6 @@ const createDailySlots = async () => {
 
 const saveGymHours = async () => {
   isSavingGymHours.value = true;
-  ownerMessage.value = '';
-  ownerError.value = '';
   try {
     await gymApi.replaceHours(gymHours.value.map((item) => ({
       dayOfWeek: item.dayOfWeek,
@@ -1459,9 +1525,18 @@ const saveGymHours = async () => {
       closeTime: toHHmmss(item.closeTime, '23:00:00'),
       closed: Boolean(item.isClosed),
     })));
-    ownerMessage.value = '영업 시간이 저장되었습니다.';
+    openOwnerActionModal({
+      tone: 'success',
+      title: '영업 시간 저장 완료',
+      message: '영업 시간이 저장되었습니다.',
+    });
   } catch (error) {
-    ownerError.value = '영업 시간 저장에 실패했습니다.';
+    openOwnerActionModal({
+      tone: 'error',
+      title: '영업 시간 저장 실패',
+      message: '영업 시간을 저장하지 못했습니다.',
+      detail: extractOwnerActionErrorMessage(error),
+    });
   } finally {
     isSavingGymHours.value = false;
   }
@@ -1469,13 +1544,20 @@ const saveGymHours = async () => {
 
 const saveAmenities = async () => {
   isSavingAmenities.value = true;
-  ownerMessage.value = '';
-  ownerError.value = '';
   try {
     await gymApi.replaceAmenities(selectedAmenities.value);
-    ownerMessage.value = '편의시설이 저장되었습니다.';
+    openOwnerActionModal({
+      tone: 'success',
+      title: '편의시설 저장 완료',
+      message: '편의시설이 저장되었습니다.',
+    });
   } catch (error) {
-    ownerError.value = '편의시설 저장에 실패했습니다.';
+    openOwnerActionModal({
+      tone: 'error',
+      title: '편의시설 저장 실패',
+      message: '편의시설을 저장하지 못했습니다.',
+      detail: extractOwnerActionErrorMessage(error),
+    });
   } finally {
     isSavingAmenities.value = false;
   }
@@ -1496,8 +1578,6 @@ const removeProduct = (index) => {
 
 const saveProducts = async () => {
   isSavingProducts.value = true;
-  ownerMessage.value = '';
-  ownerError.value = '';
   try {
     const payload = products.value
       .filter((item) => item.productName)
@@ -1506,9 +1586,18 @@ const saveProducts = async () => {
         price: Number(item.price || 0),
       }));
     await gymApi.replaceProducts(payload);
-    ownerMessage.value = '상품 정보가 저장되었습니다.';
+    openOwnerActionModal({
+      tone: 'success',
+      title: '상품 저장 완료',
+      message: '상품 정보가 저장되었습니다.',
+    });
   } catch (error) {
-    ownerError.value = '상품 저장에 실패했습니다.';
+    openOwnerActionModal({
+      tone: 'error',
+      title: '상품 저장 실패',
+      message: '상품 정보를 저장하지 못했습니다.',
+      detail: extractOwnerActionErrorMessage(error),
+    });
   } finally {
     isSavingProducts.value = false;
   }
@@ -1516,13 +1605,16 @@ const saveProducts = async () => {
 
 const createException = async () => {
   if (!exceptionForm.value.specificDate) {
-    ownerError.value = '예외 날짜를 선택해주세요.';
+    openOwnerActionModal({
+      tone: 'error',
+      title: '예외 운영시간 추가 실패',
+      message: '예외 운영시간을 추가하지 못했습니다.',
+      detail: '예외 날짜를 선택해주세요.',
+    });
     return;
   }
 
   isCreatingException.value = true;
-  ownerMessage.value = '';
-  ownerError.value = '';
   try {
     const openTime = exceptionForm.value.isClosed ? null : toHHmmss(exceptionForm.value.openTime, '09:00:00');
     const closeTime = exceptionForm.value.isClosed ? null : toHHmmss(exceptionForm.value.closeTime, '18:00:00');
@@ -1537,9 +1629,18 @@ const createException = async () => {
     exceptionForm.value.specificDate = '';
     exceptionForm.value.description = '';
     await loadExceptions();
-    ownerMessage.value = '예외 운영시간이 추가되었습니다.';
+    openOwnerActionModal({
+      tone: 'success',
+      title: '예외 운영시간 추가 완료',
+      message: '예외 운영시간이 추가되었습니다.',
+    });
   } catch (error) {
-    ownerError.value = '예외 운영시간 추가에 실패했습니다.';
+    openOwnerActionModal({
+      tone: 'error',
+      title: '예외 운영시간 추가 실패',
+      message: '예외 운영시간을 추가하지 못했습니다.',
+      detail: extractOwnerActionErrorMessage(error),
+    });
   } finally {
     isCreatingException.value = false;
   }
@@ -1550,8 +1651,18 @@ const deleteException = async (id) => {
   try {
     await gymApi.deleteException(id);
     await loadExceptions();
+    openOwnerActionModal({
+      tone: 'success',
+      title: '예외 운영시간 삭제 완료',
+      message: '예외 운영시간이 삭제되었습니다.',
+    });
   } catch (error) {
-    ownerError.value = '예외 운영시간 삭제에 실패했습니다.';
+    openOwnerActionModal({
+      tone: 'error',
+      title: '예외 운영시간 삭제 실패',
+      message: '예외 운영시간을 삭제하지 못했습니다.',
+      detail: extractOwnerActionErrorMessage(error),
+    });
   }
 };
 
@@ -1579,8 +1690,6 @@ const handleGymImageAction = () => {
 const uploadImages = async () => {
   if (pendingImages.value.length === 0) return;
   isUploadingImages.value = true;
-  ownerMessage.value = '';
-  ownerError.value = '';
   try {
     await gymApi.addImages(pendingImages.value);
     pendingImages.value = [];
@@ -1589,9 +1698,18 @@ const uploadImages = async () => {
       gymImageInputRef.value.value = '';
     }
     await loadGym();
-    ownerMessage.value = '짐 이미지가 업로드되었습니다.';
+    openOwnerActionModal({
+      tone: 'success',
+      title: '짐 이미지 업로드 완료',
+      message: '짐 이미지가 업로드되었습니다.',
+    });
   } catch (error) {
-    ownerError.value = '짐 이미지 업로드에 실패했습니다.';
+    openOwnerActionModal({
+      tone: 'error',
+      title: '짐 이미지 업로드 실패',
+      message: '짐 이미지를 업로드하지 못했습니다.',
+      detail: extractOwnerActionErrorMessage(error),
+    });
   } finally {
     isUploadingImages.value = false;
   }
@@ -1601,14 +1719,21 @@ const deleteImage = async (image) => {
   if (!image?.id) return;
   if (!window.confirm('해당 이미지를 삭제할까요?')) return;
   isDeletingImage.value = true;
-  ownerMessage.value = '';
-  ownerError.value = '';
   try {
     await gymApi.deleteImage(image.id);
     await loadGym();
-    ownerMessage.value = '짐 이미지가 삭제되었습니다.';
+    openOwnerActionModal({
+      tone: 'success',
+      title: '짐 이미지 삭제 완료',
+      message: '짐 이미지가 삭제되었습니다.',
+    });
   } catch (error) {
-    ownerError.value = '짐 이미지 삭제에 실패했습니다.';
+    openOwnerActionModal({
+      tone: 'error',
+      title: '짐 이미지 삭제 실패',
+      message: '짐 이미지를 삭제하지 못했습니다.',
+      detail: extractOwnerActionErrorMessage(error),
+    });
   } finally {
     isDeletingImage.value = false;
   }
@@ -1883,10 +2008,14 @@ onMounted(async () => {
   grid-template-columns: minmax(0, 1fr) auto;
   gap: 8px;
   margin-top: 16px;
+  align-items: center;
 }
 
 .owner-edit-address-search-submit {
-  min-width: 88px;
+  min-width: 72px;
+  min-height: 44px;
+  padding: 0 14px;
+  flex-shrink: 0;
 }
 
 .owner-edit-address-result {
@@ -2067,14 +2196,24 @@ onMounted(async () => {
 }
 
 @media (max-width: 767px) {
-  .owner-edit-address-row,
-  .owner-edit-address-search-row {
+  .owner-edit-address-row {
     grid-template-columns: minmax(0, 1fr);
   }
 
-  .owner-edit-address-btn,
-  .owner-edit-address-search-submit {
+  .owner-edit-address-btn {
     width: 100%;
+  }
+
+  .owner-edit-address-search-row {
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 8px;
+  }
+
+  .owner-edit-address-search-submit {
+    width: auto;
+    min-width: 64px;
+    padding: 0 12px;
+    font-size: 13px;
   }
 
   .v-profile-save-modal-body {

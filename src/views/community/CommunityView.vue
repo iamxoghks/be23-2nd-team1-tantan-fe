@@ -132,7 +132,7 @@
                   <div class="sx-views-community-communityview-009"><Zap :size="18" class="ux-views-community-communityview-008" /><span class="ux-views-community-communityview-009">{{ post.author }}님이 운동을 공유했어요!</span></div>
                   <div class="sx-views-community-communityview-010">
                     <div class="sx-views-community-communityview-011">
-                      <div class="sx-views-community-communityview-012"><MapPin :size="12" />{{ post.gymName || '운동 기록 첨부' }}</div>
+                      <div class="sx-views-community-communityview-012"><Clock :size="12" />{{ post.time || '방금 전' }}</div>
                       <div class="sx-views-community-communityview-013"><Clock :size="12" />총 시간: {{ post.duration && post.duration !== '-' ? post.duration : '정보 없음' }}</div>
                       <div class="ux-views-community-communityview-010">
                         <template v-if="post.exercises && post.exercises.length > 0">
@@ -201,7 +201,27 @@
           />
           <div class="v-report-modal-meta">
             <span v-if="reportErrorMessage" class="v-report-error">{{ reportErrorMessage }}</span>
-            <span class="v-report-count">{{ reportReason.length }}/500</span>
+            <div class="v-report-meter-group">
+              <div class="v-report-meter" aria-hidden="true">
+                <svg viewBox="0 0 28 28" class="v-report-meter-svg">
+                  <circle class="v-report-meter-track" cx="14" cy="14" r="10" />
+                  <circle
+                    class="v-report-meter-progress"
+                    :class="{ 'is-over-limit': isReportReasonOverLimit }"
+                    cx="14"
+                    cy="14"
+                    r="10"
+                    :style="{
+                      strokeDasharray: `${REPORT_REASON_METER_CIRCUMFERENCE} ${REPORT_REASON_METER_CIRCUMFERENCE}`,
+                      strokeDashoffset: `${reportReasonMeterDashOffset}`,
+                    }"
+                  />
+                </svg>
+              </div>
+              <span class="v-report-count" :class="{ 'is-over-limit': isReportReasonOverLimit }">
+                {{ reportReasonCountLabel }}
+              </span>
+            </div>
           </div>
           <div class="v-report-actions">
             <button type="button" class="v-report-cancel" :disabled="isSubmittingReport" @click="closeReportModal">취소</button>
@@ -223,7 +243,7 @@
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { RouterLink, useRoute, useRouter } from 'vue-router';
 import NavigationRail from '@/components/sections/NavigationRail.vue';
-import { Search, MessageCircle, Heart, ArrowUpDown, MapPin, Clock, Zap, Flag, X, Eye } from 'lucide-vue-next';
+import { Search, MessageCircle, Heart, ArrowUpDown, Clock, Zap, Flag, X, Eye } from 'lucide-vue-next';
 import { communityLikeApi, communityPostApi, reportApi } from '@/services/apis';
 import { useSession } from '@/composables/useSession';
 import { normalizeCommunityPost } from '@/utils/postNormalizer';
@@ -253,6 +273,9 @@ const isSubmittingReport = ref(false);
 const reportToastMessage = ref('');
 const reportTargetRefId = ref(null);
 const reportTargetType = ref('POST');
+const REPORT_REASON_MAX_LENGTH = 500;
+const REPORT_REASON_METER_RADIUS = 10;
+const REPORT_REASON_METER_CIRCUMFERENCE = 2 * Math.PI * REPORT_REASON_METER_RADIUS;
 let suggestDebounceTimer = null;
 let suggestRequestId = 0;
 let reportToastTimer = null;
@@ -273,6 +296,16 @@ const selectedSortLabel = computed(() => (
 const hasSearchTerm = computed(() => String(searchTerm.value || '').length > 0);
 const hasSuggestTarget = computed(() => String(searchTerm.value || '').trim().length >= 2);
 const showSuggestionPanel = computed(() => isSearchFocused.value && hasSuggestTarget.value);
+const reportReasonLength = computed(() => Array.from(String(reportReason.value || '')).length);
+const reportReasonRemaining = computed(() => REPORT_REASON_MAX_LENGTH - reportReasonLength.value);
+const isReportReasonOverLimit = computed(() => reportReasonRemaining.value < 0);
+const reportReasonCountLabel = computed(() => (
+  isReportReasonOverLimit.value ? String(reportReasonRemaining.value) : `${reportReasonLength.value}/${REPORT_REASON_MAX_LENGTH}`
+));
+const reportReasonMeterRatio = computed(() => Math.min(reportReasonLength.value / REPORT_REASON_MAX_LENGTH, 1));
+const reportReasonMeterDashOffset = computed(() => (
+  REPORT_REASON_METER_CIRCUMFERENCE * (1 - reportReasonMeterRatio.value)
+));
 const isFollowOnly = ref(false);
 
 const getNumber = (value, fallback = 0) => {
