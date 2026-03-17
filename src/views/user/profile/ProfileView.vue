@@ -95,16 +95,28 @@
                   </div>
                   <div v-if="gymOwnerSlots.length > 0" class="v-owner-row-gap" style="margin-top: 12px; max-height: 200px; overflow-y: auto; padding-right: 4px;">
                     <div v-for="slot in gymOwnerSlots" :key="slot.id" class="v-owner-exception-row">
-                      <div>
-                        <p class="v-owner-exception-date">{{ formatGymOwnerTime(slot.slotDateTime) }} ~ {{ formatGymOwnerTime(slot.endTime) }}</p>
-                        <p class="v-owner-exception-help">
-                          {{ slot.slotName }} ({{ slot.price.toLocaleString() }}원)
-                        </p>
+                      <div class="u-flex u-justify-between u-items-start">
+                        <div>
+                          <p class="v-owner-exception-date">{{ formatGymOwnerTime(slot.slotDateTime) }} ~ {{ formatGymOwnerTime(slot.endTime) }}</p>
+                          <p class="v-owner-exception-help">
+                            {{ slot.slotName }} ({{ slot.price.toLocaleString() }}원)
+                          </p>
+                        </div>
+                        <div style="text-align: right;">
+                          <span class="v-profile-activity-pill" :class="slot.remainingCount > 0 ? 'v-profile-activity-pill-green' : 'v-profile-activity-pill-gray'" style="min-height: 24px; padding: 0 10px; font-size: 11px;">
+                            {{ slot.remainingCount > 0 ? `잔여 ${slot.remainingCount}명` : '마감' }}
+                          </span>
+                        </div>
                       </div>
-                      <div style="text-align: right;">
-                        <span class="v-profile-activity-pill" :class="slot.remainingCount > 0 ? 'v-profile-activity-pill-green' : 'v-profile-activity-pill-gray'" style="min-height: 24px; padding: 0 10px; font-size: 11px;">
-                          {{ slot.remainingCount > 0 ? `잔여 ${slot.remainingCount}명` : '마감' }}
-                        </span>
+                      
+                      <!-- 예약자 명단 표시 -->
+                      <div v-if="slot.reservations && slot.reservations.length > 0" class="v-owner-booked-users-wrap">
+                        <p class="v-owner-booked-label">예약자 명단:</p>
+                        <div class="v-owner-booked-list">
+                          <span v-for="res in slot.reservations" :key="res.id || res.reservationId" class="v-owner-booked-user-chip">
+                            {{ res.userNickname || res.userName || res.displayName || '사용자' }}
+                          </span>
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -1133,7 +1145,11 @@ const handleExerciseNumberInput = (index, field, event) => {
 
 const toHHmm = (value, fallback = '00:00') => {
   if (!value) return fallback;
-  return String(value).slice(0, 5);
+  const str = String(value);
+  // ISO 형식 (2026-03-17T14:00:00) 또는 날짜 포함 문자열에서 시간 추출
+  const timeMatch = str.match(/(\d{2}:\d{2})/);
+  if (timeMatch) return timeMatch[1];
+  return str.slice(0, 5);
 };
 
 const formatGymOwnerTime = (value) => toHHmm(value, '--:--');
@@ -2767,6 +2783,37 @@ onBeforeUnmount(() => {
   margin: 4px 0 0;
   font-size: 12px;
   color: #64748b;
+}
+
+.v-owner-booked-users-wrap {
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px dashed #e2e8f0;
+}
+
+.v-owner-booked-label {
+  margin: 0 0 6px;
+  font-size: 11px;
+  font-weight: 700;
+  color: #64748b;
+}
+
+.v-owner-booked-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.v-owner-booked-user-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 10px;
+  border-radius: 6px;
+  background: #f1f5f9;
+  color: #334155;
+  font-size: 12px;
+  font-weight: 600;
+  border: 1px solid #e2e8f0;
 }
 
 @media (min-width: 900px) {
