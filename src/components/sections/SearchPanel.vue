@@ -2504,7 +2504,14 @@ const handleShareGym = async () => {
 };
 
 const startChatWithGymOwner = async () => {
-  const gymOwnerId = Number(selectedGymDetail.value?.userId || selectedGymDetail.value?.ownerId || props.selectedGym?.userId || props.selectedGym?.ownerId || 0);
+  const gymOwnerId = Number(
+    selectedGymDetail.value?.ownerId || 
+    props.selectedGym?.ownerId || 
+    selectedGymDetail.value?.userId || 
+    props.selectedGym?.userId || 
+    0
+  );
+  
   if (!gymOwnerId) {
     window.alert('해당 헬스장 사장님 정보를 찾을 수 없습니다.');
     return;
