@@ -291,10 +291,10 @@ const calculateDistanceMeters = (start, end) => {
 };
 
 const computeMapViewportSearch = () => {
-  if (!mapInstance.value || !nearbyModeEnabled.value) return null;
+  if (!mapInstance.value) return null;
 
   const center = getMapLatLng(mapInstance.value.getCenter?.());
-  const bounds = mapInstance.value.getBounds?.();
+  const bounds = mapInstance.value.getBounds?.());
   const northEast = getMapLatLng(bounds?.getNE?.());
   const southWest = getMapLatLng(bounds?.getSW?.());
 
@@ -346,7 +346,8 @@ const buildGymListParams = () => {
     params.category = category;
   }
 
-  if (nearbyModeEnabled.value) {
+  // 지도가 로드되어 있다면 항상 위치 정보를 포함하여 검색 품질 개선
+  if (mapInstance.value) {
     const geoParams = computeMapViewportSearch();
     if (geoParams) {
       params.userLatitude = geoParams.userLatitude;
@@ -523,7 +524,7 @@ const handleMapReady = (map) => {
   mapInstance.value = map;
   if (!map || !window.naver?.maps?.Event) return;
   mapIdleListener = window.naver.maps.Event.addListener(map, 'idle', () => {
-    if (!nearbyModeEnabled.value) return;
+    // 맵이 이동할 때마다 자동 재검색 (지정된 반경 내 검색 품질 향상)
     scheduleViewportSearchReload();
   });
 };
@@ -533,7 +534,7 @@ const applyMobileSearch = async () => {
   selectedGymId.value = null;
   isSearchPanelCollapsed.value = false;
   syncHomeDetailQuery(null);
-  await loadGymsForCurrentContext();
+  await loadGymsForCurrentContext({ force: true });
   if (appliedSearchQuery.value.length > 0) {
     mobileSheetState.value = 'full';
     return;
@@ -546,7 +547,7 @@ const clearMobileSearch = async () => {
   appliedSearchQuery.value = '';
   selectedGymId.value = null;
   syncHomeDetailQuery(null);
-  await loadGymsForCurrentContext();
+  await loadGymsForCurrentContext({ force: true });
   mobileSheetState.value = 'peek';
 };
 
@@ -628,7 +629,7 @@ const handleCategorySelect = async (category) => {
     mobileSheetState.value = 'peek';
   }
 
-  await loadGymsForCurrentContext();
+  await loadGymsForCurrentContext({ force: true });
 };
 
 const handleDesktopSearch = async (keyword) => {
@@ -640,7 +641,7 @@ const handleDesktopSearch = async (keyword) => {
     mobileSheetState.value = 'peek';
   }
 
-  await loadGymsForCurrentContext();
+  await loadGymsForCurrentContext({ force: true });
 };
 
 const handleCurrentLocationSelected = () => {
@@ -732,9 +733,10 @@ const loadGyms = async (params = {}, options = {}) => {
 
   try {
     const response = await gymApi.list(params);
-    const list = response.data?.data || response.data?.result || response.data;
+    const payload = extractPayload(response);
     if (requestId !== gymLoadSequence) return;
 
+    const list = extractList(payload);
     gyms.value = (Array.isArray(list) ? list : []).map((gym) => normalizeGym(gym));
 
     if (selectedGymId.value && !gyms.value.some((gym) => gym.id === selectedGymId.value)) {
