@@ -77,7 +77,7 @@ import { onMounted, ref } from 'vue';
 import { useRouter } from 'vue-router';
 import NavigationRail from '@/components/sections/NavigationRail.vue';
 import { adminApi } from '@/services/apis';
-import { extractPayload } from '@/utils/api';
+import { extractPayload, extractList } from '@/utils/api';
 
 const router = useRouter();
 const users = ref([]);
@@ -89,14 +89,6 @@ const size = ref(20);
 const totalPages = ref(1);
 const message = ref('');
 const errorMessage = ref('');
-
-const parseList = (payload) => {
-  if (Array.isArray(payload)) return payload;
-  if (Array.isArray(payload?.content)) return payload.content;
-  if (Array.isArray(payload?.list)) return payload.list;
-  if (Array.isArray(payload?.items)) return payload.items;
-  return [];
-};
 
 const goBackToAdmin = () => {
   router.push('/admin');
@@ -120,13 +112,17 @@ const loadUsers = async (nextPage = 0) => {
       suspended: suspendedFilter.value === '' ? undefined : suspendedFilter.value === 'true',
       sort: 'id,desc',
     });
+    
     const payload = extractPayload(response);
-    users.value = parseList(payload);
-    totalPages.value = Number(payload.totalPages || 1);
+    users.value = extractList(payload);
+    
+    // 페이징 정보 추출 (payload 자체가 페이징 객체이거나 그 안에 있을 수 있음)
+    totalPages.value = Number(payload?.totalPages ?? 1);
   } catch (error) {
+    console.error('관리자 사용자 목록 로드 실패:', error);
     users.value = [];
     totalPages.value = 1;
-    errorMessage.value = '사용자 목록을 불러오지 못했습니다.';
+    errorMessage.value = '사용자 목록을 불러오지 못했습니다. 권한이 없거나 서버 오류일 수 있습니다.';
   }
 };
 
