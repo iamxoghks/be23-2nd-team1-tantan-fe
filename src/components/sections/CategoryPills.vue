@@ -115,7 +115,7 @@ const CATEGORY_UI_MAP = {
 };
 
 const fallbackCategories = [
-  { name: '헬스장', iconKey: 'dumbbell', material: 'fitness_center', color: '#0068ff', sortOrder: 10 },
+  { name: '헬스', iconKey: 'dumbbell', material: 'fitness_center', color: '#0068ff', sortOrder: 10 },
   { name: 'PT', iconKey: 'person', material: 'person', color: '#ff4b4b', sortOrder: 20 },
   { name: '요가', iconKey: 'yoga', material: 'self_improvement', color: '#00c73c', sortOrder: 30 },
   { name: '필라테스', iconKey: 'pilates', material: 'accessibility_new', color: '#9b59b6', sortOrder: 40 },
