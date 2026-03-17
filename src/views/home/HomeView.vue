@@ -294,7 +294,7 @@ const computeMapViewportSearch = () => {
   if (!mapInstance.value) return null;
 
   const center = getMapLatLng(mapInstance.value.getCenter?.());
-  const bounds = mapInstance.value.getBounds?.());
+  const bounds = mapInstance.value.getBounds?.();
   const northEast = getMapLatLng(bounds?.getNE?.());
   const southWest = getMapLatLng(bounds?.getSW?.());
 
