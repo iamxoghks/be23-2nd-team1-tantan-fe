@@ -106,19 +106,19 @@
                     type="text"
                     placeholder="대화 내용 검색"
                     class="v-chat-message-search-input"
+                    @keydown.esc.prevent="clearMessageSearch"
                   />
                   <button
-                    v-if="hasMessageSearchTerm"
                     type="button"
                     class="chat-main-search-clear-btn"
-                    aria-label="대화 내용 검색어 지우기"
+                    aria-label="대화 내용 검색 닫기"
                     @pointerdown.prevent.stop="clearMessageSearch"
                     @click.prevent.stop="clearMessageSearch"
                   >
                     <X :size="12" />
                   </button>
                 </div>
-                <button type="button" class="v-chat-header-icon-btn" @click="toggleMessageSearch">
+                <button v-else type="button" class="v-chat-header-icon-btn" @click="toggleMessageSearch">
                   <Search :size="20" class="v-chat-action-icon" />
                 </button>
                 <div ref="roomMenuRef" class="chat-room-menu-wrap">
@@ -132,53 +132,111 @@
               </div>
             </div>
 
-            <div ref="chatMessageAreaRef" class="chat-message-area">
-              <div class="chat-date-row"><span class="chat-date-chip">2026년 1월 28일 수요일</span></div>
-              <div
-                v-for="message in filteredSelectedMessages"
-                :key="message.id"
-                :class="message.isMine ? 'chat-msg-row-mine' : 'chat-msg-row-other'"
-                class="chat-msg-row"
+            <div class="chat-message-area-shell">
+              <div ref="chatMessageAreaRef" class="chat-message-area" @scroll="handleMessageAreaScroll">
+                <div class="chat-date-row"><span class="chat-date-chip">2026년 1월 28일 수요일</span></div>
+                <div
+                  v-for="message in selectedMessages"
+                  :key="message.id"
+                  :ref="(el) => setMessageElement(message.id, el)"
+                  :class="message.isMine ? 'chat-msg-row-mine' : 'chat-msg-row-other'"
+                  class="chat-msg-row"
+                >
+                  <template v-if="!message.isMine">
+                    <button class="chat-msg-avatar chat-msg-avatar-btn" @click="goToCounterpartProfile">
+                      <img
+                        :src="selectedRoom.avatarImageUrl"
+                        :alt="`${selectedRoom?.name || '상대방'} 프로필`"
+                        class="chat-msg-avatar-image"
+                        @error="handleUserAvatarError"
+                      />
+                    </button>
+                    <div class="chat-msg-col">
+                      <span class="chat-msg-sender">{{ selectedRoom?.name }}</span>
+                      <div class="chat-msg-bubble-row chat-msg-bubble-row-other">
+                        <div class="chat-bubble chat-bubble-other">
+                          <template
+                            v-for="(segment, segmentIndex) in getHighlightedMessageSegments(message)"
+                            :key="`${message.id}-other-${segmentIndex}`"
+                          >
+                            <mark v-if="segment.match" class="chat-search-highlight">{{ segment.text }}</mark>
+                            <span v-else>{{ segment.text }}</span>
+                          </template>
+                        </div>
+                        <span class="chat-msg-time">{{ formatMessageDisplayTime(message) }}</span>
+                        <button type="button" class="chat-msg-report-btn" @click="reportChatMessage(message)">
+                          <Flag :size="10" />
+                        </button>
+                      </div>
+                    </div>
+                  </template>
+                  <template v-else>
+                    <div class="chat-msg-col chat-msg-col-mine">
+                      <div class="chat-msg-bubble-row chat-msg-bubble-row-mine">
+                        <span v-if="isLastReadMyMessage(message)" class="chat-msg-read-label">읽음</span>
+                        <span class="chat-msg-time">{{ formatMessageDisplayTime(message) }}</span>
+                        <div class="chat-bubble chat-bubble-mine">
+                          <template
+                            v-for="(segment, segmentIndex) in getHighlightedMessageSegments(message)"
+                            :key="`${message.id}-mine-${segmentIndex}`"
+                          >
+                            <mark v-if="segment.match" class="chat-search-highlight">{{ segment.text }}</mark>
+                            <span v-else>{{ segment.text }}</span>
+                          </template>
+                        </div>
+                      </div>
+                    </div>
+                  </template>
+                </div>
+              </div>
+
+              <button
+                v-if="isScrollToBottomVisible"
+                type="button"
+                class="chat-scroll-bottom-btn"
+                aria-label="맨 아래 대화로 이동"
+                @click="scrollMessagesToBottom"
               >
-                <template v-if="!message.isMine">
-                  <button class="chat-msg-avatar chat-msg-avatar-btn" @click="goToCounterpartProfile">
-                    <img
-                      :src="selectedRoom.avatarImageUrl"
-                      :alt="`${selectedRoom?.name || '상대방'} 프로필`"
-                      class="chat-msg-avatar-image"
-                      @error="handleUserAvatarError"
-                    />
-                  </button>
-                  <div class="chat-msg-col">
-                    <span class="chat-msg-sender">{{ selectedRoom?.name }}</span>
-                    <div class="chat-msg-bubble-row chat-msg-bubble-row-other">
-                      <div class="chat-bubble chat-bubble-other">{{ message.text }}</div>
-                      <span class="chat-msg-time">{{ formatMessageDisplayTime(message) }}</span>
-                      <button type="button" class="chat-msg-report-btn" @click="reportChatMessage(message)">
-                        <Flag :size="10" />
-                      </button>
-                    </div>
-                  </div>
-                </template>
-                <template v-else>
-                  <div class="chat-msg-col chat-msg-col-mine">
-                    <div class="chat-msg-bubble-row chat-msg-bubble-row-mine">
-                      <span v-if="isLastReadMyMessage(message)" class="chat-msg-read-label">읽음</span>
-                      <span class="chat-msg-time">{{ formatMessageDisplayTime(message) }}</span>
-                      <div class="chat-bubble chat-bubble-mine">{{ message.text }}</div>
-                    </div>
-                  </div>
-                </template>
+                <ChevronDown :size="21" />
+              </button>
+            </div>
+
+            <div v-if="isMessageSearchOpen && hasMessageSearchTerm" class="chat-search-status-bar">
+              <div class="chat-search-status-summary">
+                <Search :size="15" class="chat-search-status-icon" />
+                <span class="chat-search-status-count">{{ messageSearchResultLabel }}</span>
+              </div>
+              <div class="chat-search-status-actions">
+                <button
+                  type="button"
+                  class="chat-search-status-btn"
+                  :disabled="!canMoveToPreviousSearchResult"
+                  aria-label="이전 검색 결과"
+                  @click="moveToPreviousSearchResult"
+                >
+                  <ChevronUp :size="16" />
+                </button>
+                <button
+                  type="button"
+                  class="chat-search-status-btn"
+                  :disabled="!canMoveToNextSearchResult"
+                  aria-label="다음 검색 결과"
+                  @click="moveToNextSearchResult"
+                >
+                  <ChevronDown :size="16" />
+                </button>
               </div>
             </div>
 
             <div class="chat-input-section">
               <div class="chat-input-shell">
                 <textarea
+                  ref="messageInputRef"
                   v-model="messageInput"
+                  rows="1"
                   placeholder="메시지를 입력하세요..."
                   class="v-chat-input-box"
-                  @input="handleInputTyping"
+                  @input="handleMessageInput"
                   @blur="stopTypingForRoom(selectedRoom?.roomKey || selectedRoomId)"
                   @keydown.enter.exact.prevent="sendMessage"
                 />
@@ -196,6 +254,20 @@
         </div>
       </div>
     </div>
+
+    <ReportReasonModal
+      :open="isReportModalOpen"
+      :reason="reportReason"
+      :error-message="reportErrorMessage"
+      :submitting="isSubmittingReport"
+      @update:reason="reportReason = $event"
+      @close="closeReportModal"
+      @submit="submitReport"
+    />
+
+    <Teleport to="body">
+      <div v-if="reportToastMessage" class="v-report-toast">{{ reportToastMessage }}</div>
+    </Teleport>
   </div>
 </template>
 
@@ -203,7 +275,8 @@
 import { ref, computed, onMounted, onBeforeUnmount, watch, nextTick } from 'vue';
 import { Client } from '@stomp/stompjs';
 import NavigationRail from '@/components/sections/NavigationRail.vue';
-import { Search, MessageSquare, MoreHorizontal, Send, ChevronLeft, X, Flag } from 'lucide-vue-next';
+import ReportReasonModal from '@/components/modals/ReportReasonModal.vue';
+import { Search, MessageSquare, MoreHorizontal, Send, ChevronLeft, ChevronUp, ChevronDown, X, Flag } from 'lucide-vue-next';
 import { chatApi, userApi } from '@/services/apis';
 import { extractList, extractPayload } from '@/utils/api';
 import { getAccessToken } from '@/services/token';
@@ -220,6 +293,9 @@ const roomSearchTerm = ref('');
 const messageSearchTerm = ref('');
 const isMessageSearchOpen = ref(false);
 const messageSearchInputRef = ref(null);
+const messageInputRef = ref(null);
+const isScrollToBottomVisible = ref(false);
+const currentSearchResultIndex = ref(0);
 const selectedRoom = computed(() => chatRoomsData.value.find((r) => r.id === selectedRoomId.value));
 const hasChatRooms = computed(() => chatRoomsData.value.length > 0);
 const chatEmptyStateTitle = computed(() => (
@@ -242,6 +318,12 @@ const messagesByRoom = ref({});
 const presenceByRoom = ref({});
 const isRoomMenuOpen = ref(false);
 const isReportingMessageId = ref(null);
+const isReportModalOpen = ref(false);
+const reportReason = ref('');
+const reportErrorMessage = ref('');
+const isSubmittingReport = ref(false);
+const reportToastMessage = ref('');
+const reportTargetMessageId = ref(null);
 const roomMenuRef = ref(null);
 const chatMessageAreaRef = ref(null);
 const typingStopTimerByRoom = new Map();
@@ -249,6 +331,8 @@ const typingStateByRoom = new Map();
 const presenceTimeoutByRoom = new Map();
 let unregisterAuthCleanup = null;
 let roomSelectionRequestSeq = 0;
+let reportToastTimer = null;
+const scrollToBottomThreshold = 96;
 const hasRoomSearchTerm = computed(() => String(roomSearchTerm.value || '').trim().length > 0);
 const hasMessageSearchTerm = computed(() => String(messageSearchTerm.value || '').trim().length > 0);
 const { setUnreadFromRooms } = useChatUnreadCenter();
@@ -268,11 +352,29 @@ const selectedMessages = computed(() => {
   if (!selected) return [];
   return messagesByRoom.value[selectedRoomId.value] || [];
 });
-const filteredSelectedMessages = computed(() => {
-  const keyword = String(messageSearchTerm.value || '').trim().toLowerCase();
-  if (!keyword) return selectedMessages.value;
-  return selectedMessages.value.filter((message) => String(message?.text || '').toLowerCase().includes(keyword));
+const normalizedMessageSearchTerm = computed(() => String(messageSearchTerm.value || '').trim());
+const matchedMessageIds = computed(() => {
+  const keyword = normalizedMessageSearchTerm.value.toLowerCase();
+  if (!keyword) return [];
+  return selectedMessages.value
+    .filter((message) => String(message?.text || '').toLowerCase().includes(keyword))
+    .map((message) => String(message.id));
 });
+const messageSearchMatchCount = computed(() => matchedMessageIds.value.length);
+const currentSearchResultMessageId = computed(() => {
+  if (!messageSearchMatchCount.value) return null;
+  const safeIndex = Math.min(currentSearchResultIndex.value, messageSearchMatchCount.value - 1);
+  return matchedMessageIds.value[safeIndex] || null;
+});
+const messageSearchResultLabel = computed(() => {
+  if (!normalizedMessageSearchTerm.value) return '0/0';
+  if (!messageSearchMatchCount.value) return '0/0';
+  return `${messageSearchMatchCount.value - currentSearchResultIndex.value}/${messageSearchMatchCount.value}`;
+});
+const canMoveToPreviousSearchResult = computed(() => currentSearchResultIndex.value > 0);
+const canMoveToNextSearchResult = computed(() => (
+  messageSearchMatchCount.value > 0 && currentSearchResultIndex.value < messageSearchMatchCount.value - 1
+));
 
 const unreadTotal = computed(() => chatRoomsData.value.reduce((sum, room) => sum + Number(room.unread || 0), 0));
 
@@ -297,14 +399,17 @@ const clearRoomSearch = () => {
 };
 
 const clearMessageSearch = () => {
-  if (!hasMessageSearchTerm.value) return;
+  if (!isMessageSearchOpen.value && !hasMessageSearchTerm.value) return;
   messageSearchTerm.value = '';
+  currentSearchResultIndex.value = 0;
+  isMessageSearchOpen.value = false;
 };
 
 const toggleMessageSearch = async () => {
   isMessageSearchOpen.value = !isMessageSearchOpen.value;
   if (!isMessageSearchOpen.value) {
     messageSearchTerm.value = '';
+    currentSearchResultIndex.value = 0;
     return;
   }
   await nextTick();
@@ -341,6 +446,73 @@ const scrollMessagesToBottom = async () => {
   const container = chatMessageAreaRef.value;
   if (!container) return;
   container.scrollTop = container.scrollHeight;
+  isScrollToBottomVisible.value = false;
+};
+
+const updateScrollToBottomVisibility = () => {
+  const container = chatMessageAreaRef.value;
+  if (!container) {
+    isScrollToBottomVisible.value = false;
+    return;
+  }
+  const distanceFromBottom = container.scrollHeight - container.scrollTop - container.clientHeight;
+  isScrollToBottomVisible.value = distanceFromBottom > scrollToBottomThreshold;
+};
+
+const handleMessageAreaScroll = () => {
+  updateScrollToBottomVisibility();
+};
+
+const messageElements = new Map();
+
+const setMessageElement = (messageId, element) => {
+  const key = String(messageId || '');
+  if (!key) return;
+  if (element) {
+    messageElements.set(key, element);
+    return;
+  }
+  messageElements.delete(key);
+};
+
+const scrollToCurrentSearchResult = async (behavior = 'smooth') => {
+  await nextTick();
+  const messageId = currentSearchResultMessageId.value;
+  if (!messageId) return;
+  const element = messageElements.get(String(messageId));
+  if (!element) return;
+  element.scrollIntoView({
+    block: 'center',
+    behavior,
+  });
+};
+
+const moveToPreviousSearchResult = () => {
+  if (!canMoveToPreviousSearchResult.value) return;
+  currentSearchResultIndex.value -= 1;
+  scrollToCurrentSearchResult();
+};
+
+const moveToNextSearchResult = () => {
+  if (!canMoveToNextSearchResult.value) return;
+  currentSearchResultIndex.value += 1;
+  scrollToCurrentSearchResult();
+};
+
+const resizeMessageInput = async () => {
+  await nextTick();
+  const textarea = messageInputRef.value;
+  if (!textarea) return;
+
+  textarea.style.height = 'auto';
+
+  const styles = window.getComputedStyle(textarea);
+  const minHeight = Number.parseFloat(styles.minHeight) || textarea.scrollHeight;
+  const maxHeight = Number.parseFloat(styles.maxHeight) || textarea.scrollHeight;
+  const nextHeight = Math.min(Math.max(textarea.scrollHeight, minHeight), maxHeight);
+
+  textarea.style.height = `${nextHeight}px`;
+  textarea.style.overflowY = textarea.scrollHeight > maxHeight ? 'auto' : 'hidden';
 };
 
 const handleDocumentPointerDown = (event) => {
@@ -359,6 +531,28 @@ const toFriendlyApiError = (error, defaultMessage = '요청 처리에 실패했�
   if (status >= 500) return '서버 오류로 요청을 처리하지 못했습니다.';
   if (!error?.response) return '백엔드 연결에 실패했습니다. API 주소/CORS 설정을 확인해주세요.';
   return defaultMessage;
+};
+
+const toFriendlyChatReportError = (error) => {
+  const status = Number(error?.response?.status || 0);
+  if (status === 401) return '로그인이 필요합니다.';
+  if (status === 403) return '신고 권한이 없습니다.';
+  if (status === 404) return '신고 대상을 찾을 수 없습니다.';
+  if (status >= 500) return '서버 오류로 신고에 실패했습니다.';
+  if (!error?.response) return '백엔드 연결에 실패했습니다. 잠시 후 다시 시도해주세요.';
+  return '신고 처리에 실패했습니다.';
+};
+
+const showReportToast = (message) => {
+  if (reportToastTimer) {
+    window.clearTimeout(reportToastTimer);
+    reportToastTimer = null;
+  }
+  reportToastMessage.value = message;
+  reportToastTimer = window.setTimeout(() => {
+    reportToastMessage.value = '';
+    reportToastTimer = null;
+  }, 1800);
 };
 
 const sendMessage = () => {
@@ -381,6 +575,7 @@ const sendMessage = () => {
     next.push(optimistic);
     messagesByRoom.value[roomKey] = sortMessagesByTimeAsc(next);
     messageInput.value = '';
+    resizeMessageInput();
     return;
   }
 
@@ -403,6 +598,7 @@ const sendMessage = () => {
   }
 
   messageInput.value = '';
+  resizeMessageInput();
   stopTypingForRoom(roomKey);
 };
 
@@ -502,6 +698,48 @@ const selectedLastReadMyMessageId = computed(() => {
 });
 
 const isLastReadMyMessage = (message) => String(message?.id || '') === String(selectedLastReadMyMessageId.value || '');
+const isCurrentSearchResult = (message) => (
+  String(message?.id || '') === String(currentSearchResultMessageId.value || '')
+);
+
+const buildHighlightedSegments = (text, keyword) => {
+  const source = String(text || '');
+  if (!keyword) {
+    return [{ text: source, match: false }];
+  }
+
+  const segments = [];
+  const normalizedKeyword = keyword.toLowerCase();
+  const normalizedSource = source.toLowerCase();
+  let cursor = 0;
+
+  while (cursor < source.length) {
+    const matchIndex = normalizedSource.indexOf(normalizedKeyword, cursor);
+    if (matchIndex === -1) {
+      segments.push({ text: source.slice(cursor), match: false });
+      break;
+    }
+
+    if (matchIndex > cursor) {
+      segments.push({ text: source.slice(cursor, matchIndex), match: false });
+    }
+
+    segments.push({
+      text: source.slice(matchIndex, matchIndex + keyword.length),
+      match: true,
+    });
+    cursor = matchIndex + keyword.length;
+  }
+
+  return segments.length > 0 ? segments : [{ text: source, match: false }];
+};
+
+const getHighlightedMessageSegments = (message) => {
+  if (!normalizedMessageSearchTerm.value || !isCurrentSearchResult(message)) {
+    return [{ text: String(message?.text || ''), match: false }];
+  }
+  return buildHighlightedSegments(message?.text, normalizedMessageSearchTerm.value);
+};
 
 const setRoomPresence = (roomKey, status, ttlMs = 12000) => {
   if (!roomKey) return;
@@ -701,6 +939,11 @@ const handleInputTyping = () => {
   }
 };
 
+const handleMessageInput = () => {
+  resizeMessageInput();
+  handleInputTyping();
+};
+
 const stopTypingForRoom = (roomKey) => {
   if (!roomKey) return;
   const key = String(roomKey);
@@ -743,23 +986,47 @@ const reportChatMessage = async (message) => {
   if (!selectedRoom.value) return;
   if (message?.isMine) return;
   if (!message?.id || String(message.id).startsWith('m-') || String(message.id).startsWith('ws-')) return;
-  if (isReportingMessageId.value) return;
+  if (isReportingMessageId.value || isSubmittingReport.value) return;
+  reportTargetMessageId.value = String(message.id);
+  reportReason.value = '';
+  reportErrorMessage.value = '';
+  isReportModalOpen.value = true;
+};
 
-  const reasonInput = window.prompt('신고 사유를 입력해주세요. (5~500자)');
-  const reason = String(reasonInput || '').trim();
-  if (!reason) return;
+const closeReportModal = () => {
+  if (isSubmittingReport.value) return;
+  isReportModalOpen.value = false;
+  reportReason.value = '';
+  reportErrorMessage.value = '';
+  reportTargetMessageId.value = null;
+};
+
+const submitReport = async () => {
+  if (!selectedRoom.value) return;
+  const targetMessageId = String(reportTargetMessageId.value || '').trim();
+  if (!targetMessageId) return;
+
+  const reason = String(reportReason.value || '').trim();
   if (reason.length < 5 || reason.length > 500) {
-    window.alert('신고 사유는 5자 이상 500자 이하로 입력해주세요.');
+    reportErrorMessage.value = '신고 사유는 5자 이상 500자 이하로 입력해주세요.';
     return;
   }
 
-  isReportingMessageId.value = String(message.id);
+  reportErrorMessage.value = '';
+  isSubmittingReport.value = true;
+  isReportingMessageId.value = targetMessageId;
+
   try {
-    await chatApi.reportMessage(selectedRoom.value.roomKey || selectedRoom.value.id, message.id, { reason });
-    window.alert('신고가 접수되었습니다.');
+    await chatApi.reportMessage(selectedRoom.value.roomKey || selectedRoom.value.id, targetMessageId, { reason });
+    isReportModalOpen.value = false;
+    reportReason.value = '';
+    reportErrorMessage.value = '';
+    reportTargetMessageId.value = null;
+    showReportToast('신고가 접수되었습니다.');
   } catch (error) {
-    window.alert(toFriendlyApiError(error, '신고 처리에 실패했습니다.'));
+    reportErrorMessage.value = toFriendlyChatReportError(error);
   } finally {
+    isSubmittingReport.value = false;
     isReportingMessageId.value = null;
   }
 };
@@ -923,6 +1190,8 @@ const loadMessages = async (roomId, { requestSeq = null } = {}) => {
 
 watch(selectedRoomId, async (next, prev) => {
   isRoomMenuOpen.value = false;
+  closeReportModal();
+  currentSearchResultIndex.value = 0;
   if (prev) {
     const prevRoom = chatRoomsData.value.find((room) => String(room.id) === String(prev));
     stopTypingForRoom(prevRoom?.roomKey || prev);
@@ -930,6 +1199,8 @@ watch(selectedRoomId, async (next, prev) => {
   if (!next) {
     roomSelectionRequestSeq += 1;
     clearActiveRoomSubscription();
+    isScrollToBottomVisible.value = false;
+    await resizeMessageInput();
     return;
   }
   const requestSeq = ++roomSelectionRequestSeq;
@@ -940,6 +1211,7 @@ watch(selectedRoomId, async (next, prev) => {
   if (chatConnectionState.value === 'connected') {
     subscribeActiveRoom(next);
   }
+  await resizeMessageInput();
   await scrollMessagesToBottom();
 });
 
@@ -948,6 +1220,34 @@ watch(
   () => {
     scrollMessagesToBottom();
   }
+);
+
+watch(
+  () => normalizedMessageSearchTerm.value,
+  async (nextKeyword, prevKeyword) => {
+    if (!nextKeyword) {
+      currentSearchResultIndex.value = 0;
+      return;
+    }
+    if (nextKeyword !== prevKeyword) {
+      currentSearchResultIndex.value = Math.max(matchedMessageIds.value.length - 1, 0);
+    }
+    await scrollToCurrentSearchResult(nextKeyword !== prevKeyword ? 'auto' : 'smooth');
+  },
+);
+
+watch(
+  () => matchedMessageIds.value.join('|'),
+  async () => {
+    if (!matchedMessageIds.value.length) {
+      currentSearchResultIndex.value = 0;
+      return;
+    }
+    if (currentSearchResultIndex.value >= matchedMessageIds.value.length) {
+      currentSearchResultIndex.value = matchedMessageIds.value.length - 1;
+    }
+    await scrollToCurrentSearchResult('auto');
+  },
 );
 
 onMounted(() => {
@@ -960,6 +1260,8 @@ onMounted(() => {
   window.addEventListener('pointerdown', handleDocumentPointerDown);
   loadRooms();
   connectStomp();
+  resizeMessageInput();
+  updateScrollToBottomVisibility();
 });
 
 onBeforeUnmount(() => {
@@ -973,6 +1275,10 @@ onBeforeUnmount(() => {
   }
   typingStopTimerByRoom.forEach((timer) => window.clearTimeout(timer));
   presenceTimeoutByRoom.forEach((timer) => window.clearTimeout(timer));
+  if (reportToastTimer) {
+    window.clearTimeout(reportToastTimer);
+    reportToastTimer = null;
+  }
   typingStopTimerByRoom.clear();
   presenceTimeoutByRoom.clear();
   window.removeEventListener('pointerdown', handleDocumentPointerDown);

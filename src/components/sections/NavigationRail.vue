@@ -71,7 +71,7 @@ import {
   watch,
 } from 'vue';
 import { RouterLink, useRoute, useRouter } from 'vue-router';
-import { Home, Send, Share2, Bell, User, Dumbbell, LogIn, LogOut, Shield } from 'lucide-vue-next';
+import { Home, Send, Share2, Bell, User, Dumbbell, LogIn, LogOut } from 'lucide-vue-next';
 import { useAuthModal } from '@/composables/useAuthModal';
 import { useSession } from '@/composables/useSession';
 import { useNotificationCenter } from '@/composables/useNotificationCenter';
@@ -82,12 +82,14 @@ import { notifyAuthInvalidated } from '@/services/authLifecycle';
 const route = useRoute();
 const router = useRouter();
 const { openAuthModal } = useAuthModal();
-const { sessionProfile, isAuthenticated, syncSessionFromServer, primeSessionFromToken } = useSession();
+const { isAuthenticated, syncSessionFromServer, primeSessionFromToken } = useSession();
 const { hasUnread, clearUnread, syncUnreadCount } = useNotificationCenter();
 const {
   hasUnread: hasUnreadChat,
   clearUnread: clearUnreadChat,
   syncUnreadCount: syncChatUnreadCount,
+  ensureInboxConnected,
+  disconnectInbox,
 } = useChatUnreadCenter();
 
 const logout = async () => {
@@ -115,10 +117,12 @@ const refreshUnreadBadge = async ({ force = false } = {}) => {
 
 const refreshChatUnreadBadge = async ({ force = false } = {}) => {
   if (!isAuthenticated.value) {
+    disconnectInbox();
     clearUnreadChat();
     return;
   }
   try {
+    await ensureInboxConnected();
     await syncChatUnreadCount({ force });
   } catch (error) {
     // no-op: 채팅 unread badge는 마지막 정상값을 유지합니다.
@@ -152,16 +156,6 @@ const items = computed(() => {
       icon: LogOut,
       label: '로그아웃',
       action: logout,
-    });
-  }
-
-  if (sessionProfile.value?.role === 'ADMIN') {
-    base.splice(base.length - 1, 0, {
-      id: 'admin',
-      icon: Shield,
-      label: '관리자',
-      to: '/admin',
-      className: 'rail-desktop-only',
     });
   }
 

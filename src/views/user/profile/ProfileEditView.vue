@@ -531,10 +531,10 @@
           </div>
         </div>
         <div class="v-profile-save-modal-actions owner-edit-address-modal-actions">
-          <button type="button" class="v-modal-cancel-btn" @click="closeAddressSearchModal">닫기</button>
           <button type="button" class="v-modal-save-btn" :disabled="!addressSearchResult" @click="applySearchedAddress">
             이 주소 사용
           </button>
+          <button type="button" class="v-modal-cancel-btn" @click="closeAddressSearchModal">닫기</button>
         </div>
       </div>
     </div>

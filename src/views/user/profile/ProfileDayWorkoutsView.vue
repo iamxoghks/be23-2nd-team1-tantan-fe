@@ -77,43 +77,41 @@
                   <div class="u-flex-1-min">
                     <div class="sx-views-user-profile-profilehistoryview-007">
                       <span class="v-profile-history-meta">{{ workout.date }} {{ workout.time }}</span>
-                      <span class="v-profile-history-duration">{{ workout.duration || 'Daily' }}</span>
+                      <span
+                        v-if="workout.duration && workout.duration !== 'Daily'"
+                        class="v-profile-history-duration"
+                      >
+                        {{ workout.duration }}
+                      </span>
                     </div>
-                    <h4 class="sx-views-user-profile-profilehistoryview-008">{{ workout.title }}</h4>
+                    <div class="v-day-history-title-row">
+                      <h4 class="sx-views-user-profile-profilehistoryview-008">{{ workout.title }}</h4>
+                      <button
+                        v-if="isOwnWorkoutHistory"
+                        type="button"
+                        class="v-history-delete-btn v-day-history-delete-btn v-day-history-delete-btn-inline"
+                        :disabled="isDeletingWorkout(workout.id)"
+                        @click="deleteWorkout(workout.id)"
+                      >
+                        <Trash2 class="v-icon-18-md20" />
+                      </button>
+                    </div>
                     <div v-if="workout.exercises && workout.exercises.length > 0" class="v-history-exercise-list">
                       <div
                         v-for="(exercise, exerciseIndex) in workout.exercises"
                         :key="`${workout.id}-${exerciseIndex}-${exercise.name}`"
-                        class="v-workout-detail-box"
+                        class="v-workout-detail-box v-history-workout-detail-box"
                       >
-                        <div class="v-workout-detail-row">
-                          <span class="v-workout-detail-name">{{ exercise.name }}</span>
-                          <span class="v-workout-detail-separator">|</span>
-                          <span class="v-workout-detail-metric">
-                            {{ exercise.hasWeight && exercise.weight !== null ? formatWorkoutMetricValue(exercise.weight, 'kg') : '-' }}
-                          </span>
-                          <span class="v-workout-detail-separator">|</span>
-                          <span class="v-workout-detail-metric">
-                            {{ exercise.hasSets && exercise.sets !== null ? `${formatWorkoutMetricValue(exercise.sets)}세트` : '-' }}
-                          </span>
-                          <span class="v-workout-detail-separator">|</span>
-                          <span class="v-workout-detail-metric">
-                            {{ exercise.hasReps && exercise.reps !== null ? `${formatWorkoutMetricValue(exercise.reps)}회` : '-' }}
+                        <div class="v-history-workout-detail-inline">
+                          <span class="v-workout-detail-name v-history-workout-detail-name">{{ exercise.name }}</span>
+                          <span class="v-history-workout-detail-stats">
+                            {{ formatExerciseSummary(exercise) }}
                           </span>
                         </div>
                       </div>
                     </div>
                   </div>
                 </div>
-                <button
-                  v-if="isOwnWorkoutHistory"
-                  type="button"
-                  class="v-history-delete-btn v-history-delete-btn-align v-day-history-delete-btn"
-                  :disabled="isDeletingWorkout(workout.id)"
-                  @click="deleteWorkout(workout.id)"
-                >
-                  <Trash2 class="v-icon-18-md20" />
-                </button>
               </div>
             </template>
 
@@ -256,6 +254,20 @@ const formatWorkoutMetricValue = (value, unit = '') => {
   const normalized = Number(value);
   if (!Number.isFinite(normalized)) return '-';
   return `${normalized.toLocaleString()}${unit}`;
+};
+
+const formatExerciseSummary = (exercise = {}) => {
+  const parts = [];
+  if (exercise.hasWeight && exercise.weight !== null) {
+    parts.push(formatWorkoutMetricValue(exercise.weight, 'kg'));
+  }
+  if (exercise.hasSets && exercise.sets !== null) {
+    parts.push(`${formatWorkoutMetricValue(exercise.sets)}세트`);
+  }
+  if (exercise.hasReps && exercise.reps !== null) {
+    parts.push(`${formatWorkoutMetricValue(exercise.reps)}회`);
+  }
+  return parts.length > 0 ? parts.join(', ') : '-';
 };
 
 const extractListPayload = (raw = {}) => {

@@ -71,25 +71,32 @@
                 <img :src="post.image" alt="" class="ux-views-community-communityview-032 v-community-detail-image" />
               </div>
 
-              <div v-if="showWorkoutPanel" class="sx-views-community-communityview-025">
-                <div class="sx-views-community-communityview-026">
-                  <span class="sx-views-community-communityview-027"><Zap :size="14" />{{ post.author }}님이 운동을 공유했어요!</span>
-                  <span class="sx-views-community-communityview-029"><Zap :size="14" />{{ post.streak || 0 }}일 연속</span>
+              <div v-if="showWorkoutPanel" class="v-community-workout-share-block">
+                <div class="v-community-workout-share-head">
+                  <span class="v-community-workout-share-label">
+                    <Zap :size="14" />
+                    {{ post.author }}님이 운동을 공유했어요!
+                  </span>
+                  <span class="v-community-workout-share-streak">
+                    <Flame :size="15" />
+                    {{ post.streak || 0 }}일 연속
+                  </span>
                 </div>
 
-                <div class="u-col-gap-2">
+                <div class="v-community-workout-share-panel">
                   <template v-if="post.exercises && post.exercises.length > 0">
                     <div
                       v-for="exercise in post.exercises"
                       :key="exercise.name"
-                      class="sx-views-community-communityview-030"
+                      class="v-community-workout-share-item"
                     >
-                      <span class="ux-views-community-communityview-033">{{ exercise.name }}</span>
-                      <span class="ux-views-community-communityview-034">{{ exercise.stats }}</span>
+                      <span class="v-community-workout-share-item-name">{{ exercise.name }}</span>
+                      <span class="v-community-workout-share-item-stats">{{ exercise.stats }}</span>
                     </div>
                   </template>
-                  <div v-else class="sx-views-community-communityview-030">
-                    <span class="ux-views-community-communityview-034">요약 정보 없음</span>
+                  <div v-else class="v-community-workout-share-item">
+                    <span class="v-community-workout-share-item-name">운동 기록</span>
+                    <span class="v-community-workout-share-item-stats">요약 정보 없음</span>
                   </div>
                 </div>
               </div>
@@ -231,50 +238,15 @@
       </div>
     </Teleport>
 
-    <Teleport to="body">
-      <div v-if="isReportModalOpen" class="v-report-modal-backdrop" @click.self="closeReportModal">
-        <div class="v-report-modal">
-          <h3 class="v-report-modal-title">신고하기</h3>
-          <p class="v-report-modal-desc">신고 사유를 입력해주세요. 5자 이상 500자 이하로 작성 가능합니다.</p>
-          <textarea
-            v-model="reportReason"
-            class="v-report-textarea"
-            placeholder="신고 사유를 입력해주세요."
-            maxlength="500"
-          />
-          <div class="v-report-modal-meta">
-            <span v-if="reportErrorMessage" class="v-report-error">{{ reportErrorMessage }}</span>
-            <div class="v-report-meter-group">
-              <div class="v-report-meter" aria-hidden="true">
-                <svg viewBox="0 0 28 28" class="v-report-meter-svg">
-                  <circle class="v-report-meter-track" cx="14" cy="14" r="10" />
-                  <circle
-                    class="v-report-meter-progress"
-                    :class="{ 'is-over-limit': isReportReasonOverLimit }"
-                    cx="14"
-                    cy="14"
-                    r="10"
-                    :style="{
-                      strokeDasharray: `${REPORT_REASON_METER_CIRCUMFERENCE} ${REPORT_REASON_METER_CIRCUMFERENCE}`,
-                      strokeDashoffset: `${reportReasonMeterDashOffset}`,
-                    }"
-                  />
-                </svg>
-              </div>
-              <span class="v-report-count" :class="{ 'is-over-limit': isReportReasonOverLimit }">
-                {{ reportReasonCountLabel }}
-              </span>
-            </div>
-          </div>
-          <div class="v-report-actions">
-            <button type="button" class="v-report-cancel" :disabled="isSubmittingReport" @click="closeReportModal">취소</button>
-            <button type="button" class="v-report-submit" :disabled="isSubmittingReport" @click="submitReport">
-              {{ isSubmittingReport ? '접수 중...' : '신고 접수' }}
-            </button>
-          </div>
-        </div>
-      </div>
-    </Teleport>
+    <ReportReasonModal
+      :open="isReportModalOpen"
+      :reason="reportReason"
+      :error-message="reportErrorMessage"
+      :submitting="isSubmittingReport"
+      @update:reason="reportReason = $event"
+      @close="closeReportModal"
+      @submit="submitReport"
+    />
 
     <Teleport to="body">
       <div v-if="reportToastMessage" class="v-report-toast">{{ reportToastMessage }}</div>
@@ -286,7 +258,8 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import NavigationRail from '@/components/sections/NavigationRail.vue';
-import { Heart, Zap, Flag, Eye, MoreHorizontal } from 'lucide-vue-next';
+import ReportReasonModal from '@/components/modals/ReportReasonModal.vue';
+import { Heart, Zap, Flame, Flag, Eye, MoreHorizontal } from 'lucide-vue-next';
 import { communityCommentApi, communityLikeApi, communityPostApi, reportApi, workoutApi } from '@/services/apis';
 import { useSession } from '@/composables/useSession';
 import { normalizeCommunityPost } from '@/utils/postNormalizer';
@@ -330,9 +303,6 @@ const isSubmittingReport = ref(false);
 const reportTargetRefId = ref(null);
 const reportTargetType = ref('POST');
 const reportToastMessage = ref('');
-const REPORT_REASON_MAX_LENGTH = 500;
-const REPORT_REASON_METER_RADIUS = 10;
-const REPORT_REASON_METER_CIRCUMFERENCE = 2 * Math.PI * REPORT_REASON_METER_RADIUS;
 let reportToastTimer = null;
 const myProfileImage = computed(() => (
   resolveUserAvatar(
@@ -358,16 +328,6 @@ const myUserId = computed(() => {
 });
 const isMyPost = computed(() => Boolean(myUserId.value) && Boolean(authorUserId.value) && myUserId.value === authorUserId.value);
 const showWorkoutPanel = computed(() => Boolean(post.value?.type === 'workout' || post.value?.hasWorkout));
-const reportReasonLength = computed(() => Array.from(String(reportReason.value || '')).length);
-const reportReasonRemaining = computed(() => REPORT_REASON_MAX_LENGTH - reportReasonLength.value);
-const isReportReasonOverLimit = computed(() => reportReasonRemaining.value < 0);
-const reportReasonCountLabel = computed(() => (
-  isReportReasonOverLimit.value ? String(reportReasonRemaining.value) : `${reportReasonLength.value}/${REPORT_REASON_MAX_LENGTH}`
-));
-const reportReasonMeterRatio = computed(() => Math.min(reportReasonLength.value / REPORT_REASON_MAX_LENGTH, 1));
-const reportReasonMeterDashOffset = computed(() => (
-  REPORT_REASON_METER_CIRCUMFERENCE * (1 - reportReasonMeterRatio.value)
-));
 const totalCommentCount = computed(() => {
   const serverCount = Number(post.value?.comments ?? post.value?.commentCount);
   if (Number.isFinite(serverCount) && serverCount > 0) return serverCount;
@@ -1245,7 +1205,7 @@ onBeforeUnmount(() => {
     margin: 0;
     padding-left: 8px;
     padding-right: 8px;
-    padding-bottom: calc(56px + env(safe-area-inset-bottom, 0px) + 88px);
+    padding-bottom: calc(64px + env(safe-area-inset-bottom, 0px) + 88px);
   }
 
   .v-community-detail-body .sx-views-community-communityview-020 {
@@ -1270,7 +1230,7 @@ onBeforeUnmount(() => {
   .v-community-detail-body .v-community-ig-input-wrap {
     left: 0;
     right: 0;
-    bottom: calc(56px + env(safe-area-inset-bottom, 0px));
+    bottom: calc(64px + env(safe-area-inset-bottom, 0px));
     padding: 8px 12px;
   }
 }
