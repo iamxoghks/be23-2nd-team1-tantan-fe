@@ -347,8 +347,9 @@ const buildGymListParams = () => {
     params.category = category;
   }
 
-  // 지도가 로드되어 있고, 특정 조건이 있을 때만 위치 정보 포함 (백엔드 500 에러 방지)
-  if (mapInstance.value && (nearbyModeEnabled.value || keyword || category)) {
+  // 홈 검색/카테고리 필터는 전체 목록 기준으로 조회하고,
+  // 현재 위치 기반 재검색을 눌렀을 때만 좌표 반경을 함께 전달한다.
+  if (mapInstance.value && nearbyModeEnabled.value) {
     const geoParams = computeMapViewportSearch();
     if (geoParams) {
       params.userLatitude = geoParams.userLatitude;
@@ -532,6 +533,7 @@ const handleMapReady = (map) => {
 
 const applyMobileSearch = async () => {
   appliedSearchQuery.value = mobileSearchInput.value.trim();
+  nearbyModeEnabled.value = false;
   selectedGymId.value = null;
   isSearchPanelCollapsed.value = false;
   syncHomeDetailQuery(null);
@@ -546,6 +548,7 @@ const applyMobileSearch = async () => {
 const clearMobileSearch = async () => {
   mobileSearchInput.value = '';
   appliedSearchQuery.value = '';
+  nearbyModeEnabled.value = false;
   selectedGymId.value = null;
   syncHomeDetailQuery(null);
   await loadGymsForCurrentContext({ force: true });
@@ -624,6 +627,7 @@ const handleCategorySelect = async (category) => {
   const nextCategoryName = selectedCategoryName.value === clickedCategoryName ? '' : clickedCategoryName;
 
   selectedCategoryName.value = nextCategoryName;
+  nearbyModeEnabled.value = false;
   resetSelectedGymContext();
 
   if (mobileSheetState.value === 'hidden') {
@@ -636,6 +640,7 @@ const handleCategorySelect = async (category) => {
 const handleDesktopSearch = async (keyword) => {
   appliedSearchQuery.value = String(keyword || '').trim();
   mobileSearchInput.value = appliedSearchQuery.value;
+  nearbyModeEnabled.value = false;
   resetSelectedGymContext();
 
   if (mobileSheetState.value === 'hidden') {
