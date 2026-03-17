@@ -161,7 +161,6 @@ const items = computed(() => {
       icon: Shield,
       label: '관리자',
       to: '/admin',
-      className: 'rail-desktop-only',
     });
   }
 
