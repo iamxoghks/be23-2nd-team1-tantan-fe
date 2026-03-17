@@ -299,6 +299,7 @@ const normalizeNotification = (item, index) => {
     refId: item?.refId ?? null,
     type,
     actor: {
+      id: item?.actorId || item?.senderId || item?.fromUserId || item?.userId || null,
       name: actorName,
       image: resolveUserAvatar(item?.actorImage || item?.senderImage || item?.profileImage),
     },
@@ -428,7 +429,8 @@ const resolveNotificationTarget = (notification) => {
   }
 
   if (refType.includes('FOLLOW') || refType.includes('PROFILE') || refType.includes('WORKOUT')) {
-    return { path: '/profile' };
+    const targetUserId = notification?.actor?.id || notification?.refId;
+    return targetUserId ? { path: '/profile', query: { userId: String(targetUserId) } } : { path: '/profile' };
   }
 
   return { path: '/notifications' };
