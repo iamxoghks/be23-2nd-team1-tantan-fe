@@ -25,8 +25,10 @@
             <table class="admin-table">
               <thead>
                 <tr>
-                  <th>ID</th>
+                  <th>Num.</th>
                   <th>타입</th>
+                  <th>신고자</th>
+                  <th>피신고자</th>
                   <th>사유</th>
                   <th>상태</th>
                   <th>처리</th>
@@ -36,8 +38,10 @@
                 <tr v-for="item in reports" :key="item.id">
                   <td>{{ item.id }}</td>
                   <td>{{ item.refType }}</td>
+                  <td>{{ getReporterLabel(item) }}</td>
+                  <td>{{ getTargetLabel(item) }}</td>
                   <td>{{ item.reason }}</td>
-                  <td>{{ getStatusLabel(item) }}</td>
+                  <td><span class="admin-status-label">{{ getStatusLabel(item) }}</span></td>
                   <td>
                     <div v-if="isPending(item)" class="admin-action-row">
                       <button class="admin-btn" @click="resolve(item.id, false)">해결</button>
@@ -48,7 +52,7 @@
                   </td>
                 </tr>
                 <tr v-if="reports.length === 0">
-                  <td colspan="5" class="admin-empty">표시할 신고가 없습니다.</td>
+                  <td colspan="7" class="admin-empty">표시할 신고가 없습니다.</td>
                 </tr>
               </tbody>
             </table>
@@ -107,6 +111,10 @@ const getStatusLabel = (item) => {
   }
   return item?.status || '-';
 };
+
+const getReporterLabel = (item) => item?.reporterNickname || (item?.reporterId ? `#${item.reporterId}` : '-');
+
+const getTargetLabel = (item) => item?.targetAuthor || '-';
 
 const loadReports = async (nextPage = 0) => {
   page.value = Math.max(0, nextPage);
@@ -253,12 +261,23 @@ onMounted(() => {
   color: #94a3b8;
 }
 
+.admin-status-label,
 .admin-status-text {
-  display: inline-block;
-  color: #475569;
+  display: inline-flex;
+  align-items: center;
+  min-height: 34px;
   font-size: 13px;
+  line-height: 1.2;
+}
+
+.admin-status-label {
+  color: #334155;
+  font-weight: 500;
+}
+
+.admin-status-text {
+  color: #475569;
   font-weight: 700;
-  line-height: 34px;
 }
 
 .admin-pagination {
