@@ -59,10 +59,17 @@ const checklist = ['운동 히스토리 기록', '근처 체육관 찾기 및 �
 const router = useRouter();
 const { openAuthModal } = useAuthModal();
 const errorMessage = ref('');
-const API_BASE_URL =
-  import.meta.env.VUE_APP_API_BASE_URL ||
-  import.meta.env.VITE_API_BASE_URL ||
-  'http://server.nahcb572.shop';
+const getValidApiBaseUrl = () => {
+  const envVite = import.meta.env.VITE_API_BASE_URL;
+  const envVue = import.meta.env.VUE_APP_API_BASE_URL;
+  
+  if (envVite && envVite.startsWith('http')) return envVite;
+  if (envVue && envVue.startsWith('http')) return envVue;
+  
+  return 'http://localhost:8080';
+};
+
+const API_BASE_URL = getValidApiBaseUrl();
 
 const startSocialSignUp = async (provider) => {
   errorMessage.value = '';
