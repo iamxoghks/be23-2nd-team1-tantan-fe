@@ -123,6 +123,7 @@ import { gymApi, gymFavoriteApi, mapApi } from '@/services/apis';
 import { getAccessToken } from '@/services/token';
 import { useAuthModal } from '@/composables/useAuthModal';
 import { getPrimaryThumbnailImageUrl, toImageVariantItems } from '@/utils/imageVariants';
+import * as apiUtils from '@/utils/api';
 
 const { openAuthModal } = useAuthModal();
 const route = useRoute();
@@ -346,8 +347,8 @@ const buildGymListParams = () => {
     params.category = category;
   }
 
-  // 지도가 로드되어 있다면 항상 위치 정보를 포함하여 검색 품질 개선
-  if (mapInstance.value) {
+  // 지도가 로드되어 있고, 특정 조건이 있을 때만 위치 정보 포함 (백엔드 500 에러 방지)
+  if (mapInstance.value && (nearbyModeEnabled.value || keyword || category)) {
     const geoParams = computeMapViewportSearch();
     if (geoParams) {
       params.userLatitude = geoParams.userLatitude;
@@ -733,10 +734,10 @@ const loadGyms = async (params = {}, options = {}) => {
 
   try {
     const response = await gymApi.list(params);
-    const payload = extractPayload(response);
+    const payload = apiUtils.extractPayload(response);
     if (requestId !== gymLoadSequence) return;
 
-    const list = extractList(payload);
+    const list = apiUtils.extractList(payload);
     gyms.value = (Array.isArray(list) ? list : []).map((gym) => normalizeGym(gym));
 
     if (selectedGymId.value && !gyms.value.some((gym) => gym.id === selectedGymId.value)) {
