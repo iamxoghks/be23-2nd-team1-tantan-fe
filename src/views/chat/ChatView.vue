@@ -279,12 +279,13 @@ import ReportReasonModal from '@/components/modals/ReportReasonModal.vue';
 import { Search, MessageSquare, MoreHorizontal, Send, ChevronLeft, ChevronUp, ChevronDown, X, Flag } from 'lucide-vue-next';
 import { chatApi, userApi } from '@/services/apis';
 import { extractList, extractPayload } from '@/utils/api';
+import { consumePendingChatRoom } from '@/utils/chatNavigation';
 import { getAccessToken } from '@/services/token';
 import { registerAuthCleanup } from '@/services/authLifecycle';
 import { wsConfig } from '@/services/ws';
 import { useChatUnreadCenter } from '@/composables/useChatUnreadCenter';
 import { resolveUserAvatar, handleUserAvatarError } from '@/utils/userAvatar';
-import { useRouter } from 'vue-router';
+import { useRoute, useRouter } from 'vue-router';
 
 const chatRoomsData = ref([]);
 const selectedRoomId = ref(null);
@@ -312,7 +313,10 @@ const inboxSubscription = ref(null);
 const activeRoomSubscription = ref(null);
 const nowTick = ref(Date.now());
 let timeTicker = null;
+const route = useRoute();
 const router = useRouter();
+const pendingRequestedRoom = ref(null);
+const isChatViewInitialized = ref(false);
 
 const messagesByRoom = ref({});
 const presenceByRoom = ref({});
@@ -335,6 +339,7 @@ let reportToastTimer = null;
 const scrollToBottomThreshold = 96;
 const hasRoomSearchTerm = computed(() => String(roomSearchTerm.value || '').trim().length > 0);
 const hasMessageSearchTerm = computed(() => String(messageSearchTerm.value || '').trim().length > 0);
+const requestedRoomKey = computed(() => String(route.query.roomKey || '').trim());
 const { setUnreadFromRooms } = useChatUnreadCenter();
 
 const filteredChatRooms = computed(() => {
@@ -621,6 +626,8 @@ const sortRoomsByLastMessageDesc = (rooms = []) => (
   [...rooms].sort((a, b) => toRoomLastMessageEpoch(b) - toRoomLastMessageEpoch(a))
 );
 
+const getRoomIdentifier = (room) => String(room?.roomKey || room?.id || '');
+
 const mapRoom = (room, index) => {
   const roomKey = room.roomKey || room.id || room.roomId || `room-${index + 1}`;
   const otherProfile = room.otherProfile || {};
@@ -645,6 +652,65 @@ const mapRoom = (room, index) => {
     verified: false,
     colorHex: room.colorHex || '#1a1a1a',
   };
+};
+
+const mergeMappedRooms = (primaryRooms = [], fallbackRooms = []) => {
+  const seenRoomKeys = new Set();
+  const mergedRooms = [];
+
+  [...primaryRooms, ...fallbackRooms].forEach((room) => {
+    const roomKey = getRoomIdentifier(room);
+    if (!roomKey || seenRoomKeys.has(roomKey)) return;
+    seenRoomKeys.add(roomKey);
+    mergedRooms.push(room);
+  });
+
+  return sortRoomsByLastMessageDesc(mergedRooms);
+};
+
+const hydratePendingRequestedRoom = (roomKey) => {
+  if (!roomKey) {
+    pendingRequestedRoom.value = null;
+    return null;
+  }
+
+  if (String(pendingRequestedRoom.value?.roomKey || '') === String(roomKey)) {
+    return pendingRequestedRoom.value;
+  }
+
+  pendingRequestedRoom.value = consumePendingChatRoom(roomKey);
+  return pendingRequestedRoom.value;
+};
+
+const ensureRequestedRoomInList = (roomKey) => {
+  const normalizedRoomKey = String(roomKey || '').trim();
+  if (!normalizedRoomKey) return false;
+
+  const hasKnownRoom = chatRoomsData.value.some((room) => getRoomIdentifier(room) === normalizedRoomKey);
+  if (hasKnownRoom) return true;
+
+  const pendingRoom = hydratePendingRequestedRoom(normalizedRoomKey);
+  if (!pendingRoom) return false;
+
+  applyChatRooms(mergeMappedRooms(
+    chatRoomsData.value,
+    [mapRoom(pendingRoom, chatRoomsData.value.length)],
+  ));
+  return true;
+};
+
+const selectRequestedRoomByKey = (roomKey) => {
+  const normalizedRoomKey = String(roomKey || '').trim();
+  if (!normalizedRoomKey) return false;
+
+  ensureRequestedRoomInList(normalizedRoomKey);
+  const room = chatRoomsData.value.find((entry) => getRoomIdentifier(entry) === normalizedRoomKey);
+  if (!room) return false;
+
+  if (String(selectedRoomId.value || '') !== String(room.id)) {
+    selectRoom(room.id);
+  }
+  return true;
 };
 
 const formatMessageTime = (value) => {
@@ -1124,6 +1190,8 @@ const loadRooms = async () => {
   isLoadingRooms.value = true;
   chatLoadError.value = '';
   try {
+    const pendingRoomKey = requestedRoomKey.value;
+    const pendingRoom = hydratePendingRequestedRoom(pendingRoomKey);
     const [profileResponse, roomsResponse] = await Promise.all([
       userApi.myInfo(),
       chatApi.rooms(),
@@ -1134,11 +1202,11 @@ const loadRooms = async () => {
 
     const roomsPayload = extractPayload(roomsResponse);
     const roomList = extractList(roomsPayload);
-    if (roomList.length > 0) {
-      applyChatRooms(sortRoomsByLastMessageDesc(roomList.map(mapRoom)));
-    } else {
-      applyChatRooms([]);
-    }
+    const mappedRooms = roomList.map(mapRoom);
+    const fallbackRooms = pendingRoomKey && pendingRoom
+      ? [mapRoom(pendingRoom, mappedRooms.length)]
+      : [];
+    applyChatRooms(mergeMappedRooms(mappedRooms, fallbackRooms));
   } catch (error) {
     chatLoadError.value = toFriendlyApiError(error, '채팅방 목록을 불러오지 못했습니다.');
   } finally {
@@ -1258,10 +1326,16 @@ onMounted(() => {
     nowTick.value = Date.now();
   }, 15000);
   window.addEventListener('pointerdown', handleDocumentPointerDown);
-  loadRooms();
-  connectStomp();
-  resizeMessageInput();
-  updateScrollToBottomVisibility();
+  hydratePendingRequestedRoom(requestedRoomKey.value);
+  ensureRequestedRoomInList(requestedRoomKey.value);
+  void (async () => {
+    await loadRooms();
+    selectRequestedRoomByKey(requestedRoomKey.value);
+    connectStomp();
+    await resizeMessageInput();
+    updateScrollToBottomVisibility();
+    isChatViewInitialized.value = true;
+  })();
 });
 
 onBeforeUnmount(() => {
@@ -1284,4 +1358,19 @@ onBeforeUnmount(() => {
   window.removeEventListener('pointerdown', handleDocumentPointerDown);
   disconnectStomp();
 });
+
+watch(
+  () => requestedRoomKey.value,
+  async (nextRoomKey, prevRoomKey) => {
+    if (!isChatViewInitialized.value) return;
+    if (!nextRoomKey || nextRoomKey === prevRoomKey) return;
+
+    hydratePendingRequestedRoom(nextRoomKey);
+    const selected = selectRequestedRoomByKey(nextRoomKey);
+    if (selected) return;
+
+    await loadRooms();
+    selectRequestedRoomByKey(nextRoomKey);
+  },
+);
 </script>

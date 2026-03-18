@@ -844,6 +844,7 @@ import { gymApi, reservationApi, reviewApi, chatApi, reportApi } from '@/service
 import { useSession } from '@/composables/useSession';
 import { normalizeRole } from '@/services/token';
 import { extractList, extractPayload } from '@/utils/api';
+import { savePendingChatRoom } from '@/utils/chatNavigation';
 import { resolveUserAvatar, handleUserAvatarError } from '@/utils/userAvatar';
 import {
   getPrimaryOriginalImageUrl,
@@ -2614,8 +2615,13 @@ const startChatWithGymOwner = async () => {
 
   isCreatingChat.value = true;
   try {
-    await chatApi.createRoom({ otherUserId: gymOwnerId });
-    router.push('/chat');
+    const response = await chatApi.createRoom({ otherUserId: gymOwnerId });
+    const roomSummary = extractPayload(response);
+    const roomKey = String(roomSummary?.roomKey || '').trim();
+    savePendingChatRoom(roomSummary);
+    await router.push(roomKey
+      ? { path: '/chat', query: { roomKey } }
+      : { path: '/chat' });
   } catch (error) {
     console.error('Failed to create chat room:', error);
     window.alert('채팅방 생성에 실패했습니다.');
