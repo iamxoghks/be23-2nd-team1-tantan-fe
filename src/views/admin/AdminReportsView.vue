@@ -632,7 +632,6 @@ const goToReportTarget = () => {
   closeReportDetail();
   router.push(targetPath);
 };
-
 const loadReports = async (nextPage = 0) => {
   page.value = Math.max(0, nextPage);
   pageErrorMessage.value = '';
