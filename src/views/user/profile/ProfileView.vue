@@ -650,6 +650,7 @@ import { useSession } from '@/composables/useSession';
 import { normalizeRole } from '@/services/token';
 import { formatTimeAgo } from '@/utils/time';
 import { extractList, extractPayload } from '@/utils/api';
+import { savePendingChatRoom } from '@/utils/chatNavigation';
 import { normalizeReservationRecord, pickNearestReservation, sortReservationRecords } from '@/utils/reservationHistory';
 import { resolveUserAvatar, handleUserAvatarError } from '@/utils/userAvatar';
 import { buildWorkoutTags, buildWorkoutTitle, extractWorkoutExercises } from '@/utils/workoutDisplay';
@@ -1581,8 +1582,13 @@ const startChatWithUser = async () => {
   if (!otherUserId || isOwnProfile.value) return;
   isCreatingChat.value = true;
   try {
-    await chatApi.createRoom({ otherUserId });
-    router.push('/chat');
+    const response = await chatApi.createRoom({ otherUserId });
+    const roomSummary = extractPayload(response);
+    const roomKey = String(roomSummary?.roomKey || '').trim();
+    savePendingChatRoom(roomSummary);
+    await router.push(roomKey
+      ? { path: '/chat', query: { roomKey } }
+      : { path: '/chat' });
   } catch (error) {
     // keep silent fail and let user retry
   } finally {
