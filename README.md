@@ -615,8 +615,6 @@ TanTan은 사용자뿐 아니라 **헬스장 관리자(GYM_OWNER)**도 고려합
 
 ## <span id="11">🖥️ 주요 기능 소개(테스트케이스)</span>
 
-아래 섹션은 BE README와 동일하게 기능별 시연 GIF를 접어서 확인할 수 있도록 구성했습니다.
-
 <details>
   <summary>👤 회원 / 프로필</summary>
 
