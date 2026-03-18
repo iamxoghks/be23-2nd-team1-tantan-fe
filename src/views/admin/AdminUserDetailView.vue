@@ -15,6 +15,7 @@
           </div>
 
           <div v-if="isLoading" class="admin-loading">사용자 정보를 불러오는 중입니다.</div>
+          <p v-if="pageErrorMessage" class="admin-error">{{ pageErrorMessage }}</p>
 
           <div v-else class="admin-detail-grid">
             <div class="admin-detail-card">
@@ -38,16 +39,90 @@
           </div>
 
           <div class="admin-action-row">
-            <button v-if="!isSuspended" class="admin-btn admin-btn-warn" @click="suspendUser">
+            <button v-if="!isSuspended" class="admin-btn admin-btn-warn" :disabled="isStatusUpdating" @click="openSuspendDaysModal">
               정지
             </button>
-            <button v-else class="admin-btn admin-btn-muted" @click="unsuspendUser">
+            <button v-else class="admin-btn admin-btn-muted" :disabled="isStatusUpdating" @click="unsuspendUser">
               정지 해제
             </button>
           </div>
+        </div>
+      </div>
+    </div>
 
-          <p v-if="message" class="admin-message">{{ message }}</p>
-          <p v-if="errorMessage" class="admin-error">{{ errorMessage }}</p>
+    <div
+      v-if="isSuspendDaysModalOpen"
+      class="view-modal-backdrop admin-action-modal-backdrop"
+      @click.self="closeSuspendDaysModal"
+    >
+      <div class="view-modal-panel admin-action-modal-panel" role="dialog" aria-modal="true" aria-labelledby="admin-user-suspend-days-title">
+        <div class="admin-action-modal-body">
+          <h2 id="admin-user-suspend-days-title" class="v-modal-title">사용자 정지</h2>
+          <p class="admin-action-modal-copy">정지 기간(일)을 입력해주세요.</p>
+          <input
+            v-model="suspendDaysInput"
+            type="number"
+            min="1"
+            class="v-modal-line-input"
+            placeholder="예: 7"
+            @keydown.enter.prevent="proceedToSuspendReasonModal"
+          />
+          <p v-if="suspendDaysError" class="admin-action-modal-error">{{ suspendDaysError }}</p>
+        </div>
+        <div class="admin-action-modal-actions">
+          <button type="button" class="v-modal-cancel-btn" :disabled="isStatusUpdating" @click="closeSuspendDaysModal">취소</button>
+          <button type="button" class="v-modal-save-btn" :disabled="isStatusUpdating" @click="proceedToSuspendReasonModal">다음</button>
+        </div>
+      </div>
+    </div>
+
+    <div
+      v-if="isSuspendReasonModalOpen"
+      class="view-modal-backdrop admin-action-modal-backdrop"
+      @click.self="closeSuspendReasonModal"
+    >
+      <div class="view-modal-panel admin-action-modal-panel" role="dialog" aria-modal="true" aria-labelledby="admin-user-suspend-reason-title">
+        <div class="admin-action-modal-body">
+          <h2 id="admin-user-suspend-reason-title" class="v-modal-title">정지 사유</h2>
+          <p class="admin-action-modal-copy">정지 사유를 입력해주세요.</p>
+          <textarea
+            v-model="suspendReasonInput"
+            rows="4"
+            class="v-modal-line-input admin-action-modal-textarea"
+            placeholder="정지 사유를 입력하세요"
+          />
+          <p v-if="suspendReasonError" class="admin-action-modal-error">{{ suspendReasonError }}</p>
+        </div>
+        <div class="admin-action-modal-actions">
+          <button type="button" class="v-modal-cancel-btn" :disabled="isStatusUpdating" @click="closeSuspendReasonModal">취소</button>
+          <button type="button" class="v-modal-save-btn admin-action-modal-save-warn" :disabled="isStatusUpdating" @click="submitSuspendUser">
+            {{ isStatusUpdating ? '처리 중...' : '정지' }}
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <div
+      v-if="feedbackModal.open"
+      class="view-modal-backdrop admin-action-modal-backdrop"
+      @click.self="closeFeedbackModal"
+    >
+      <div class="view-modal-panel admin-feedback-modal-panel" role="dialog" aria-modal="true" aria-labelledby="admin-user-feedback-title">
+        <div class="admin-action-modal-body">
+          <h2 id="admin-user-feedback-title" class="v-modal-title">{{ feedbackModal.title }}</h2>
+          <p class="admin-action-modal-copy" :class="feedbackModal.tone === 'error' ? 'admin-action-modal-copy-error' : ''">
+            {{ feedbackModal.message }}
+          </p>
+        </div>
+        <div class="admin-action-modal-actions admin-action-modal-actions-single">
+          <button
+            type="button"
+            class="v-modal-save-btn"
+            :class="feedbackModal.tone === 'error' ? 'admin-action-modal-save-warn' : ''"
+            @click="closeFeedbackModal"
+          >
+            확인
+          </button>
         </div>
       </div>
     </div>
@@ -66,8 +141,20 @@ const router = useRouter();
 const userId = computed(() => route.params.userId);
 const user = ref({});
 const isLoading = ref(false);
-const message = ref('');
-const errorMessage = ref('');
+const pageErrorMessage = ref('');
+const isStatusUpdating = ref(false);
+const isSuspendDaysModalOpen = ref(false);
+const isSuspendReasonModalOpen = ref(false);
+const suspendDaysInput = ref('7');
+const suspendReasonInput = ref('운영 정책 위반');
+const suspendDaysError = ref('');
+const suspendReasonError = ref('');
+const feedbackModal = ref({
+  open: false,
+  title: '',
+  message: '',
+  tone: 'success',
+});
 
 const isSuspended = computed(() => (
   Boolean(user.value?.suspended)
@@ -78,45 +165,126 @@ const goBackToUsers = () => {
   router.push('/admin/users');
 };
 
+const openFeedbackModal = (title, message, tone = 'success') => {
+  feedbackModal.value = {
+    open: true,
+    title,
+    message,
+    tone,
+  };
+};
+
+const closeFeedbackModal = () => {
+  feedbackModal.value = {
+    ...feedbackModal.value,
+    open: false,
+  };
+};
+
+const toActionErrorMessage = (error, fallback) => (
+  error?.response?.data?.message
+  || error?.response?.data?.error
+  || fallback
+);
+
 const loadUser = async () => {
   isLoading.value = true;
-  errorMessage.value = '';
+  pageErrorMessage.value = '';
   try {
     const response = await adminApi.userDetail(userId.value);
     user.value = extractPayload(response);
   } catch (error) {
     user.value = {};
-    errorMessage.value = '사용자 상세 정보를 불러오지 못했습니다.';
+    pageErrorMessage.value = '사용자 상세 정보를 불러오지 못했습니다.';
   } finally {
     isLoading.value = false;
   }
 };
 
-const suspendUser = async () => {
-  const daysInput = window.prompt('정지 기간(일)을 입력해주세요.', '7');
-  const reason = window.prompt('정지 사유를 입력해주세요.', '운영 정책 위반') || '운영 정책 위반';
-  const days = Number(daysInput || 0);
-  if (!days || days < 1) {
-    errorMessage.value = '정지 기간은 1일 이상이어야 합니다.';
+const openSuspendDaysModal = () => {
+  suspendDaysInput.value = '7';
+  suspendReasonInput.value = '운영 정책 위반';
+  suspendDaysError.value = '';
+  suspendReasonError.value = '';
+  isSuspendDaysModalOpen.value = true;
+};
+
+const resetSuspendFlow = () => {
+  isSuspendDaysModalOpen.value = false;
+  isSuspendReasonModalOpen.value = false;
+  suspendDaysError.value = '';
+  suspendReasonError.value = '';
+};
+
+const closeSuspendDaysModal = () => {
+  if (isStatusUpdating.value) return;
+  isSuspendDaysModalOpen.value = false;
+  suspendDaysError.value = '';
+};
+
+const proceedToSuspendReasonModal = () => {
+  const days = Number(suspendDaysInput.value || 0);
+  if (!Number.isFinite(days) || days < 1) {
+    suspendDaysError.value = '정지 기간은 1일 이상이어야 합니다.';
+    return;
+  }
+  suspendDaysError.value = '';
+  isSuspendDaysModalOpen.value = false;
+  isSuspendReasonModalOpen.value = true;
+};
+
+const closeSuspendReasonModal = () => {
+  if (isStatusUpdating.value) return;
+  isSuspendReasonModalOpen.value = false;
+  suspendReasonError.value = '';
+};
+
+const submitSuspendUser = async () => {
+  const days = Number(suspendDaysInput.value || 0);
+  const reason = String(suspendReasonInput.value || '').trim();
+  if (!Number.isFinite(days) || days < 1) {
+    isSuspendReasonModalOpen.value = false;
+    isSuspendDaysModalOpen.value = true;
+    suspendDaysError.value = '정지 기간은 1일 이상이어야 합니다.';
+    return;
+  }
+  if (!reason) {
+    suspendReasonError.value = '정지 사유를 입력해주세요.';
     return;
   }
 
+  isStatusUpdating.value = true;
   try {
     await adminApi.suspendUser(userId.value, { days, reason });
-    message.value = `사용자 #${userId.value} 계정을 정지했습니다.`;
-    await loadUser();
+    user.value = {
+      ...user.value,
+      suspended: true,
+      status: 'SUSPENDED',
+    };
+    resetSuspendFlow();
+    openFeedbackModal('정지 완료', `사용자 #${userId.value} 계정을 정지했습니다.`);
   } catch (error) {
-    errorMessage.value = '사용자 정지 처리에 실패했습니다.';
+    resetSuspendFlow();
+    openFeedbackModal('정지 실패', toActionErrorMessage(error, '사용자 정지 처리에 실패했습니다.'), 'error');
+  } finally {
+    isStatusUpdating.value = false;
   }
 };
 
 const unsuspendUser = async () => {
+  isStatusUpdating.value = true;
   try {
     await adminApi.unsuspendUser(userId.value);
-    message.value = `사용자 #${userId.value} 계정 정지를 해제했습니다.`;
-    await loadUser();
+    user.value = {
+      ...user.value,
+      suspended: false,
+      status: 'ACTIVE',
+    };
+    openFeedbackModal('정지 해제 완료', `사용자 #${userId.value} 계정 정지를 해제했습니다.`);
   } catch (error) {
-    errorMessage.value = '사용자 정지 해제에 실패했습니다.';
+    openFeedbackModal('정지 해제 실패', toActionErrorMessage(error, '사용자 정지 해제에 실패했습니다.'), 'error');
+  } finally {
+    isStatusUpdating.value = false;
   }
 };
 
@@ -209,6 +377,11 @@ onMounted(loadUser);
   padding: 0 12px;
 }
 
+.admin-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
 .admin-btn-warn {
   border-color: #ef4444;
   background: #ef4444;
@@ -220,16 +393,64 @@ onMounted(loadUser);
   color: #334155;
 }
 
-.admin-message {
-  margin: 0;
-  color: #166534;
-  font-size: 13px;
-}
-
 .admin-error {
   margin: 0;
   color: #dc2626;
   font-size: 13px;
+}
+
+.admin-action-modal-backdrop {
+  z-index: 2100;
+}
+
+.admin-action-modal-panel,
+.admin-feedback-modal-panel {
+  width: min(460px, calc(100% - 32px));
+}
+
+.admin-action-modal-body {
+  display: grid;
+  gap: 12px;
+  padding: 24px;
+}
+
+.admin-action-modal-copy {
+  margin: 0;
+  color: #475569;
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.admin-action-modal-copy-error {
+  color: #b91c1c;
+}
+
+.admin-action-modal-textarea {
+  min-height: 120px;
+  resize: vertical;
+  padding: 12px 14px;
+}
+
+.admin-action-modal-error {
+  margin: 0;
+  color: #dc2626;
+  font-size: 13px;
+}
+
+.admin-action-modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 0 24px 24px;
+}
+
+.admin-action-modal-actions-single {
+  justify-content: center;
+}
+
+.admin-action-modal-save-warn {
+  border-color: #ef4444;
+  background: #ef4444;
 }
 
 @media (min-width: 900px) {

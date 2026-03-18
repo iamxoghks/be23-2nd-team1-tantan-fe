@@ -31,7 +31,7 @@
   position: relative;
   flex: 1;
   margin-left: 0;
-  margin-bottom: calc(56px + env(safe-area-inset-bottom, 0px));
+  margin-bottom: calc(64px + env(safe-area-inset-bottom, 0px));
   display: flex;
   overflow: hidden;
 }
@@ -319,7 +319,7 @@
   bottom: 0;
   z-index: 1190;
   width: 100%;
-  height: calc(56px + env(safe-area-inset-bottom, 0px));
+  height: calc(64px + env(safe-area-inset-bottom, 0px));
   padding-bottom: env(safe-area-inset-bottom, 0px);
   box-sizing: border-box;
   display: flex;
@@ -542,7 +542,7 @@
 .map-controls-stack {
   position: absolute;
   right: 16px;
-  bottom: calc(env(safe-area-inset-bottom, 0px) + 72px);
+  bottom: calc(env(safe-area-inset-bottom, 0px) + 80px);
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -738,6 +738,7 @@
 
 .search-panel-hero {
   position: relative;
+  flex: 0 0 auto;
   width: 100%;
   aspect-ratio: 16 / 9;
   overflow: hidden;
@@ -1488,6 +1489,27 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
+}
+
+.search-panel-review-report-btn {
+  width: 28px;
+  height: 28px;
+  flex: 0 0 28px;
+  border: 1px solid #eef2f7;
+  border-radius: 999px;
+  background: #ffffff;
+  color: #9ca3af;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.search-panel-review-report-btn:hover {
+  color: #ef4444;
+}
+
+.search-panel-review-report-btn:disabled {
+  opacity: 0.55;
 }
 
 .search-panel-review-score {
@@ -2876,7 +2898,7 @@
     right: 22px;
   }
 
-  .search-panel-detail-pane .sx-components-sections-searchpanel-001 {
+  .search-panel-detail-pane .search-panel-hero {
     position: relative;
     height: 200px;
   }

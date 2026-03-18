@@ -27,7 +27,7 @@
 
 .app-main-column {
   flex: 1;
-  margin-bottom: calc(56px + env(safe-area-inset-bottom, 0px));
+  margin-bottom: calc(64px + env(safe-area-inset-bottom, 0px));
   display: flex;
   flex-direction: column;
   overflow-y: auto;
@@ -38,7 +38,7 @@
 }
 
 .layout-bottom-nav-safe {
-  padding-bottom: calc(56px + env(safe-area-inset-bottom, 0px));
+  padding-bottom: calc(64px + env(safe-area-inset-bottom, 0px));
 }
 
 .view-wrap {
@@ -683,8 +683,9 @@
   }
 
   .v-chat-input-box {
-    height: 100px;
-    padding: 16px;
+    min-height: 52px;
+    max-height: 160px;
+    padding: 14px 60px 14px 14px;
   }
 
   .v-modal-cancel-btn,

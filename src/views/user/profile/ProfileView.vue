@@ -359,21 +359,12 @@
                         <div
                           v-for="(exercise, exerciseIndex) in log.exercises"
                           :key="`${log.id}-${exerciseIndex}-${exercise.name}`"
-                          class="v-workout-detail-box"
+                          class="v-workout-detail-box v-history-workout-detail-box"
                         >
-                          <div class="v-workout-detail-row">
-                            <span class="v-workout-detail-name">{{ exercise.name }}</span>
-                            <span class="v-workout-detail-separator">|</span>
-                            <span class="v-workout-detail-metric">
-                              {{ exercise.hasWeight && exercise.weight !== null ? formatWorkoutMetricValue(exercise.weight, 'kg') : '-' }}
-                            </span>
-                            <span class="v-workout-detail-separator">|</span>
-                            <span class="v-workout-detail-metric">
-                              {{ exercise.hasSets && exercise.sets !== null ? `${formatWorkoutMetricValue(exercise.sets)}세트` : '-' }}
-                            </span>
-                            <span class="v-workout-detail-separator">|</span>
-                            <span class="v-workout-detail-metric">
-                              {{ exercise.hasReps && exercise.reps !== null ? `${formatWorkoutMetricValue(exercise.reps)}회` : '-' }}
+                          <div class="v-history-workout-detail-inline">
+                            <span class="v-workout-detail-name v-history-workout-detail-name">{{ exercise.name }}</span>
+                            <span class="v-history-workout-detail-stats">
+                              {{ formatExerciseSummary(exercise) }}
                             </span>
                           </div>
                         </div>
@@ -382,9 +373,6 @@
                   </div>
                   <div class="sx-views-user-profile-profileview-022">
                     <span class="v-profile-log-time">{{ log.timeAgo }}</span>
-                    <button v-if="isOwnProfile" class="sx-views-user-profile-profileview-023 v-profile-log-delete-btn" @click="deleteWorkout(log.id)">
-                      <Trash2 :size="18" />
-                    </button>
                   </div>
                 </div>
               </div>
@@ -440,9 +428,9 @@
               v-if="isOwnProfile && !isGymOwner"
               type="button"
               class="v-footer-link v-footer-link-button"
-              @click="openGymOwnerApplyModal"
+              @click="handleProfileFooterAction"
             >
-              운동업체 등록하기
+              {{ profileFooterActionLabel }}
             </button>
           </div>
         </footer>
@@ -789,6 +777,7 @@ const viewedRole = computed(() => (
   || normalizeRole(sessionProfile.value?.role)
   || 'USER'
 ));
+const isAdminProfile = computed(() => viewedRole.value === 'ADMIN');
 const isGymOwner = computed(() => viewedRole.value === 'GYM_OWNER');
 const viewedUserId = computed(() => {
   const fromProfile = Number(profile.value?.id ?? profile.value?.userId ?? 0);
@@ -831,6 +820,9 @@ const isOwnProfile = computed(() => {
   if (!viewedUserId.value || !currentUserId.value) return true;
   return Number(viewedUserId.value) === Number(currentUserId.value);
 });
+const profileFooterActionLabel = computed(() => (
+  isOwnProfile.value && isAdminProfile.value ? '관리자 페이지 가기' : '운동업체 등록하기'
+));
 const isPrivateProfile = computed(() => Boolean(profile.value?.privateProfile));
 const shouldMaskPrivateProfile = computed(() => !isOwnProfile.value && isPrivateProfile.value);
 const normalizedProfileUserId = computed(() => Number(viewedUserId.value || currentUserId.value || 0));
@@ -996,6 +988,20 @@ const formatWorkoutMetricValue = (value, unit = '') => {
   const normalized = Number(value);
   if (!Number.isFinite(normalized)) return '-';
   return `${normalized.toLocaleString()}${unit}`;
+};
+
+const formatExerciseSummary = (exercise = {}) => {
+  const parts = [];
+  if (exercise.hasWeight && exercise.weight !== null) {
+    parts.push(formatWorkoutMetricValue(exercise.weight, 'kg'));
+  }
+  if (exercise.hasSets && exercise.sets !== null) {
+    parts.push(`${formatWorkoutMetricValue(exercise.sets)}세트`);
+  }
+  if (exercise.hasReps && exercise.reps !== null) {
+    parts.push(`${formatWorkoutMetricValue(exercise.reps)}회`);
+  }
+  return parts.length > 0 ? parts.join(', ') : '-';
 };
 
 const toFollowUserList = (payload) => {
@@ -1636,6 +1642,14 @@ const openGymOwnerApplyModal = () => {
   gymOwnerApplyMessage.value = '';
   gymOwnerApplyError.value = '';
   isGymOwnerApplyModalOpen.value = true;
+};
+
+const handleProfileFooterAction = () => {
+  if (isOwnProfile.value && isAdminProfile.value) {
+    router.push('/admin');
+    return;
+  }
+  openGymOwnerApplyModal();
 };
 
 const closeGymOwnerApplyModal = () => {

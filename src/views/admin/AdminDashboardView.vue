@@ -39,16 +39,25 @@
 
           <div class="admin-link-row">
             <RouterLink to="/admin/reports" class="admin-link-card">
-              <h2>신고 처리</h2>
+              <div class="admin-link-card-head">
+                <h2>신고 처리</h2>
+                <ArrowRight :size="18" />
+              </div>
               <p>신고 목록을 검토하고 상태를 변경합니다.</p>
             </RouterLink>
             <RouterLink to="/admin/users" class="admin-link-card">
-              <h2>사용자 관리</h2>
+              <div class="admin-link-card-head">
+                <h2>사용자 관리</h2>
+                <ArrowRight :size="18" />
+              </div>
               <p>사용자 상태(정지/해제)를 관리합니다.</p>
             </RouterLink>
             <RouterLink to="/admin/gyms" class="admin-link-card">
-              <h2>짐 관리</h2>
-              <p>짐 상태(정지/해제)를 관리합니다.</p>
+              <div class="admin-link-card-head">
+                <h2>체육관 관리</h2>
+                <ArrowRight :size="18" />
+              </div>
+              <p>체육관 상태(정지/해제)를 관리합니다.</p>
             </RouterLink>
           </div>
 
@@ -89,6 +98,7 @@
 <script setup>
 import { onMounted, ref } from 'vue';
 import { RouterLink } from 'vue-router';
+import { ArrowRight } from 'lucide-vue-next';
 import NavigationRail from '@/components/sections/NavigationRail.vue';
 import { adminApi, communityPostApi, gymApi } from '@/services/apis';
 import { extractPayload } from '@/utils/api';
@@ -265,6 +275,18 @@ onMounted(loadSummary);
   padding: 14px;
   text-decoration: none;
   color: inherit;
+}
+
+.admin-link-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.admin-link-card-head svg {
+  flex-shrink: 0;
+  color: #94a3b8;
 }
 
 .admin-link-card h2 {

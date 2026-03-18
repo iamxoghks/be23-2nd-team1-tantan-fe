@@ -209,6 +209,36 @@
   white-space: nowrap;
 }
 
+.v-history-workout-detail-box {
+  padding: 14px 16px;
+  border-color: #e5eaf1;
+  border-radius: 16px;
+  background: #ffffff;
+}
+
+.v-history-workout-detail-inline {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+}
+
+.v-history-workout-detail-name {
+  color: #475569;
+  font-weight: 600;
+  min-width: 0;
+  flex: 1;
+}
+
+.v-history-workout-detail-stats {
+  color: #111827;
+  font-weight: 800;
+  flex-shrink: 0;
+  text-align: right;
+  white-space: nowrap;
+}
+
 .v-profile-achievement-box {
   width: 52px;
   height: 52px;
@@ -1576,6 +1606,23 @@
 
 .v-day-history-delete-btn {
   color: #94a3b8;
+}
+
+.v-day-history-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+}
+
+.v-day-history-title-row .sx-views-user-profile-profilehistoryview-008 {
+  min-width: 0;
+  flex: 1;
+}
+
+.v-day-history-delete-btn-inline {
+  flex-shrink: 0;
 }
 
 .v-day-history-delete-btn:hover {

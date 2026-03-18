@@ -128,20 +128,33 @@
 
                 <h3 class="v-community-card-title">{{ post.title }}</h3>
 
-                <div v-if="post.type === 'workout' || post.hasWorkout">
-                  <div class="sx-views-community-communityview-009"><Zap :size="18" class="ux-views-community-communityview-008" /><span class="ux-views-community-communityview-009">{{ post.author }}님이 운동을 공유했어요!</span></div>
-                  <div class="sx-views-community-communityview-010">
-                    <div class="sx-views-community-communityview-011">
-                      <div class="sx-views-community-communityview-012"><Clock :size="12" />{{ post.time || '방금 전' }}</div>
-                      <div class="sx-views-community-communityview-013"><Clock :size="12" />총 시간: {{ post.duration && post.duration !== '-' ? post.duration : '정보 없음' }}</div>
-                      <div class="ux-views-community-communityview-010">
-                        <template v-if="post.exercises && post.exercises.length > 0">
-                          <div v-for="ex in post.exercises" :key="ex.name" class="sx-views-community-communityview-014"><span class="ux-views-community-communityview-011">{{ ex.name }}</span><span class="ux-views-community-communityview-012">{{ ex.stats }}</span></div>
-                        </template>
-                        <div v-else class="sx-views-community-communityview-014"><span class="ux-views-community-communityview-011">운동 기록</span><span class="ux-views-community-communityview-012">요약 정보 없음</span></div>
+                <div v-if="post.type === 'workout' || post.hasWorkout" class="v-community-workout-share-block">
+                  <div class="v-community-workout-share-head">
+                    <span class="v-community-workout-share-label">
+                      <Zap :size="18" class="ux-views-community-communityview-008" />
+                      {{ post.author }}님이 운동을 공유했어요!
+                    </span>
+                    <span class="v-community-workout-share-streak">
+                      <Flame :size="16" />
+                      {{ post.streak || 0 }}일 연속
+                    </span>
+                  </div>
+                  <div class="v-community-workout-share-layout">
+                    <div class="v-community-workout-share-panel">
+                      <template v-if="post.exercises && post.exercises.length > 0">
+                        <div v-for="ex in post.exercises" :key="ex.name" class="v-community-workout-share-item">
+                          <span class="v-community-workout-share-item-name">{{ ex.name }}</span>
+                          <span class="v-community-workout-share-item-stats">{{ ex.stats }}</span>
+                        </div>
+                      </template>
+                      <div v-else class="v-community-workout-share-item">
+                        <span class="v-community-workout-share-item-name">운동 기록</span>
+                        <span class="v-community-workout-share-item-stats">요약 정보 없음</span>
                       </div>
                     </div>
-                    <div v-if="post.image" class="ux-views-community-communityview-013"><img :src="post.image" alt="" class="ux-views-community-communityview-014" /></div>
+                    <div v-if="post.image" class="v-community-workout-share-image">
+                      <img :src="post.image" alt="" class="v-community-workout-share-image-img" />
+                    </div>
                   </div>
                 </div>
                 <div v-else>
@@ -188,50 +201,15 @@
       </main>
     </div>
 
-    <Teleport to="body">
-      <div v-if="isReportModalOpen" class="v-report-modal-backdrop" @click.self="closeReportModal">
-        <div class="v-report-modal">
-          <h3 class="v-report-modal-title">신고하기</h3>
-          <p class="v-report-modal-desc">신고 사유를 입력해주세요. 5자 이상 500자 이하로 작성 가능합니다.</p>
-          <textarea
-            v-model="reportReason"
-            class="v-report-textarea"
-            placeholder="신고 사유를 입력해주세요."
-            maxlength="500"
-          />
-          <div class="v-report-modal-meta">
-            <span v-if="reportErrorMessage" class="v-report-error">{{ reportErrorMessage }}</span>
-            <div class="v-report-meter-group">
-              <div class="v-report-meter" aria-hidden="true">
-                <svg viewBox="0 0 28 28" class="v-report-meter-svg">
-                  <circle class="v-report-meter-track" cx="14" cy="14" r="10" />
-                  <circle
-                    class="v-report-meter-progress"
-                    :class="{ 'is-over-limit': isReportReasonOverLimit }"
-                    cx="14"
-                    cy="14"
-                    r="10"
-                    :style="{
-                      strokeDasharray: `${REPORT_REASON_METER_CIRCUMFERENCE} ${REPORT_REASON_METER_CIRCUMFERENCE}`,
-                      strokeDashoffset: `${reportReasonMeterDashOffset}`,
-                    }"
-                  />
-                </svg>
-              </div>
-              <span class="v-report-count" :class="{ 'is-over-limit': isReportReasonOverLimit }">
-                {{ reportReasonCountLabel }}
-              </span>
-            </div>
-          </div>
-          <div class="v-report-actions">
-            <button type="button" class="v-report-cancel" :disabled="isSubmittingReport" @click="closeReportModal">취소</button>
-            <button type="button" class="v-report-submit" :disabled="isSubmittingReport" @click="submitReport">
-              {{ isSubmittingReport ? '접수 중...' : '신고 접수' }}
-            </button>
-          </div>
-        </div>
-      </div>
-    </Teleport>
+    <ReportReasonModal
+      :open="isReportModalOpen"
+      :reason="reportReason"
+      :error-message="reportErrorMessage"
+      :submitting="isSubmittingReport"
+      @update:reason="reportReason = $event"
+      @close="closeReportModal"
+      @submit="submitReport"
+    />
 
     <Teleport to="body">
       <div v-if="reportToastMessage" class="v-report-toast">{{ reportToastMessage }}</div>
@@ -243,7 +221,8 @@
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { RouterLink, useRoute, useRouter } from 'vue-router';
 import NavigationRail from '@/components/sections/NavigationRail.vue';
-import { Search, MessageCircle, Heart, ArrowUpDown, Clock, Zap, Flag, X, Eye } from 'lucide-vue-next';
+import ReportReasonModal from '@/components/modals/ReportReasonModal.vue';
+import { Search, MessageCircle, Heart, ArrowUpDown, Zap, Flame, Flag, X, Eye } from 'lucide-vue-next';
 import { communityLikeApi, communityPostApi, reportApi } from '@/services/apis';
 import { useSession } from '@/composables/useSession';
 import { normalizeCommunityPost } from '@/utils/postNormalizer';
@@ -273,9 +252,6 @@ const isSubmittingReport = ref(false);
 const reportToastMessage = ref('');
 const reportTargetRefId = ref(null);
 const reportTargetType = ref('POST');
-const REPORT_REASON_MAX_LENGTH = 500;
-const REPORT_REASON_METER_RADIUS = 10;
-const REPORT_REASON_METER_CIRCUMFERENCE = 2 * Math.PI * REPORT_REASON_METER_RADIUS;
 let suggestDebounceTimer = null;
 let suggestRequestId = 0;
 let reportToastTimer = null;
@@ -296,16 +272,6 @@ const selectedSortLabel = computed(() => (
 const hasSearchTerm = computed(() => String(searchTerm.value || '').length > 0);
 const hasSuggestTarget = computed(() => String(searchTerm.value || '').trim().length >= 2);
 const showSuggestionPanel = computed(() => isSearchFocused.value && hasSuggestTarget.value);
-const reportReasonLength = computed(() => Array.from(String(reportReason.value || '')).length);
-const reportReasonRemaining = computed(() => REPORT_REASON_MAX_LENGTH - reportReasonLength.value);
-const isReportReasonOverLimit = computed(() => reportReasonRemaining.value < 0);
-const reportReasonCountLabel = computed(() => (
-  isReportReasonOverLimit.value ? String(reportReasonRemaining.value) : `${reportReasonLength.value}/${REPORT_REASON_MAX_LENGTH}`
-));
-const reportReasonMeterRatio = computed(() => Math.min(reportReasonLength.value / REPORT_REASON_MAX_LENGTH, 1));
-const reportReasonMeterDashOffset = computed(() => (
-  REPORT_REASON_METER_CIRCUMFERENCE * (1 - reportReasonMeterRatio.value)
-));
 const isFollowOnly = ref(false);
 
 const getNumber = (value, fallback = 0) => {
@@ -849,7 +815,7 @@ onBeforeUnmount(() => {
 .v-community-card-title {
   margin: 2px 0 10px;
   font-size: 18px;
-  font-weight: 800;
+  font-weight: 700;
   color: #111827;
   line-height: 1.35;
   overflow: hidden;

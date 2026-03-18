@@ -50,4 +50,8 @@ export const adminApi = {
       params: { status, deleteTarget },
     });
   },
+
+  resolveReportWithDeleteAndSuspend(id, payload) {
+    return apiClient.patch(`/reports/${id}/resolve-delete-suspend`, payload);
+  },
 };

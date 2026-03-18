@@ -116,7 +116,7 @@
 
         <div class="search-panel-detail-pane">
           <div v-if="selectedGym" ref="detailScrollRef" class="search-panel-detail" @scroll.passive="handleDetailScroll">
-            <div class="sx-components-sections-searchpanel-001">
+            <div class="sx-components-sections-searchpanel-001 search-panel-hero">
               <img :src="selectedGymHeroImage" :alt="selectedGym.name" class="ux-components-sections-searchpanel-001" />
               <UiIconButton
                 class="search-panel-hero-btn search-panel-hero-btn-left"
@@ -506,6 +506,16 @@
                           >
                             <Pencil :size="16" />
                           </button>
+                          <button
+                            v-else-if="review.canReport"
+                            type="button"
+                            class="search-panel-review-report-btn"
+                            :aria-label="`${review.nickname || '사용자'} 리뷰 신고`"
+                            :disabled="isSubmittingReport && reportTargetRefId === Number(review.reviewId || review.id || 0)"
+                            @click="openReportModal(review)"
+                          >
+                            <Flag :size="16" />
+                          </button>
                         </div>
                       </div>
 
@@ -711,6 +721,16 @@
       </div>
     </Teleport>
 
+    <ReportReasonModal
+      :open="isReportModalOpen"
+      :reason="reportReason"
+      :error-message="reportErrorMessage"
+      :submitting="isSubmittingReport"
+      @update:reason="reportReason = $event"
+      @close="closeReportModal"
+      @submit="submitReport"
+    />
+
     <Teleport to="body">
       <div
         v-if="isPhotoViewerOpen"
@@ -793,6 +813,7 @@ import {
   ChevronRight,
   ChevronLeft,
   Pencil,
+  Flag,
   Speaker,
   Dumbbell,
   User,
@@ -818,7 +839,8 @@ import {
   LogIn,
 } from 'lucide-vue-next';
 import UiIconButton from '@/components/ui/UiIconButton.vue';
-import { gymApi, reservationApi, reviewApi, chatApi } from '@/services/apis';
+import ReportReasonModal from '@/components/modals/ReportReasonModal.vue';
+import { gymApi, reservationApi, reviewApi, chatApi, reportApi } from '@/services/apis';
 import { useSession } from '@/composables/useSession';
 import { normalizeRole } from '@/services/token';
 import { extractList, extractPayload } from '@/utils/api';
@@ -926,10 +948,15 @@ const isReviewModalOpen = ref(false);
 const isPhotoViewerOpen = ref(false);
 const isPhotoViewerMobile = ref(false);
 const isPhotoViewerControlsVisible = ref(true);
+const isReportModalOpen = ref(false);
+const isSubmittingReport = ref(false);
 const photoViewerItems = ref([]);
 const photoViewerSource = ref('gallery');
 const reviewExpandedMap = ref({});
 const isReviewSubmitting = ref(false);
+const reportReason = ref('');
+const reportErrorMessage = ref('');
+const reportTargetRefId = ref(null);
 const reviewSubmitError = ref('');
 const reviewImageInputRef = ref(null);
 const selectedPhotoIndex = ref(-1);
@@ -1277,6 +1304,7 @@ const reviewDisplayItems = computed(() =>
     isExpanded: Boolean(reviewExpandedMap.value[getReviewKey(review)]),
     commentPreview: getReviewPreviewText(review?.comment),
     canEdit: canEditReviewItem(review),
+    canReport: isAuthenticated.value && !canEditReviewItem(review),
   })));
 
 const reviewModalTitle = computed(() => (isEditingReview.value ? '리뷰 수정' : '리뷰 작성'));
@@ -1929,6 +1957,59 @@ const resetReviewForm = () => {
 
 const openReviewFilePicker = () => {
   reviewImageInputRef.value?.click();
+};
+
+const openReportModal = (review) => {
+  const targetId = Number(review?.reviewId || review?.id || 0);
+  if (!targetId) return;
+  if (!isAuthenticated.value) {
+    if (typeof props.onRequireAuth === 'function') {
+      props.onRequireAuth();
+      return;
+    }
+    window.alert('로그인이 필요합니다.');
+    return;
+  }
+
+  reportTargetRefId.value = targetId;
+  reportReason.value = '';
+  reportErrorMessage.value = '';
+  isSubmittingReport.value = false;
+  isReportModalOpen.value = true;
+};
+
+const closeReportModal = (force = false) => {
+  if (isSubmittingReport.value && !force) return;
+  isReportModalOpen.value = false;
+  reportReason.value = '';
+  reportErrorMessage.value = '';
+  reportTargetRefId.value = null;
+};
+
+const submitReport = async () => {
+  const targetId = Number(reportTargetRefId.value || 0);
+  if (!targetId) return;
+  const reason = String(reportReason.value || '').trim();
+  if (reason.length < 5 || reason.length > 500) {
+    reportErrorMessage.value = '신고 사유는 5자 이상 500자 이하로 입력해주세요.';
+    return;
+  }
+
+  reportErrorMessage.value = '';
+  isSubmittingReport.value = true;
+  try {
+    await reportApi.create({
+      refId: targetId,
+      refType: 'REVIEW',
+      reason,
+    });
+    closeReportModal(true);
+    showShareToast('신고가 접수되었습니다.');
+  } catch (error) {
+    reportErrorMessage.value = '신고 처리에 실패했습니다.';
+  } finally {
+    isSubmittingReport.value = false;
+  }
 };
 
 const getFileExtension = (filename = '') => {
