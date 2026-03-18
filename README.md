@@ -110,22 +110,24 @@ TanTan은 사용자뿐 아니라 **헬스장 관리자(GYM_OWNER)**도 고려합
 ### 🔍 사용한 핵심 기술
 | 사용 기술 | 설명 |
 | ---------- | ---------------------------------------------- |
-| **OAuth2 소셜 로그인** | 자체 로그인 외에 **Google, Kakao** 소셜 로그인을 통합 구현하여 사용자 접근성을 극대화했습니다. |
-| **JWT & Spring Security** | Access/Refresh Token 기반의 이중 보안 체계와 Stateless 아키텍처를 구축하여 인증의 안전성과 서버 확장성을 동시에 확보했습니다. |
-| **Redis 기반 토큰 및 세션 관리** | Refresh Token을 Redis에 저장하고 TTL(Time To Live)을 통해 자동 관리함으로써, 토큰 탈취 위험을 최소화하고 인증 성능을 최적화했습니다. |
-| **Redis 역방향 인덱스 (ZSet)** | 대규모 **팔로워/팔로잉 및 즐겨찾기** 데이터를 Redis ZSet으로 관리하여, 정렬된 목록의 고속 추출과 실시간 카운팅 성능을 비약적으로 향상시켰습니다. |
-| **Redis Pub/Sub & WebSocket** | 메시지 브로커 기반의 **STOMP 프로토콜**과 Redis Pub/Sub을 결합하여, 분산 환경에서도 안정적인 실시간 양방향 채팅 및 상태 공유 기능을 구현했습니다. |
-| **AWS S3 기반 폴리모픽 이미지 시스템** | **RefType/RefId** 구조를 통해 프로필, 게시글, 리뷰 등 다양한 도메인의 이미지를 통합 관리하며, S3 연동과 Soft Delete 패턴으로 데이터 정합성을 유지합니다. |
-| **Naver Map API 통합** | **Geocoding API**를 통한 주소-좌표 자동 변환 및 **Driving Direction API**를 활용한 길 찾기 기능을 제공하여 위치 기반 서비스의 정확도를 높였습니다. |
-| **SSE & @Async 실시간 알림** | **Server-Sent Events(SSE)**와 비동기(`@Async`) 처리를 조합하여, 대규모 팔로워 대상의 공지 알림 발송 시 메인 로직의 지연 없이 실시간 정보를 전달합니다. |
-| **운영 상태 판단 알고리즘** | 정기 휴무일과 예외 공휴일을 고려한 로직을 통해, 현재 시각 기준 헬스장의 **영업 여부(OPEN/CLOSED)**를 실시간으로 판별하여 사용자에게 제공합니다. |
-| **Soft Delete & 데이터 거버넌스** | 전사적인 **DelYn** 패턴과 **BaseTimeEntity** 적용으로 실제 DB 삭제 없이 데이터를 보호하며, 관리자 복구 기능 및 데이터 추적성을 강화했습니다. |
-| **Cleanup 자동화 프로세스** | 사용자 탈퇴 시 Redis(팔로우/즐겨찾기), RDB(좋아요), S3(이미지) 등 여러 저장소에 분산된 연관 데이터를 연쇄적으로 정리하여 데이터 무결성을 보장합니다. |
-| **Spring RestClient API 통신** | 최신 **Spring RestClient**를 도입하여 외부 API(Naver Map 등)와의 통신을 선언적이고 효율적으로 관리하며 예외 처리 가독성을 높였습니다. |
+| **Vue 3 Composition API** | 컴포넌트 로직을 기능별로 캡슐화하고 재사용성을 높이기 위해 Composition API와 자체 Composable(`useSession`, `useNotificationCenter` 등) 패턴을 적극 활용했습니다. |
+| **Vite** | 기존 번들러 대비 압도적으로 빠른 HMR(Hot Module Replacement)과 빌드 속도를 제공하는 Vite를 도입하여 개발 생산성을 크게 향상시켰습니다. |
+| **Axios Interceptor 기반 인증 제어** | Axios Interceptor를 통해 JWT Access Token을 전역적으로 관리하며, 만료 시 Refresh Token을 이용한 자동 갱신 및 동시 다발적인 요청을 처리하는 갱신 대기 큐(Wait Queue) 로직을 구현했습니다. |
+| **Tailwind CSS & 커스텀 CSS** | 유틸리티 퍼스트 프레임워크인 Tailwind CSS를 사용해 UI를 빠르게 구축하고, 지도 오버레이 등 복잡한 디자인이 필요한 부분은 별도의 모듈화된 바닐라 CSS를 혼합하여 유연성을 확보했습니다. |
+| **STOMP & WebSocket 실시간 통신** | `@stomp/stompjs`를 활용하여 헬스장 관리자와 사용자 간의 1:1 상담 채팅 및 실시간 알림 시스템을 구현하여 매끄러운 상호작용을 지원합니다. |
+| **Naver Map API 연동 및 커스텀 UI** | Naver Map API를 통합하여 위치 기반 탐색을 구현했으며, 지도 위 마커 클릭 시 자연스럽게 나타나는 좌측 슬라이드 패널(Left Slide Panel) UI를 통해 직관적인 사용자 경험을 제공합니다. |
+| **Vue Router 기반 SPA 라우팅** | Vue Router를 통해 단일 페이지 애플리케이션(SPA)의 부드러운 화면 전환을 구현하고, 역할(일반 유저, 헬스장 소유자, 관리자)에 따른 접근 제어(Navigation Guard)를 구성했습니다. |
+| **경량화된 전역 상태 및 모달 관리** | 무거운 상태 관리 라이브러리(Vuex, Pinia) 대신 Composition API의 반응형(`ref`, `reactive`) 객체를 활용한 경량화된 세션 관리와 재사용 가능한 커스텀 모달 컴포넌트 시스템을 구축했습니다. |
+
+### 📦 사용 오픈소스
+| 오픈소스 | 버전 | 사용 목적 | 라이선스 | 링크 |
+| ---------- | ---------- | ---------- | ---------- | ---------- |
+| Thumbnailator | 0.4.20 | 업로드 이미지의 비율을 유지한 썸네일 생성 및 원본/썸네일 분리 저장 | MIT | [coobird/thumbnailator](https://github.com/coobird/thumbnailator) |
+
 
 ## 🛠️ 시스템 아키텍쳐
 
-[//]: # (<img width="944" height="471" alt="drawio" src="https://github.com/user-attachments/assets/ae25777f-9bb5-4a4a-a8e4-8378cc5f050c" />)
+![TanTan FE-BE System Architecture](./images/system-architecture-fe-be.svg)
 
 
 ## <span id="11">🚦 트러블 슈팅</span>
@@ -611,679 +613,228 @@ TanTan은 사용자뿐 아니라 **헬스장 관리자(GYM_OWNER)**도 고려합
 ### 📄 주요기능, 요구사항명세서, 팀 전략
 [요구사항 명세서](https://docs.google.com/spreadsheets/d/1UjxzOpptgDh60qLhGtd6FsADTPM40OOCVrUY1_OP__w/edit?gid=2109308759#gid=2109308759)
 
-[//]: # (## <span id="11">🖥️ 주요 기능 소개&#40;테스트케이스&#41;</span>)
-
-[//]: # (<details>)
-
-[//]: # (  <summary> 👥 사용자 </summary>)
-
-[//]: # (<details>)
-
-[//]: # (  <summary>회원가입</summary>)
-
-[//]: # (  <div align="center">)
-
-[//]: # ()
-[//]: # (![회원가입]&#40;https://github.com/user-attachments/assets/530a9258-93f0-4b6d-b2ec-5dd82cbabf86&#41;)
-
-[//]: # ()
-[//]: # (  </div>)
-
-[//]: # (</details>)
-
-[//]: # ()
-[//]: # (<details>)
-
-[//]: # (  <summary>이메일 로그인</summary>)
-
-[//]: # (  <div align="center">)
-
-[//]: # ()
-[//]: # ()
-[//]: # (![이메일로그인]&#40;https://github.com/user-attachments/assets/809f003c-0651-44b5-8f7b-138be3e5915c&#41;)
-
-[//]: # ()
-[//]: # ()
-[//]: # (  </div>)
-
-[//]: # (</details>)
-
-[//]: # ()
-[//]: # (<details>)
-
-[//]: # (  <summary>구글 회원가입 / 로그인</summary>)
-
-[//]: # (  <div align="center">)
-
-[//]: # ()
-[//]: # (![구글회원가입및로그인]&#40;https://github.com/user-attachments/assets/ca1c6479-ad4e-4a82-aa0e-adf4c127bd9b&#41;)
-
-[//]: # ()
-[//]: # ()
-[//]: # (  </div>)
-
-[//]: # (</details>)
-
-[//]: # ()
-[//]: # (<details>)
-
-[//]: # (  <summary>카카오 회원가입 / 로그인</summary>)
-
-[//]: # (  <div align="center">)
-
-[//]: # ()
-[//]: # ()
-[//]: # (![카카오회원가입및로그인]&#40;https://github.com/user-attachments/assets/1ee3ff99-1bbd-44c2-b0d1-ed888f0f1a41&#41;)
-
-[//]: # ()
-[//]: # ()
-[//]: # ()
-[//]: # (  </div>)
-
-[//]: # (</details>)
-
-[//]: # ()
-[//]: # (<details>)
-
-[//]: # (  <summary>내 정보 조회&#40;마이페이지&#41;</summary>)
-
-[//]: # (  <div align="center">)
-
-[//]: # ()
-[//]: # ()
-[//]: # (![내정보조회마이페이지]&#40;https://github.com/user-attachments/assets/7b90a8e7-c094-4c7b-bf85-8d5c4cd1ff53&#41;)
-
-[//]: # ()
-[//]: # ()
-[//]: # ()
-[//]: # (  </div>)
-
-[//]: # (</details>)
-
-[//]: # ()
-[//]: # (<details>)
-
-[//]: # (  <summary>내 정보 수정</summary>)
-
-[//]: # (  <div align="center">)
-
-[//]: # ()
-[//]: # (![내정보수정]&#40;https://github.com/user-attachments/assets/a97c255f-b5ec-4385-ad4f-7e9c71853388&#41;)
-
-[//]: # ()
-[//]: # ()
-[//]: # ()
-[//]: # ()
-[//]: # (  </div>)
-
-[//]: # (</details>)
-
-[//]: # ()
-[//]: # (<details>)
-
-[//]: # (  <summary>사용자 탈퇴</summary>)
-
-[//]: # (  <div align="center">)
-
-[//]: # ()
-[//]: # ()
-[//]: # (![사용자탈퇴]&#40;https://github.com/user-attachments/assets/6b6902c9-b3ea-4b51-8dcb-b1d3783e1213&#41;)
-
-[//]: # ()
-[//]: # ()
-[//]: # ()
-[//]: # (  </div>)
-
-[//]: # (</details>)
-
-[//]: # (</details>)
-
-[//]: # ()
-[//]: # (<details>)
-
-[//]: # ( <summary> 🔑 호스트 기능 </summary>)
-
-[//]: # (<details>)
-
-[//]: # (  <summary>호텔 등록</summary>)
-
-[//]: # (  <div align="center">)
-
-[//]: # ()
-[//]: # (![호텔 등록]&#40;https://github.com/user-attachments/assets/b8f4fe54-b0a1-42a1-852c-354911cb826b&#41;)
-
-[//]: # ()
-[//]: # ()
-[//]: # (  </div>)
-
-[//]: # (</details>)
-
-[//]: # (<details>)
-
-[//]: # (  <summary>호텔 수정</summary>)
-
-[//]: # (  <div align="center">)
-
-[//]: # ()
-[//]: # (![호텔 수정]&#40;https://github.com/user-attachments/assets/767c20af-3150-41f0-986f-5c66195ee7f0&#41;)
-
-[//]: # ()
-[//]: # ()
-[//]: # (  </div>)
-
-[//]: # (</details>)
-
-[//]: # ()
-[//]: # (<details>)
-
-[//]: # (  <summary>호스트 채팅 공지사항 등록</summary>)
-
-[//]: # (  <div align="center">)
-
-[//]: # ()
-[//]: # (![호스트 공지 등록]&#40;https://github.com/user-attachments/assets/c3286910-76b3-4326-a13f-fb707545d000&#41;)
-
-[//]: # ()
-[//]: # (<img width="926" height="289" alt="image" src="https://github.com/user-attachments/assets/7db8fdf2-3475-49cc-919b-c6dbf64f7a14" />)
-
-[//]: # ()
-[//]: # (  </div>)
-
-[//]: # (</details>)
-
-[//]: # (<details>)
-
-[//]: # (  <summary>호스트 채팅 공지사항 비활성화</summary>)
-
-[//]: # (  <div align="center">)
-
-[//]: # ()
-[//]: # (![공지 비활성화]&#40;https://github.com/user-attachments/assets/51cdcd50-359c-4aaa-9b6d-c4a9b22e9371&#41;)
-
-[//]: # (<img width="940" height="311" alt="image" src="https://github.com/user-attachments/assets/2b0a5003-22d8-4183-aeff-5b88e265c036" />)
-
-[//]: # ()
-[//]: # (  </div>)
-
-[//]: # (</details>)
-
-[//]: # ()
-[//]: # (</details>)
-
-[//]: # ()
-[//]: # (<details>)
-
-[//]: # (<summary>⚙️ 관리자 화면</summary>)
-
-[//]: # (<details>)
-
-[//]: # (  <summary>호텔 승인</summary>)
-
-[//]: # (  <div align="center">)
-
-[//]: # ()
-[//]: # ()
-[//]: # (![호텔 승인]&#40;https://github.com/user-attachments/assets/b6346ad3-167b-4620-9d7d-87d0b71012d2&#41;)
-
-[//]: # ()
-[//]: # ()
-[//]: # (  </div>)
-
-[//]: # (</details>)
-
-[//]: # (</details>)
-
-[//]: # ()
-[//]: # (<details>)
-
-[//]: # (<summary>🏨 호텔 조회</summary>)
-
-[//]: # (<details>)
-
-[//]: # (  <summary>지역명 조회</summary>)
-
-[//]: # (  <div align="center">)
-
-[//]: # ()
-[//]: # (![지역명 검색]&#40;https://github.com/user-attachments/assets/4da13680-e6d7-4034-b94d-fb494e00a907&#41;)
-
-[//]: # ()
-[//]: # ()
-[//]: # (  </div>)
-
-[//]: # (</details>)
-
-[//]: # ()
-[//]: # (<details>)
-
-[//]: # (  <summary>호텔명 조회</summary>)
-
-[//]: # (  <div align="center">)
-
-[//]: # ()
-[//]: # (![호텔명 검색]&#40;https://github.com/user-attachments/assets/d4bb8898-4f92-4549-8b1e-628532c27737&#41;)
-
-[//]: # ()
-[//]: # ()
-[//]: # (  </div>)
-
-[//]: # (</details>)
-
-[//]: # ()
-[//]: # (<details>)
-
-[//]: # (  <summary>호텔검색 필터기능</summary>)
-
-[//]: # (  <div align="center">)
-
-[//]: # ()
-[//]: # (![필터 기능]&#40;https://github.com/user-attachments/assets/4b9c6274-1f0d-4744-9839-d8a01a25a3e0&#41;)
-
-[//]: # ()
-[//]: # ()
-[//]: # (  </div>)
-
-[//]: # (</details>)
-
-[//]: # ()
-[//]: # (<details>)
-
-[//]: # (  <summary>호텔검색 정렬기능</summary>)
-
-[//]: # (  <div align="center">)
-
-[//]: # ()
-[//]: # (![정렬 기능]&#40;https://github.com/user-attachments/assets/c9e5c363-5608-4260-89b1-be90b82337af&#41;)
-
-[//]: # ()
-[//]: # ()
-[//]: # (  </div>)
-
-[//]: # (</details>)
-
-[//]: # ()
-[//]: # (<details>)
-
-[//]: # (  <summary>내 주변 호텔 조회</summary>)
-
-[//]: # (  <div align="center">)
-
-[//]: # ()
-[//]: # (![내 주변 호텔]&#40;https://github.com/user-attachments/assets/5acc8d59-9f36-4f56-a5f5-061ec643466d&#41;)
-
-[//]: # ()
-[//]: # ()
-[//]: # (  </div>)
-
-[//]: # (</details>)
-
-[//]: # (</details>)
-
-[//]: # ()
-[//]: # (<details>)
-
-[//]: # (<summary>📅 예약</summary>)
-
-[//]: # ()
-[//]: # ()
-[//]: # ()
-[//]: # (<details>)
-
-[//]: # (  <summary>예약 성공</summary>)
-
-[//]: # (  <div align="center">)
-
-[//]: # ()
-[//]: # ()
-[//]: # (![예약 성공]&#40;https://github.com/user-attachments/assets/a198e262-3d43-4d74-97ad-6050846649a7&#41;)
-
-[//]: # ()
-[//]: # ()
-[//]: # (  </div>)
-
-[//]: # (</details>)
-
-[//]: # ()
-[//]: # ()
-[//]: # (<details>)
-
-[//]: # (  <summary>예약 실패</summary>)
-
-[//]: # (  <div align="center">)
-
-[//]: # ()
-[//]: # (![예약실패 최종]&#40;https://github.com/user-attachments/assets/3d462ddb-8119-4073-8e02-e953c924f973&#41;)
-
-[//]: # ()
-[//]: # ()
-[//]: # (  </div>)
-
-[//]: # (</details>)
-
-[//]: # ()
-[//]: # (<details>)
-
-[//]: # (  <summary>예약 내역 조회</summary>)
-
-[//]: # (  <div align="center">)
-
-[//]: # ()
-[//]: # (![예약 내역]&#40;https://github.com/user-attachments/assets/31c34501-187e-4b74-b10c-8082f6a33b9d&#41;)
-
-[//]: # ()
-[//]: # (  </div>)
-
-[//]: # (</details>)
-
-[//]: # ()
-[//]: # (<details>)
-
-[//]: # (  <summary>예약 상세 내역 조회</summary>)
-
-[//]: # (  <div align="center">)
-
-[//]: # ()
-[//]: # (![예약 상세 내역]&#40;https://github.com/user-attachments/assets/1aa81a29-261e-4f26-9b2a-2d5728448eb7&#41;)
-
-[//]: # ()
-[//]: # (  </div>)
-
-[//]: # (</details>)
-
-[//]: # ()
-[//]: # (<details>)
-
-[//]: # (  <summary>예약 호스트 연락 </summary>)
-
-[//]: # (  <div align="center">)
-
-[//]: # ()
-[//]: # (![예약-호스트 연락]&#40;https://github.com/user-attachments/assets/91d7552e-f1b7-4a9b-9b8b-e4b50edefc86&#41;)
-
-[//]: # ()
-[//]: # (  </div>)
-
-[//]: # (</details>)
-
-[//]: # ()
-[//]: # ()
-[//]: # ()
-[//]: # ()
-[//]: # ()
-[//]: # (</details>)
-
-[//]: # ()
-[//]: # (<details>)
-
-[//]: # (<summary>💬 채팅</summary>)
-
-[//]: # (<details>)
-
-[//]: # (  <summary>채팅 </summary>)
-
-[//]: # (  <div align="center">)
-
-[//]: # ()
-[//]: # ()
-[//]: # (![채팅]&#40;https://github.com/user-attachments/assets/f9020b80-39f5-4e59-83db-0cc830e30083&#41;)
-
-[//]: # ()
-[//]: # ()
-[//]: # (  </div>)
-
-[//]: # (</details>)
-
-[//]: # (<details>)
-
-[//]: # (  <summary>채팅 알림 </summary>)
-
-[//]: # (  <div align="center">)
-
-[//]: # ()
-[//]: # ()
-[//]: # (![채팅-알림 &#40;1&#41;]&#40;https://github.com/user-attachments/assets/c4c93492-c861-410b-a15c-df1674210174&#41;)
-
-[//]: # ()
-[//]: # ()
-[//]: # ()
-[//]: # (  </div>)
-
-[//]: # (</details>)
-
-[//]: # ()
-[//]: # (</details>)
-
-[//]: # ()
-[//]: # (<details>)
-
-[//]: # (<summary>✏️ 리뷰</summary>)
-
-[//]: # (<details>)
-
-[//]: # (  <summary>호텔 리뷰조회</summary>)
-
-[//]: # (  <div align="center">)
-
-[//]: # ()
-[//]: # (![호텔리뷰조회]&#40;https://github.com/user-attachments/assets/e8ddbdb4-669a-442e-af04-20ea8b329622&#41;)
-
-[//]: # ()
-[//]: # ()
-[//]: # (  </div>)
-
-[//]: # (</details>)
-
-[//]: # ()
-[//]: # (<details>)
-
-[//]: # (  <summary>리뷰작성</summary>)
-
-[//]: # (  <div align="center">)
-
-[//]: # ()
-[//]: # ()
-[//]: # (![리뷰작성]&#40;https://github.com/user-attachments/assets/d48db345-2a71-4eae-a7eb-3344a9696c18&#41;)
-
-[//]: # ()
-[//]: # ()
-[//]: # ()
-[//]: # (  </div>)
-
-[//]: # (</details>)
-
-[//]: # ()
-[//]: # (<details>)
-
-[//]: # (  <summary>내 리뷰 조회&#40;마이페이지&#41;</summary>)
-
-[//]: # (  <div align="center">)
-
-[//]: # ()
-[//]: # ()
-[//]: # (![내리뷰조회]&#40;https://github.com/user-attachments/assets/2cb8e40f-8cb4-4fe0-9e73-42d56bd22c51&#41;)
-
-[//]: # ()
-[//]: # ()
-[//]: # ()
-[//]: # (  </div>)
-
-[//]: # (</details>)
-
-[//]: # ()
-[//]: # (<details>)
-
-[//]: # (  <summary>내 리뷰 수정</summary>)
-
-[//]: # (  <div align="center">)
-
-[//]: # ()
-[//]: # ()
-[//]: # (![내리뷰수정]&#40;https://github.com/user-attachments/assets/4eee199b-b108-4720-a984-acd5cdc0ebb7&#41;)
-
-[//]: # ()
-[//]: # ()
-[//]: # ()
-[//]: # (  </div>)
-
-[//]: # (</details>)
-
-[//]: # ()
-[//]: # (<details>)
-
-[//]: # (  <summary>내 리뷰 삭제</summary>)
-
-[//]: # (  <div align="center">)
-
-[//]: # ()
-[//]: # (![내리뷰삭제]&#40;https://github.com/user-attachments/assets/49aca08d-99b0-43b9-8d7a-37e38d580bd2&#41;)
-
-[//]: # ()
-[//]: # ()
-[//]: # (  </div>)
-
-[//]: # (</details>)
-
-[//]: # ()
-[//]: # (<details>)
-
-[//]: # (  <summary>리뷰 답글 작성</summary>)
-
-[//]: # (  <div align="center">)
-
-[//]: # ()
-[//]: # ()
-[//]: # (![호스트리뷰답글작성]&#40;https://github.com/user-attachments/assets/fa9a711d-d035-4cfd-9dc3-4de98407543c&#41;)
-
-[//]: # ()
-[//]: # ()
-[//]: # (  </div>)
-
-[//]: # (</details>)
-
-[//]: # ()
-[//]: # (<details>)
-
-[//]: # (  <summary>리뷰 답글 수정/삭제</summary>)
-
-[//]: # (  <div align="center">)
-
-[//]: # ()
-[//]: # (![호스트리뷰답글수정삭제]&#40;https://github.com/user-attachments/assets/da54ed75-762a-4355-8e06-5fc47c89ecc6&#41;)
-
-[//]: # ()
-[//]: # ()
-[//]: # (  </div>)
-
-[//]: # (</details>)
-
-[//]: # (</details>)
-
-[//]: # ()
-[//]: # (<details>)
-
-[//]: # (<summary>🔔 알림</summary>)
-
-[//]: # (<details>)
-
-[//]: # (  <summary>예약성공 알림&#40;사용자, 실시간x&#41;</summary>)
-
-[//]: # (  <div align="center">)
-
-[//]: # ()
-[//]: # (  <img width="423" height="416" alt="사용자 예약확정 알림" src="https://github.com/user-attachments/assets/ddd70b3c-40db-4d88-8940-ca1d30fc3922" />)
-
-[//]: # ()
-[//]: # (  </div>)
-
-[//]: # (</details>)
-
-[//]: # ()
-[//]: # (<details>)
-
-[//]: # (  <summary>예약성공 알림&#40;호스트, 실시간o&#41;</summary>)
-
-[//]: # (  <div align="center">)
-
-[//]: # ()
-[//]: # ()
-[//]: # (![호스트알림]&#40;https://github.com/user-attachments/assets/b66befaa-a9e2-4f0f-b2bc-82a5cd45cf5f&#41;)
-
-[//]: # ()
-[//]: # ()
-[//]: # (  </div>)
-
-[//]: # (</details>)
-
-[//]: # ()
-[//]: # (<details>)
-
-[//]: # (  <summary>호텔등록 알림&#40;관리자, 실시간o&#41;</summary>)
-
-[//]: # (  <div align="center">)
-
-[//]: # ()
-[//]: # (![관리자알림]&#40;https://github.com/user-attachments/assets/067cafe3-ecef-4444-8410-cc3b3ed51808&#41;)
-
-[//]: # ()
-[//]: # ()
-[//]: # (  </div>)
-
-[//]: # (</details>)
-
-[//]: # ()
-[//]: # (<details>)
-
-[//]: # (  <summary>입실 하루 전 알림&#40;사용자, 실시간x&#41;</summary>)
-
-[//]: # (  <div align="center">)
-
-[//]: # ()
-[//]: # (<img width="417" height="253" alt="사용자 내일 입실 알림" src="https://github.com/user-attachments/assets/e16c3ca2-20ff-436d-a1f8-a8ad91e1a8bb" />)
-
-[//]: # ()
-[//]: # (  </div>)
-
-[//]: # (</details>)
-
-[//]: # ()
-[//]: # (<details>)
-
-[//]: # (  <summary>퇴실 후 리뷰 요청 알림&#40;사용자, 실시간x&#41;</summary>)
-
-[//]: # (  <div align="center">)
-
-[//]: # ()
-[//]: # (<img width="408" height="269" alt="사용자 리뷰 요청 알림" src="https://github.com/user-attachments/assets/f85d1f43-ad23-4bce-9ef1-fb920c3da9ce" />)
-
-[//]: # ()
-[//]: # (  </div>)
-
-[//]: # (</details>)
-
-[//]: # (</details>)
-
-[//]: # ()
-[//]: # (<details>)
-
-[//]: # (<summary>♥️ 찜</summary>)
-
-[//]: # (<details>)
-
-[//]: # (  <summary>사용자 찜 기능</summary>)
-
-[//]: # (  <div align="center">)
-
-[//]: # ()
-[//]: # (![찜기능]&#40;https://github.com/user-attachments/assets/adff0a8b-9aaa-4848-bc24-70f6849dbbd6&#41;)
-
-[//]: # ()
-[//]: # ()
-[//]: # (  </div>)
-
-[//]: # (</details>)
-
-[//]: # ()
-[//]: # (</details>)
-
-[//]: # ()
-[//]: # ()
+## <span id="11">🖥️ 주요 기능 소개(테스트케이스)</span>
+
+<details>
+  <summary>👤 회원 / 프로필</summary>
+
+<details>
+  <summary>일반 회원가입 / 로그인</summary>
+  <div align="center">
+    <img width="926" alt="사용자 일반 회원가입 및 로그인" src="images/사용자-일반 회원가입, 로그인.gif" />
+  </div>
+</details>
+
+<details>
+  <summary>프로필 수정</summary>
+  <div align="center">
+    <img width="926" alt="사용자 프로필 수정" src="images/사용자-프로필 수정.gif" />
+  </div>
+</details>
+
+<details>
+  <summary>팔로우</summary>
+  <div align="center">
+    <img width="926" alt="사용자 팔로우" src="images/사용자-팔로우.gif" />
+  </div>
+</details>
+
+</details>
+
+<details>
+  <summary>🏋️ 헬스장 탐색 / 예약</summary>
+
+<details>
+  <summary>초기 조회화면(지역기준)</summary>
+  <div align="center">
+    <img width="926" alt="헬스장 초기 조회 화면" src="images/9cca4f97c2ae5511.gif" />
+  </div>
+</details>
+
+<details>
+  <summary>지도 기반 헬스장 조회</summary>
+  <div align="center">
+    <img width="926" alt="지도 기반 헬스장 조회" src="images/gym-map-ezgif.com-video-to-gif-converter.gif" />
+  </div>
+</details>
+
+<details>
+  <summary>헬스장 상세 조회</summary>
+  <div align="center">
+    <img width="926" alt="헬스장 상세 조회" src="images/gym-detail-ezgif.com-video-to-gif-converter.gif" />
+  </div>
+</details>
+
+<details>
+  <summary>찜 등록 / 지도 찜 확인</summary>
+  <div align="center">
+    <img width="926" alt="찜 등록 및 지도 찜 확인" src="images/사용자-찜 등록, 지도 찜 확인.gif" />
+  </div>
+</details>
+
+<details>
+  <summary>헬스장 예약</summary>
+  <div align="center">
+    <img width="926" alt="헬스장 예약" src="images/사용자- 헬스장 예약.gif" />
+  </div>
+</details>
+
+</details>
+
+<details>
+  <summary>💬 채팅</summary>
+
+<details>
+  <summary>1:1 상담 채팅</summary>
+  <div align="center">
+    <img width="926" alt="사용자 채팅" src="images/사용자-채팅.gif" />
+  </div>
+</details>
+
+<details>
+  <summary>채팅방 검색</summary>
+  <div align="center">
+    <img width="926" alt="채팅방 검색" src="images/사용자-채팅방 검색.gif" />
+  </div>
+</details>
+
+<details>
+  <summary>채팅방 내 검색 / 나가기</summary>
+  <div align="center">
+    <img width="926" alt="채팅방 내 검색 및 나가기" src="images/사용자-채팅방 내 검색, 나가기.gif" />
+  </div>
+</details>
+
+</details>
+
+<details>
+  <summary>🏃 운동 기록</summary>
+
+<details>
+  <summary>운동기록 등록</summary>
+  <div align="center">
+    <img width="926" alt="운동기록 등록" src="images/사용자-운동기록 등록.gif" />
+  </div>
+</details>
+
+<details>
+  <summary>운동기록 일별 조회</summary>
+  <div align="center">
+    <img width="926" alt="운동기록 일별 조회" src="images/사용자-운동기록 조회 (일별).gif" />
+  </div>
+</details>
+
+<details>
+  <summary>운동기록 삭제</summary>
+  <div align="center">
+    <img width="926" alt="운동기록 삭제" src="images/사용자-운동기록 삭제.gif" />
+  </div>
+</details>
+
+</details>
+
+<details>
+  <summary>📝 리뷰 / 신고 / 알림</summary>
+
+<details>
+  <summary>리뷰 등록</summary>
+  <div align="center">
+    <img width="926" alt="리뷰 등록" src="images/사용자-리뷰 등록.gif" />
+  </div>
+</details>
+
+<details>
+  <summary>리뷰 수정</summary>
+  <div align="center">
+    <img width="926" alt="리뷰 수정" src="images/사용자-리뷰 수정.gif" />
+  </div>
+</details>
+
+<details>
+  <summary>신고</summary>
+  <div align="center">
+    <img width="926" alt="신고" src="images/사용자-신고.gif" />
+  </div>
+</details>
+
+<details>
+  <summary>알림 읽음 / 삭제 처리</summary>
+  <div align="center">
+    <img width="926" alt="알림 읽음 및 삭제 처리" src="images/사용자-알림 읽음 삭제 처리.gif" />
+  </div>
+</details>
+
+</details>
+
+<details>
+  <summary>⚙️ 관리자 화면</summary>
+
+<details>
+  <summary>헬스장 / 신고 처리</summary>
+  <div align="center">
+    <img width="926" alt="관리자 헬스장 및 신고 처리" src="images/관리자-헬스장 신고 처리.gif" />
+  </div>
+</details>
+
+</details>
+
+<details>
+  <summary>📝 커뮤니티</summary>
+
+<details>
+  <summary>일반 게시글 작성</summary>
+  <div align="center">
+    <img width="926" alt="일반 게시글 작성" src="images/community-post-create-posts-ezgif.com-video-to-gif-converter.gif" />
+  </div>
+</details>
+
+<details>
+  <summary>운동 기록 게시글 작성</summary>
+  <div align="center">
+    <img width="926" alt="운동 기록 게시글 작성" src="images/community-post-create-workout-ezgif.com-video-to-gif-converter.gif" />
+  </div>
+</details>
+
+<details>
+  <summary>게시글 상세 / 수정 / 삭제</summary>
+  <div align="center">
+    <img width="926" alt="게시글 상세 수정 삭제" src="images/community-post-detail-edit-delete-ezgif.com-video-to-gif-converter.gif" />
+  </div>
+</details>
+
+<details>
+  <summary>게시글 검색</summary>
+  <div align="center">
+    <img width="926" alt="게시글 검색" src="images/community-post-search-ezgif.com-video-to-gif-converter.gif" />
+  </div>
+</details>
+
+<details>
+  <summary>게시글 카테고리 검색</summary>
+  <div align="center">
+    <img width="926" alt="게시글 카테고리 검색" src="images/community-post-search-category-ezgif.com-video-to-gif-converter.gif" />
+  </div>
+</details>
+
+<details>
+  <summary>게시글 정렬</summary>
+  <div align="center">
+    <img width="926" alt="게시글 정렬" src="images/community-post-sort-ezgif.com-video-to-gif-converter.gif" />
+  </div>
+</details>
+
+<details>
+  <summary>좋아요</summary>
+  <div align="center">
+    <img width="926" alt="커뮤니티 좋아요" src="images/community-like-ezgif.com-video-to-gif-converter.gif" />
+  </div>
+</details>
+
+<details>
+  <summary>댓글 / 답글</summary>
+  <div align="center">
+    <img width="926" alt="커뮤니티 댓글 및 답글" src="images/community-comment-reply-ezgif.com-video-to-gif-converter.gif" />
+  </div>
+</details>
+
+</details>
