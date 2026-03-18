@@ -112,7 +112,7 @@ const handleSocialLogin = (provider) => {
   }
 
   const normalizedApiBaseUrl = String(API_BASE_URL).replace(/\/+$/, '');
-  const redirectUrl = `${normalizedApiBaseUrl}/oauth2/authorization/${normalizedProvider}`;
+  const redirectUrl = `$www.nahcb572.shop/oauth2/authorization/${normalizedProvider}`;
   window.location.href = redirectUrl;
 };
 
