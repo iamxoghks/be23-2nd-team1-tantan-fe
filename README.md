@@ -77,13 +77,18 @@ TanTan은 사용자뿐 아니라 **헬스장 관리자(GYM_OWNER)**도 고려합
   <img src="https://img.shields.io/badge/MariaDB-003545?style=for-the-badge&logo=mariadb&logoColor=white" />
   <img src="https://img.shields.io/badge/SQL-336791?style=for-the-badge&logo=sqlite&logoColor=white" />
   <img src="https://img.shields.io/badge/redis-FF4438?style=for-the-badge&logo=redis&logoColor=white" />
+  <img src="https://img.shields.io/badge/Elasticsearch-005571?style=for-the-badge&logo=elasticsearch&logoColor=white" />
 </p>
 
 ### 🚀 인프라/배포
 
 <p align="center">
+  <img src="https://img.shields.io/badge/Naver%20Cloud-03C75A?style=for-the-badge&logo=naver&logoColor=white" />
   <img src="https://img.shields.io/badge/docker-2496ED?style=for-the-badge&logo=docker&logoColor=white" />
-  <img src="https://img.shields.io/badge/Oracle%20Cloud%20Infrastructure-F80000?style=for-the-badge&logo=oracle&logoColor=white" />
+  <img src="https://img.shields.io/badge/kubernetes-326CE5?style=for-the-badge&logo=kubernetes&logoColor=white" />
+  <img src="https://img.shields.io/badge/nginx-009639?style=for-the-badge&logo=nginx&logoColor=white" />
+  <img src="https://img.shields.io/badge/Amazon%20S3-569A31?style=for-the-badge&logo=amazons3&logoColor=white" />
+  <img src="https://img.shields.io/badge/Amazon%20CloudFront-FF9900?style=for-the-badge&logo=amazon&logoColor=white" />
 </p>
 
 ### 🧰 개발 도구
@@ -107,6 +112,17 @@ TanTan은 사용자뿐 아니라 **헬스장 관리자(GYM_OWNER)**도 고려합
   <img src="https://img.shields.io/badge/ERDCloud-1F1F1F?style=for-the-badge&logo=linkerd&logoColor=white" />
 </p>
 
+### 🌐 외부 API 연동
+| API | 사용 목적 | 적용 위치 |
+| ---------- | ---------------------------------------------- | ---------------------------------------------- |
+| **Naver Map API** | 주소를 좌표로 변환하는 **Geocoding API**와 차량 경로를 계산하는 **Driving Direction API**를 연동해 지도 탐색과 길찾기 경험을 제공합니다. | `MapController`, `GeocodingService`, `DrivingDirectionService`, `naver.map.*` 설정 |
+| **사업자등록번호 조회 API** | 헬스장 관리자 권한 신청 시 사업자등록번호의 유효성과 정상 영업 여부를 검증해 허위 등록을 차단합니다. | `GymController`의 `/gym/apply`, `NtsBusinessApiClient`, `publicdata.nts.serviceKey` 설정 |
+
+### 📦 사용 오픈소스
+| 오픈소스 | 버전 | 사용 목적 | 라이선스 | 링크 |
+| ---------- | ---------- | ---------- | ---------- | ---------- |
+| Thumbnailator | 0.4.20 | 업로드 이미지의 비율을 유지한 썸네일 생성 및 원본/썸네일 분리 저장 | MIT | [coobird/thumbnailator](https://github.com/coobird/thumbnailator) |
+
 ### 🔍 사용한 핵심 기술
 | 사용 기술 | 설명 |
 | ---------- | ---------------------------------------------- |
@@ -119,15 +135,12 @@ TanTan은 사용자뿐 아니라 **헬스장 관리자(GYM_OWNER)**도 고려합
 | **Vue Router 기반 SPA 라우팅** | Vue Router를 통해 단일 페이지 애플리케이션(SPA)의 부드러운 화면 전환을 구현하고, 역할(일반 유저, 헬스장 소유자, 관리자)에 따른 접근 제어(Navigation Guard)를 구성했습니다. |
 | **경량화된 전역 상태 및 모달 관리** | 무거운 상태 관리 라이브러리(Vuex, Pinia) 대신 Composition API의 반응형(`ref`, `reactive`) 객체를 활용한 경량화된 세션 관리와 재사용 가능한 커스텀 모달 컴포넌트 시스템을 구축했습니다. |
 
-### 📦 사용 오픈소스
-| 오픈소스 | 버전 | 사용 목적 | 라이선스 | 링크 |
-| ---------- | ---------- | ---------- | ---------- | ---------- |
-| Thumbnailator | 0.4.20 | 업로드 이미지의 비율을 유지한 썸네일 생성 및 원본/썸네일 분리 저장 | MIT | [coobird/thumbnailator](https://github.com/coobird/thumbnailator) |
-
 
 ## 🛠️ 시스템 아키텍쳐
 
 ![TanTan FE-BE System Architecture](./images/system-architecture-fe-be.svg)
+
+- 외부 트래픽은 **NGINX Ingress**를 통해 진입하며, TLS 종료와 CORS 정책 적용 후 Kubernetes 내부의 Spring Boot 서비스로 라우팅됩니다.
 
 
 ## <span id="11">🚦 트러블 슈팅</span>
