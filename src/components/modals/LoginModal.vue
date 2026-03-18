@@ -112,7 +112,7 @@ const handleSocialLogin = (provider) => {
   }
 
   const normalizedApiBaseUrl = String(API_BASE_URL).replace(/\/+$/, '');
-  const redirectUrl = `/oauth2/authorization/${normalizedProvider}`;
+  const redirectUrl = `${normalizedApiBaseUrl}/oauth2/authorization/${normalizedProvider}`;
   window.location.href = redirectUrl;
 };
 
