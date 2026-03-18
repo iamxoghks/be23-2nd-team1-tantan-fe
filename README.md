@@ -414,7 +414,7 @@ TanTan은 사용자뿐 아니라 **헬스장 관리자(GYM_OWNER)**도 고려합
 
 
 ## 🛠️ 시스템 아키텍쳐
-<img src="images/제목 없는 다이어그램.png" 
+<img src="images/다이어그램.png" 
      width="600"/>
 
 - 외부 트래픽은 **NGINX Ingress**를 통해 진입하며, TLS 종료와 CORS 정책 적용 후 Kubernetes 내부의 Spring Boot 서비스로 라우팅됩니다.
