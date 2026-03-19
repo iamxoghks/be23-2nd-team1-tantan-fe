@@ -111,7 +111,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue';
+import { ref, computed, onMounted, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import NavigationRail from '@/components/sections/NavigationRail.vue';
 import SearchPanel from '@/components/sections/SearchPanel.vue';
@@ -145,11 +145,8 @@ const isRouting = ref(false);
 const isDirectionModalOpen = ref(false);
 const directionTargetGym = ref(null);
 const pendingFavoriteGymIds = new Set();
-const mapIdleDebounceMs = 250;
 const gymListPageSize = 1000;
 let gymLoadSequence = 0;
-let mapIdleListener = null;
-let viewportSearchTimer = null;
 let lastGymListRequestKey = '';
 
 const selectedGym = computed(() => gyms.value.find((gym) => gym.id === selectedGymId.value) || null);
@@ -519,16 +516,7 @@ const handleSelectGym = (id) => {
 };
 
 const handleMapReady = (map) => {
-  if (mapIdleListener && window.naver?.maps?.Event) {
-    window.naver.maps.Event.removeListener(mapIdleListener);
-    mapIdleListener = null;
-  }
   mapInstance.value = map;
-  if (!map || !window.naver?.maps?.Event) return;
-  mapIdleListener = window.naver.maps.Event.addListener(map, 'idle', () => {
-    // 맵이 이동할 때마다 자동 재검색 (지정된 반경 내 검색 품질 향상)
-    scheduleViewportSearchReload();
-  });
 };
 
 const applyMobileSearch = async () => {
@@ -652,7 +640,6 @@ const handleDesktopSearch = async (keyword) => {
 
 const handleCurrentLocationSelected = () => {
   nearbyModeEnabled.value = true;
-  scheduleViewportSearchReload(true);
 };
 
 const toggleFavoriteGym = async (id) => {
@@ -760,17 +747,6 @@ const loadGymsForCurrentContext = async (options = {}) => {
   await loadGyms(buildGymListParams(), options);
 };
 
-const scheduleViewportSearchReload = (force = false) => {
-  if (viewportSearchTimer) {
-    clearTimeout(viewportSearchTimer);
-  }
-  viewportSearchTimer = setTimeout(() => {
-    loadGymsForCurrentContext({ force }).catch((error) => {
-      console.error('Failed to reload nearby gyms:', error);
-    });
-  }, mapIdleDebounceMs);
-};
-
 const loadFavoriteGyms = async () => {
   if (!getAccessToken()) return;
 
@@ -790,17 +766,6 @@ onMounted(async () => {
   await loadGymsForCurrentContext();
   await loadFavoriteGyms();
   syncSelectedGymFromRoute();
-});
-
-onBeforeUnmount(() => {
-  if (viewportSearchTimer) {
-    clearTimeout(viewportSearchTimer);
-    viewportSearchTimer = null;
-  }
-  if (mapIdleListener && window.naver?.maps?.Event) {
-    window.naver.maps.Event.removeListener(mapIdleListener);
-    mapIdleListener = null;
-  }
 });
 
 watch(() => [route.query.g, route.query.gymId, gyms.value.length], () => {
